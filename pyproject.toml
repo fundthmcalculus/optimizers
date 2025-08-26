@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "optimizers"
+version = "0.1.0"
+description = "A collection of optimization algorithms (GA, PSO, ACO, GD, etc.)"
+authors = [ { name = "fundthmcalculus" } ]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["optimization", "GA", "PSO", "ACO", "GD"]
+dependencies = [
+	"numpy>=1.21",
+    "tqdm>=4.60",
+    "joblib>=1.0",
+    "contextlib2>=0.6.0"
+]
+
+[project.optional-dependencies]
+dev = [
+	"pytest>=6.0",
+	"black>=24.0"
+]
+[tool.setuptools.packages.find]
+where = ["."]

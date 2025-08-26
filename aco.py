@@ -1,0 +1,204 @@
+from dataclasses import dataclass
+
+import joblib
+import numpy as np
+import tqdm
+
+from local import apply_local_optimization
+from optimizer_base import (
+    IOptimizer,
+    IOptimizerConfig,
+    OptimizerResult,
+    InputVariables,
+    GoalFcn,
+    InputArguments,
+    update_solution_archive,
+    LocalOptimType,
+    setup_for_generations,
+    check_stop_early,
+)
+from variables import InputVariable
+from opt_types import af64
+
+
+def run_ants(
+    n_ants: int,
+    q_weight: float,
+    learning_rate: float,
+    local_optim: LocalOptimType,
+    solution_archive: af64,
+    variables: InputVariables,
+    fcn: GoalFcn,
+) -> tuple[af64, af64]:
+    cp_j = cdf(q_weight, len(solution_archive))
+    ant_solutions = np.zeros((n_ants, len(variables)))
+    ant_values = np.zeros(n_ants)
+    for ant in range(n_ants):
+        new_solution = np.zeros(len(variables))
+        # Generate a new solution from an existing one as a base
+        p = np.random.default_rng().uniform()
+        # Find the entry based upon cdf
+        base_solution_idx = np.searchsorted(cp_j, p)
+        base_solution = solution_archive[base_solution_idx, :]
+        for i, variable in enumerate(variables):
+            # Compute the weighted value for the variable
+            new_solution[i] = variable.random_value(
+                current_value=base_solution[i],
+                other_values=solution_archive[:, i],
+                learning_rate=learning_rate,
+            )
+        new_solution, new_value = apply_local_optimization(
+            fcn, local_optim, new_solution, variables
+        )
+
+        # Store the new solution in the temporary archive.
+        ant_solutions[ant, :] = new_solution
+        ant_values[ant] = new_value
+    return ant_solutions, ant_values
+
+
+def cdf(q: float, N: int) -> af64:
+    """
+    Parameters
+    ----------
+    q: float The weighting parameter for better ranked solutions.
+    N: int The number of solutions in the solution archive.
+
+    Returns
+    -------
+    af64 The cumulative density function.
+    """
+    j = np.r_[1 : N + 1]
+    c1 = 1 - np.exp(-q * j / N)
+    # Unity scaling, and since the CDF is positive definite, we can use the last entry.
+    return c1 / c1[-1]
+
+
+@dataclass
+class AntColonyOptimizerConfig(IOptimizerConfig):
+    learning_rate: float = 0.7
+    """Learning rate for updating pheromone trails"""
+    q: float = 1.0
+    """Weighting parameter for better ranked solutions"""
+    local_grad_optim: LocalOptimType = "none"
+
+
+class AntColonyOptimizer(IOptimizer):
+    def __init__(
+        self,
+        name: str,
+        config: AntColonyOptimizerConfig,
+        fcn: GoalFcn,
+        variables: InputVariables,
+        args: InputArguments | None = None,
+    ):
+        super().__init__(name, config, fcn, variables, args)
+        # This is a rewrite for type hinting purposes
+        self.config: AntColonyOptimizerConfig = config
+
+    def solve(self) -> OptimizerResult:
+        self.validate_config()
+        solution_archive, solution_values = self.create_solution_archive()
+        self.fill_solution_archive(solution_archive, solution_values)
+
+        # Sort the solutions by their values
+        sorted_indices = np.argsort(solution_values)
+        solution_archive = solution_archive[sorted_indices]
+        solution_values = solution_values[sorted_indices]
+        best_soln_history = np.zeros(self.config.num_generations)
+
+        # Add the progress bar
+        generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
+            self.config
+        )
+        for generation in generation_pbar:
+            if check_stop_early(self.config, best_soln_history, solution_values):
+                break
+
+            job_output = parallel(
+                joblib.delayed(run_ants)(
+                    individuals_per_job,
+                    self.config.q,
+                    self.config.learning_rate,
+                    self.config.local_grad_optim,
+                    solution_archive,
+                    self.variables,
+                    self.wrapped_fcn,
+                )
+                for _ in range(n_jobs)
+            )
+            # Get all the solutions, not just the first runner's worth
+            for output in job_output:
+                ant_solutions = output[0]
+                ant_values = output[1]
+                solution_archive, solution_values = update_solution_archive(
+                    ant_solutions,
+                    ant_values,
+                    best_soln_history,
+                    generation,
+                    solution_archive,
+                    solution_values,
+                )
+            generation_pbar.set_postfix(best_value=solution_values[0])
+
+        # Return the best solution
+        return OptimizerResult(
+            solution_vector=solution_archive[0, :],
+            solution_score=solution_values[0],
+            solution_history=best_soln_history,
+        )
+
+    def update_solution_archive(
+        self,
+        ant_solutions: af64,
+        ant_values: af64,
+        best_soln_history: af64,
+        generation: int,
+        solution_archive: af64,
+        solution_values: af64,
+    ) -> tuple[af64, af64]:
+        # After the ants have generated their solutions, update the solution archive
+        solution_archive = np.vstack((solution_archive, ant_solutions))
+        solution_values = np.hstack((solution_values, ant_values))
+        # Sort the solutions by their values
+        sorted_indices = np.argsort(solution_values)
+        solution_archive = solution_archive[sorted_indices]
+        solution_values = solution_values[sorted_indices]
+        # Chop off the worst solutions
+        solution_archive = solution_archive[: self.config.solution_archive_size]
+        solution_values = solution_values[: self.config.solution_archive_size]
+        # Clear the temp archive
+        ant_solutions[:, :] = 0.0
+        ant_values[:] = 0.0
+        # Store the ongoing best value
+        best_soln_history[generation] = solution_values[0]
+        return solution_archive, solution_values
+
+    def fill_solution_archive(
+        self,
+        solution_archive: af64,
+        solution_values: af64,
+    ) -> None:
+        for k in range(self.config.solution_archive_size):
+            for i, variable in enumerate(self.variables):
+                solution_archive[k, i] = variable.initial_random_value()
+            solution_values[k] = self.wrapped_fcn(solution_archive[k])
+        # insert the initial solutions to the archive
+        for i, variable in enumerate(self.variables):
+            solution_archive[0, i] = variable.initial_value
+        solution_values[0] = self.wrapped_fcn(solution_archive[0])
+
+    def create_solution_archive(self) -> tuple[af64, af64]:
+        # Construct the solution archive
+        solution_archive = np.zeros(
+            (self.config.solution_archive_size, len(self.variables))
+        )
+        solution_values = np.zeros(self.config.solution_archive_size)
+        return solution_archive, solution_values
+
+    def validate_config(self):
+        # Set the default values for the config
+        if self.config.solution_archive_size < 0:
+            self.config.solution_archive_size = len(self.variables) * 2
+        if self.config.population_size < 0:
+            self.config.population_size = self.config.solution_archive_size // 3
