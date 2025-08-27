@@ -126,7 +126,8 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             self.config
         )
         stopped_early = False
-        for generation in generation_pbar:
+        generations_completed = 0
+        for generations_completed in generation_pbar:
             stopped_early = check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value)
             if stopped_early:
                 break
@@ -156,4 +157,5 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             solution_score=self.soln_deck.solution_value[0],
             solution_history=best_soln_history,
             stopped_early=stopped_early
+            generations_completed=generations_completed + 1
         )

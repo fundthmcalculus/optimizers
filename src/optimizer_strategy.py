@@ -67,10 +67,12 @@ class MultiTypeOptimizer(IOptimizer):
         self.fcn = fcn
 
 
-    def solve(self, restart_count: int = 0, max_restart: int = 5) -> OptimizerResult:
+    def solve(self, restart_count: int = 0, max_restart: int = 5, generations_completed: int = 0) -> OptimizerResult:
         selected_type = self.optimizer_selector.select() if restart_count > 0 else self.initial_optimizer
         logging.info(f"Selected optimizer: {selected_type}")
         converted_config = self.optimizer_selector.config_to_type(self.config, selected_type)
+        # Ensure we do not exceed the total number of generations
+        converted_config.num_generations = max(1, converted_config.num_generations - generations_completed)
 
         if selected_type == "aco":
             optimizer = AntColonyOptimizer(self.name, converted_config, self.fcn, self.variables, self.args)
@@ -88,5 +90,5 @@ class MultiTypeOptimizer(IOptimizer):
             # If the optimizer stopped early, we can try another optimizer
             logging.warning(f"Optimizer {selected_type} stopped early, selecting a new optimizer.")
 
-            return result + self.solve(restart_count=restart_count+1)
+            return result + self.solve(restart_count=restart_count+1, generations_completed=generations_completed + result.generations_completed)
         return result

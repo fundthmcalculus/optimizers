@@ -42,6 +42,8 @@ class OptimizerResult:
     """The history of the best solutions found by the optimizer."""
     stopped_early: bool = False
     """Whether the optimizer stopped early due to convergence criteria."""
+    generations_completed: int = 0
+    """Number of generations completed before stopping."""
 
     def __repr__(self):
         return f"{self.__class__.__name__}(val={self.solution_score}, x={self.solution_vector})"
@@ -65,6 +67,7 @@ class OptimizerResult:
             solution_vector=self.solution_vector if self.solution_score <= other.solution_score else other.solution_vector,
             solution_history=combined_history,
             stopped_early=self.stopped_early or other.stopped_early
+            generations_completed=self.generations_completed + other.generations_completed
         )
 
 
