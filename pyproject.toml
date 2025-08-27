@@ -24,4 +24,4 @@ dev = [
 	"black>=24.0"
 ]
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
