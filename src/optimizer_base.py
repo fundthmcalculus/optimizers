@@ -27,7 +27,7 @@ class IOptimizerConfig:
     """The target score for the optimizer to achieve. This is used for early stopping."""
     joblib_num_procs: int = 4
     """The number of processes to use for parallel execution. -1 means use all available cores."""
-    joblib_prefer: Literal["threads", "processes"] = "processes"
+    joblib_prefer: Literal["threads", "processes"] = "threads"
     """The preferred execution mode for joblib. See https://joblib.readthedocs.io/en/latest/generated/joblib.Parallel.html#joblib.Parallel for more details."""
 
 
