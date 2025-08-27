@@ -86,9 +86,6 @@ class AntColonyOptimizer(IOptimizer):
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
             self.config
         )
-        is_local_optima = np.ones(len(self.soln_deck.solution_value), dtype=bool)
-        if self.config.local_grad_optim == "none":
-            is_local_optima = np.zeros(len(self.soln_deck.solution_value), dtype=bool)
         stopped_early = False
         generations_completed = 0
         for generations_completed in generation_pbar:
