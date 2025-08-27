@@ -67,7 +67,7 @@ class OptimizerResult:
             solution_score=min(self.solution_score, other.solution_score),
             solution_vector=self.solution_vector if self.solution_score <= other.solution_score else other.solution_vector,
             solution_history=combined_history,
-            stopped_early=self.stopped_early or other.stopped_early
+            stopped_early=self.stopped_early or other.stopped_early,
             generations_completed=self.generations_completed + other.generations_completed
         )
 

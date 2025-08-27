@@ -39,6 +39,10 @@ class InputVariable(abc.ABC):
     def initial_random_value(self, perturbation: f64 = 0.1) -> f64:
         pass
 
+    @abstractmethod
+    def range_value(self, p: f64) -> f64:
+        pass
+
     @property
     @abstractmethod
     def lower_bound(self) -> f64:
@@ -85,6 +89,12 @@ class InputDiscreteVariable(InputVariable):
     def initial_random_value(self, perturbation: float = 0.1) -> f64:
         rng = np.random.default_rng()
         return rng.choice(self.values)
+    
+    def range_value(self, p: f64) -> f64:
+        # Map p in [0,1] to the discrete values
+        idx = int(p * len(self.values))
+        idx = min(max(idx, 0), len(self.values) - 1)
+        return self.values[idx]
 
     @property
     def lower_bound(self) -> f64:
@@ -154,6 +164,10 @@ class InputContinuousVariable(InputVariable):
         if rng is None:
             rng = np.random.default_rng()
         return rng.uniform(self.lower_bound, self.upper_bound)
+    
+    def range_value(self, p: f64) -> f64:
+        # Map p in [0,1] to the variable range
+        return self.lower_bound + p * (self.upper_bound - self.lower_bound)
 
     @property
     def lower_bound(self) -> f64:
