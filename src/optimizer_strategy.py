@@ -5,7 +5,8 @@ from optimizer_base import IOptimizer, IOptimizerConfig, OptimizerResult
 import random
 from abc import ABC, abstractmethod
 
-from solution_deck import GoalFcn, InputArguments, InputVariables, SolutionDeck
+from solution_deck import GoalFcn, InputArguments, SolutionDeck
+from variables import InputVariables
 
 from aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig

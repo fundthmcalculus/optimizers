@@ -14,7 +14,8 @@ from optimizer_base import (
     cdf
 )
 from opt_types import af64
-from solution_deck import GoalFcn, LocalOptimType, InputVariables, SolutionDeck
+from solution_deck import GoalFcn, LocalOptimType, SolutionDeck
+from variables import InputVariables
 
 
 @dataclass

@@ -9,7 +9,6 @@ from optimizer_base import (
     IOptimizerConfig,
     IOptimizer,
     GoalFcn,
-    InputVariables,
     OptimizerResult,
     InputArguments,
 )
@@ -17,6 +16,7 @@ from tqdm_joblib import tqdm_joblib
 from variables import (
     InputContinuousVariable,
     InputDiscreteVariable,
+    InputVariables
 )
 
 

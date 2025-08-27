@@ -12,9 +12,9 @@ from optimizer_base import (
     check_stop_early,
     cdf
 )
-from variables import InputVariable, InputDiscreteVariable
+from variables import InputVariable, InputDiscreteVariable, InputVariables
 from opt_types import af64
-from solution_deck import GoalFcn, LocalOptimType, InputVariables, InputArguments, SolutionDeck
+from solution_deck import GoalFcn, LocalOptimType, InputArguments, SolutionDeck
 
 
 @dataclass

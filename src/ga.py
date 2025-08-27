@@ -14,7 +14,8 @@ from optimizer_base import (
     check_stop_early,
 )
 
-from solution_deck import GoalFcn, LocalOptimType, InputVariables, SolutionDeck
+from solution_deck import GoalFcn, LocalOptimType, SolutionDeck
+from variables import InputVariables
 
 @dataclass
 class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):

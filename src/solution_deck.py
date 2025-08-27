@@ -4,7 +4,6 @@ from opt_types import f64, af64, ab8, b8
 from variables import InputVariable
 
 # Some type hinting
-InputVariables = list[InputVariable]
 InputArguments = dict[str, Any]
 GoalFcn = Callable[[af64, Optional[InputArguments]], f64]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
