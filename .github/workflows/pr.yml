@@ -14,9 +14,9 @@ jobs:
       - name: Install dependencies
         run: |
           pip install .[dev]
-        - name: Check code formatting with black
-          run: |
-            pip install black
-            black --check .
+      - name: Check code formatting with black
+        run: |
+          pip install black
+          black --check .
       - name: Run tests
-        run: PYTHONPATH=. pytest tests/
+        run: PYTHONPATH=./src pytest tests/

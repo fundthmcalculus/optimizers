@@ -2,23 +2,18 @@ from dataclasses import dataclass
 
 import joblib
 import numpy as np
-import tqdm
 
 from local import apply_local_optimization
 from optimizer_base import (
     IOptimizer,
     IOptimizerConfig,
     OptimizerResult,
-    InputVariables,
-    GoalFcn,
     InputArguments,
-    update_solution_archive,
-    LocalOptimType,
     setup_for_generations,
     check_stop_early,
 )
-from variables import InputVariable
 from opt_types import af64
+from solution_deck import GoalFcn, LocalOptimType, InputVariables
 
 
 def run_ants(
@@ -129,16 +124,12 @@ class AntColonyOptimizer(IOptimizer):
             for output in job_output:
                 ant_solutions = output[0]
                 ant_values = output[1]
-                self.soln_deck.append(ant_solutions, ant_values, is_local_optima)
+                self.soln_deck.append(ant_solutions, ant_values, self.config.local_grad_optim != "none")
                 self.soln_deck.deduplicate()
             generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
         # Return the best solution
-        return OptimizerResult(
-            solution_vector=self.soln_deck.solution_archive[0, :],
-            solution_score=self.soln_deck.solution_value[0],
-            solution_history=best_soln_history,
-        )
+        return OptimizerResult.from_solution_deck(self.soln_deck)
 
     def fill_solution_archive(
         self,

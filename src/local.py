@@ -1,5 +1,5 @@
 from gd import solve_gd_for_1var, solve_gd_from_x0
-from optimizer_base import GoalFcn, LocalOptimType
+from solution_deck import GoalFcn, LocalOptimType
 from variables import InputVariable, InputDiscreteVariable
 from opt_types import af64
 

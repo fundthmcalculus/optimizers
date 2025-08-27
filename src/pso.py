@@ -8,16 +8,12 @@ from optimizer_base import (
     IOptimizer,
     IOptimizerConfig,
     OptimizerResult,
-    InputVariables,
-    GoalFcn,
-    InputArguments,
-    update_solution_archive,
-    LocalOptimType,
     setup_for_generations,
     check_stop_early,
 )
 from variables import InputVariable, InputDiscreteVariable
 from opt_types import af64
+from solution_deck import GoalFcn, LocalOptimType, InputVariables, InputArguments
 
 
 def cdf(q: float, N: int) -> af64:
@@ -136,26 +132,15 @@ class ParticleSwarmOptimizer(IOptimizer):
 
     def solve(self) -> OptimizerResult:
         self.validate_config(self.variables)
-        solution_archive, solution_values = self.create_solution_archive(self.variables)
-        self.fill_solution_archive(
-            self.wrapped_fcn,
-            solution_archive,
-            solution_values,
-            self.variables,
-            self.args,
-        )
-
-        # Sort the solutions by their values (ascending)
-        sorted_indices = np.argsort(solution_values)
-        solution_archive = solution_archive[sorted_indices]
-        solution_values = solution_values[sorted_indices]
+        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn)
+        self.soln_deck.sort()
         best_soln_history = np.zeros(self.config.num_generations)
 
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
             self.config
         )
         for generation in generation_pbar:
-            if check_stop_early(self.config, best_soln_history, solution_values):
+            if check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value):
                 break
 
             job_output = parallel(
@@ -167,7 +152,7 @@ class ParticleSwarmOptimizer(IOptimizer):
                     self.config.velocity_clamp,
                     self.config.q,
                     self.config.local_grad_optim,
-                    solution_archive,
+                    self.soln_deck.solution_archive,
                     self.variables,
                     self.wrapped_fcn,
                 )
@@ -178,21 +163,11 @@ class ParticleSwarmOptimizer(IOptimizer):
             for output in job_output:
                 part_solutions = output[0]
                 part_values = output[1]
-                solution_archive, solution_values = update_solution_archive(
-                    part_solutions,
-                    part_values,
-                    best_soln_history,
-                    generation,
-                    solution_archive,
-                    solution_values,
-                )
-            generation_pbar.set_postfix(best_value=solution_values[0])
+                self.soln_deck.append(part_solutions, part_values, self.config.local_grad_optim != "none")
+                self.soln_deck.deduplicate()
+            generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
-        return OptimizerResult(
-            solution_vector=solution_archive[0, :],
-            solution_score=solution_values[0],
-            solution_history=best_soln_history,
-        )
+        return OptimizerResult.from_solution_deck(self.soln_deck)
 
     def fill_solution_archive(
         self,

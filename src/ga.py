@@ -7,17 +7,14 @@ import tqdm
 from local import apply_local_optimization
 from optimizer_base import (
     IOptimizer,
-    GoalFcn,
-    InputVariables,
-    LocalOptimType,
     OptimizerResult,
     IOptimizerConfig,
     InputArguments,
-    update_solution_archive,
     setup_for_generations,
     check_stop_early,
 )
 
+from solution_deck import GoalFcn, LocalOptimType, InputVariables
 
 @dataclass
 class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
@@ -123,20 +120,14 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         # Optimal solution history
         best_soln_history = np.zeros(self.config.num_generations)
 
-        # Fill out the population deck initially
-        solution_archive = np.zeros((self.config.population_size, len(self.variables)))
-        solution_values = np.zeros(self.config.population_size)
-        # TODO - Vectorize this?
-        for row in range(self.config.population_size):
-            for col, var in enumerate(self.variables):
-                solution_archive[row, col] = var.initial_random_value()
-            solution_values[row] = self.wrapped_fcn(solution_archive[row, :])
+        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn)
+        self.soln_deck.sort()
 
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
             self.config
         )
         for generation in generation_pbar:
-            if check_stop_early(self.config, best_soln_history, solution_values):
+            if check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value):
                 break
 
             job_output = parallel(
@@ -145,8 +136,8 @@ class GeneticAlgorithmOptimizer(IOptimizer):
                     local_optim=self.config.local_grad_optim,
                     mutation_rate=self.config.mutation_rate,
                     crossover_rate=self.config.crossover_rate,
-                    solution_values=solution_values,
-                    solution_archive=solution_archive,
+                    solution_values=self.soln_deck.solution_value,
+                    solution_archive=self.soln_deck.solution_archive,
                     variables=self.variables,
                     fcn=self.wrapped_fcn,
                 )
@@ -155,18 +146,8 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             for output in job_output:
                 ant_solutions = output[0]
                 ant_values = output[1]
-                solution_archive, solution_values = update_solution_archive(
-                    ant_solutions,
-                    ant_values,
-                    best_soln_history,
-                    generation,
-                    solution_archive,
-                    solution_values,
-                )
-            generation_pbar.set_postfix(best_value=solution_values[0])
+                self.soln_deck.append(ant_solutions, ant_values, self.config.local_grad_optim != "none")
+                self.soln_deck.deduplicate()
+            generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
-        return OptimizerResult(
-            solution_vector=solution_archive[0, :],
-            solution_score=solution_values[0],
-            solution_history=best_soln_history,
-        )
+        return OptimizerResult.from_solution_deck(self.soln_deck)

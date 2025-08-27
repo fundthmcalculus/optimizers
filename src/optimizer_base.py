@@ -2,17 +2,10 @@ import abc
 import tqdm
 import joblib
 from dataclasses import dataclass
-from typing import Callable, Literal, Any, Optional
+from typing import Literal
 
-from solution_deck import SolutionDeck
-from variables import InputVariable
+from solution_deck import SolutionDeck, GoalFcn, InputVariables, InputArguments
 from opt_types import *
-
-# Some type hinting
-InputVariables = list[InputVariable]
-InputArguments = dict[str, Any]
-GoalFcn = Callable[[af64, Optional[InputArguments]], f64]
-LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
 
 
 @dataclass
@@ -53,6 +46,14 @@ class OptimizerResult:
 
     def __str__(self):
         return self.__repr__()
+    
+    @staticmethod
+    def from_solution_deck(soln_deck: SolutionDeck) -> "OptimizerResult":
+        return OptimizerResult(
+            solution_vector=soln_deck.solution_archive[0, :],
+            solution_score=soln_deck.solution_value[0],
+            solution_history=None
+        )
 
 
 class IOptimizer(abc.ABC):
