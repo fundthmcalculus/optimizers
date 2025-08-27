@@ -10,16 +10,11 @@ from optimizer_base import (
     OptimizerResult,
     setup_for_generations,
     check_stop_early,
+    cdf
 )
 from variables import InputVariable, InputDiscreteVariable
 from opt_types import af64
-from solution_deck import GoalFcn, LocalOptimType, InputVariables, InputArguments
-
-
-def cdf(q: float, N: int) -> af64:
-    j = np.r_[1 : N + 1]
-    c1 = 1 - np.exp(-q * j / N)
-    return c1 / c1[-1]
+from solution_deck import GoalFcn, LocalOptimType, InputVariables, InputArguments, SolutionDeck
 
 
 @dataclass
@@ -126,13 +121,14 @@ class ParticleSwarmOptimizer(IOptimizer):
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
+        existing_soln_deck: SolutionDeck | None = None,
     ):
-        super().__init__(name, config, fcn, variables, args)
+        super().__init__(name, config, fcn, variables, args, existing_soln_deck)
         self.config: ParticleSwarmOptimizerConfig = config
 
-    def solve(self) -> OptimizerResult:
+    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         self.validate_config(self.variables)
-        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn)
+        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn, preserve_percent)
         self.soln_deck.sort()
         best_soln_history = np.zeros(self.config.num_generations)
 

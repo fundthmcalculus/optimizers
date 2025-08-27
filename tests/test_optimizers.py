@@ -9,6 +9,8 @@ from gd import (
     GradientDescentOptimizer,
     GradientDescentOptimizerConfig,
 )
+from optimizer_base import IOptimizerConfig
+from optimizer_strategy import MultiTypeOptimizer
 from pso import ParticleSwarmOptimizerConfig, ParticleSwarmOptimizer
 from variables import InputContinuousVariable, InputDiscreteVariable
 from opt_types import *
@@ -87,18 +89,18 @@ def test_ga():
     )
     assert pytest.approx(best_solution.solution_score) == optim_ackley(best_solution.solution_vector)
 
-def test_pso():
+def test_multi_optimizer():
     input_variables = [
         InputContinuousVariable("x", -15, 30),
         InputContinuousVariable("y", -15, 30),
     ]
 
-    config = ParticleSwarmOptimizerConfig(
-        name="PSO Optimizer",
+    config = IOptimizerConfig(
+        name="Various-types Optimizer",
         joblib_prefer="threads",
     )
-    optimizer = ParticleSwarmOptimizer(
-        name="PSO-AckleyFunction",
+    optimizer = MultiTypeOptimizer(
+        name="Multi-strategy-AckleyFunction",
         config=config,
         variables=input_variables,
         fcn=optim_ackley,
@@ -132,7 +134,6 @@ def test_gd():
             discrete_search_size=40,
             joblib_num_procs=4,
             joblib_prefer="processes",
-            num_generations=60,
         ),
         variables=input_variables,
         fcn=optim_ackley,
@@ -151,9 +152,8 @@ def test_rosenbrock():
         "PSO",
         config=ParticleSwarmOptimizerConfig(
             name="PSO-optim",
-            joblib_prefer="processes",
+            joblib_prefer="threads",
             joblib_num_procs=4,
-            num_generations=60,
             local_grad_optim="single-var-grad",
         ),
         variables=input_variables,

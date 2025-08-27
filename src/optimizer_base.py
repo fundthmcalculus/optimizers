@@ -48,6 +48,24 @@ class OptimizerResult:
 
     def __str__(self):
         return self.__repr__()
+    
+    def __plus__(self, other):
+        if not isinstance(other, OptimizerResult):
+            return NotImplemented
+        combined_history = None
+        if self.solution_history is not None and other.solution_history is not None:
+            combined_history = np.concatenate((self.solution_history, other.solution_history))
+        elif self.solution_history is not None:
+            combined_history = self.solution_history
+        elif other.solution_history is not None:
+            combined_history = other.solution_history
+        
+        return OptimizerResult(
+            solution_score=min(self.solution_score, other.solution_score),
+            solution_vector=self.solution_vector if self.solution_score <= other.solution_score else other.solution_vector,
+            solution_history=combined_history,
+            stopped_early=self.stopped_early or other.stopped_early
+        )
 
 
 class IOptimizer(abc.ABC):
@@ -60,6 +78,7 @@ class IOptimizer(abc.ABC):
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
+        existing_soln_deck: SolutionDeck | None = None,
     ):
         self.name: str = name
         self.config: IOptimizerConfig = config
@@ -71,10 +90,10 @@ class IOptimizer(abc.ABC):
         else:
             wrapped_fcn = fcn
         self.wrapped_fcn = wrapped_fcn
-        self.soln_deck = SolutionDeck(archive_size=config.solution_archive_size, num_vars=len(variables))
+        self.soln_deck = existing_soln_deck or SolutionDeck(archive_size=config.solution_archive_size, num_vars=len(variables))
 
     @abc.abstractmethod
-    def solve(self) -> OptimizerResult:
+    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         """
         Solve the given problem.
         """
@@ -111,3 +130,20 @@ def check_stop_early(
         )
         stop_early = True
     return stop_early
+
+
+def cdf(q: float, N: int) -> af64:
+    """
+    Parameters
+    ----------
+    q: float The weighting parameter for better ranked solutions.
+    N: int The number of solutions in the solution archive.
+
+    Returns
+    -------
+    af64 The cumulative density function.
+    """
+    j = np.r_[1 : N + 1]
+    c1 = 1 - np.exp(-q * j / N)
+    # Unity scaling, and since the CDF is positive definite, we can use the last entry.
+    return c1 / c1[-1]

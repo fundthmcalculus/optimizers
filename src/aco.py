@@ -11,9 +11,19 @@ from optimizer_base import (
     InputArguments,
     setup_for_generations,
     check_stop_early,
+    cdf
 )
 from opt_types import af64
-from solution_deck import GoalFcn, LocalOptimType, InputVariables
+from solution_deck import GoalFcn, LocalOptimType, InputVariables, SolutionDeck
+
+
+@dataclass
+class AntColonyOptimizerConfig(IOptimizerConfig):
+    learning_rate: float = 0.7
+    """Learning rate for updating pheromone trails"""
+    q: float = 1.0
+    """Weighting parameter for better ranked solutions"""
+    local_grad_optim: LocalOptimType = "none"
 
 
 def run_ants(
@@ -52,32 +62,6 @@ def run_ants(
     return ant_solutions, ant_values
 
 
-def cdf(q: float, N: int) -> af64:
-    """
-    Parameters
-    ----------
-    q: float The weighting parameter for better ranked solutions.
-    N: int The number of solutions in the solution archive.
-
-    Returns
-    -------
-    af64 The cumulative density function.
-    """
-    j = np.r_[1 : N + 1]
-    c1 = 1 - np.exp(-q * j / N)
-    # Unity scaling, and since the CDF is positive definite, we can use the last entry.
-    return c1 / c1[-1]
-
-
-@dataclass
-class AntColonyOptimizerConfig(IOptimizerConfig):
-    learning_rate: float = 0.7
-    """Learning rate for updating pheromone trails"""
-    q: float = 1.0
-    """Weighting parameter for better ranked solutions"""
-    local_grad_optim: LocalOptimType = "none"
-
-
 class AntColonyOptimizer(IOptimizer):
     def __init__(
         self,
@@ -86,14 +70,15 @@ class AntColonyOptimizer(IOptimizer):
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
+        existing_soln_deck: SolutionDeck | None = None,
     ):
-        super().__init__(name, config, fcn, variables, args)
+        super().__init__(name, config, fcn, variables, args, existing_soln_deck)
         # This is a rewrite for type hinting purposes
         self.config: AntColonyOptimizerConfig = config
 
-    def solve(self) -> OptimizerResult:
+    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         self.validate_config()
-        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn)
+        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn, preserve_percent)
         self.soln_deck.sort()
         best_soln_history = np.zeros(self.config.num_generations)
 

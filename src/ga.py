@@ -14,7 +14,7 @@ from optimizer_base import (
     check_stop_early,
 )
 
-from solution_deck import GoalFcn, LocalOptimType, InputVariables
+from solution_deck import GoalFcn, LocalOptimType, InputVariables, SolutionDeck
 
 @dataclass
 class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
@@ -22,8 +22,6 @@ class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
     """Probability of mutation"""
     crossover_rate: float = 0.8
     """Probability of crossover"""
-    num_generations: int = 100
-    """Maximum number of generations"""
     local_grad_optim: LocalOptimType = "none"
 
 
@@ -112,15 +110,16 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
+        existing_soln_deck: SolutionDeck | None = None,
     ):
-        super().__init__(name, config, fcn, variables, args)
+        super().__init__(name, config, fcn, variables, args, existing_soln_deck)
         self.config: GeneticAlgorithmOptimizerConfig = config
 
-    def solve(self) -> OptimizerResult:
+    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         # Optimal solution history
         best_soln_history = np.zeros(self.config.num_generations)
 
-        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn)
+        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn, preserve_percent)
         self.soln_deck.sort()
 
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
