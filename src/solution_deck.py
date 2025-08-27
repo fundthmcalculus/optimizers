@@ -8,7 +8,7 @@ from functools import lru_cache
 InputArguments = dict[str, Any]
 GoalFcn = Callable[[af64, Optional[InputArguments]], f64]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
-InitializationType = Literal["random", "fibbonacci"]
+InitializationType = Literal["random", "fibonacci"]
 
 class SolutionDeck:
     def __init__(self, archive_size: int, num_vars: int, dtype=f64):
@@ -31,19 +31,19 @@ class SolutionDeck:
         self.solution_archive = np.vstack([self.solution_archive, solutions])
         self.solution_value = np.hstack([self.solution_value, values])
 
-    def initialize_solution_deck(self, variables: InputVariables, eval_fcn: GoalFcn, preserve_percent: float = 0.0, init_type: InitializationType = "random") -> None:
+    def initialize_solution_deck(self, variables: InputVariables, eval_fcn: GoalFcn, preserve_percent: float = 0.0, init_type: InitializationType = "fibonacci") -> None:
         if len(variables) != self.num_vars:
             raise ValueError("Number of variables does not match the initialized deck size.")
         num_preserve = int(self.archive_size * preserve_percent)
         fibb_spiral_points = None
-        if init_type == "fibbonacci" and num_preserve < self.archive_size:
+        if init_type == "fibonacci" and num_preserve < self.archive_size:
             fibb_spiral_points = fibonacci_sphere_points(self.archive_size - num_preserve, self.num_vars)
         for k in range(self.archive_size):
             for i, variable in enumerate(variables):
                 if k >= num_preserve:
                     if init_type == "random":
                         self.solution_archive[k, i] = variable.initial_random_value()
-                    elif init_type == "fibbonacci":
+                    elif init_type == "fibonacci":
                         # http://www.math.vanderbilt.edu/saffeb/texts/161.pdf
                         self.solution_archive[k, i] = variable.range_value(fibb_spiral_points[k - num_preserve, i])
                     else:
