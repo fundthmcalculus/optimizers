@@ -139,8 +139,10 @@ class ParticleSwarmOptimizer(IOptimizer):
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
             self.config
         )
+        stopped_early = False
         for generation in generation_pbar:
-            if check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value):
+            stopped_early = check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value)
+            if stopped_early:
                 break
 
             job_output = parallel(
@@ -167,7 +169,12 @@ class ParticleSwarmOptimizer(IOptimizer):
                 self.soln_deck.deduplicate()
             generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
-        return OptimizerResult.from_solution_deck(self.soln_deck)
+        return OptimizerResult(
+            solution_vector=self.soln_deck.solution_archive[0, :],
+            solution_score=self.soln_deck.solution_value[0],
+            solution_history=best_soln_history,
+            stopped_early=stopped_early
+        )
 
     def fill_solution_archive(
         self,

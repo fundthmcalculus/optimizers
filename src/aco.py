@@ -104,8 +104,10 @@ class AntColonyOptimizer(IOptimizer):
         is_local_optima = np.ones(len(self.soln_deck.solution_value), dtype=bool)
         if self.config.local_grad_optim == "none":
             is_local_optima = np.zeros(len(self.soln_deck.solution_value), dtype=bool)
+        stopped_early = False
         for generation in generation_pbar:
-            if check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value):
+            stopped_early = check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value)
+            if stopped_early:
                 break
 
             job_output = parallel(
@@ -129,7 +131,12 @@ class AntColonyOptimizer(IOptimizer):
             generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
         # Return the best solution
-        return OptimizerResult.from_solution_deck(self.soln_deck)
+        return OptimizerResult(
+            solution_vector=self.soln_deck.solution_archive[0, :],
+            solution_score=self.soln_deck.solution_value[0],
+            solution_history=best_soln_history,
+            stopped_early=stopped_early
+        )
 
     def fill_solution_archive(
         self,

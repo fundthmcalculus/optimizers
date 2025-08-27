@@ -40,20 +40,14 @@ class OptimizerResult:
     """The best solution found by the optimizer."""
     solution_history: af64 = None
     """The history of the best solutions found by the optimizer."""
+    stopped_early: bool = False
+    """Whether the optimizer stopped early due to convergence criteria."""
 
     def __repr__(self):
         return f"{self.__class__.__name__}(val={self.solution_score}, x={self.solution_vector})"
 
     def __str__(self):
         return self.__repr__()
-    
-    @staticmethod
-    def from_solution_deck(soln_deck: SolutionDeck) -> "OptimizerResult":
-        return OptimizerResult(
-            solution_vector=soln_deck.solution_archive[0, :],
-            solution_score=soln_deck.solution_value[0],
-            solution_history=None
-        )
 
 
 class IOptimizer(abc.ABC):
