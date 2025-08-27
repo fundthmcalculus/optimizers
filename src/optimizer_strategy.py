@@ -89,3 +89,4 @@ class MultiTypeOptimizer(IOptimizer):
             logging.warning(f"Optimizer {selected_type} stopped early, selecting a new optimizer.")
 
             return result + self.solve(restart_count=restart_count+1)
+        return result
