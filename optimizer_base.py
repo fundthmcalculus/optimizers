@@ -4,51 +4,15 @@ import joblib
 from dataclasses import dataclass
 from typing import Callable, Literal, Any, Optional
 
+from solution_deck import SolutionDeck
 from variables import InputVariable
 from opt_types import *
 
 # Some type hinting
 InputVariables = list[InputVariable]
 InputArguments = dict[str, Any]
-GoalFcn = Callable[[af64, Optional[InputArguments]], np.float64]
+GoalFcn = Callable[[af64, Optional[InputArguments]], f64]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
-
-
-def update_solution_archive(
-    ant_solutions: af64,
-    ant_values: af64,
-    best_soln_history: af64,
-    generation: int,
-    solution_archive: af64,
-    solution_values: af64,
-) -> tuple[af64, af64]:
-    archive_size = solution_archive.shape[0]
-    # After the ants have generated their solutions, update the solution archive
-    solution_archive = np.vstack((solution_archive, ant_solutions))
-    solution_values = np.hstack((solution_values, ant_values))
-    # Sort the solutions by their values
-    sorted_indices = np.argsort(solution_values)
-    solution_archive = solution_archive[sorted_indices]
-    solution_values = solution_values[sorted_indices]
-    # Deduplicate solutions (worst to best)
-    for i_row in range(len(solution_archive) - 1, 0, -1):
-        for j_row in range(i_row - 1, 0, -1):
-            if len(solution_values) == archive_size:
-                break
-            if np.allclose(
-                solution_archive[i_row], solution_archive[j_row], rtol=1e-2, atol=1e-4
-            ):
-                solution_archive = np.delete(solution_archive, i_row, axis=0)
-                solution_values = np.delete(solution_values, i_row)
-            else:
-                break
-
-    # Chop off the worst solutions
-    solution_archive = solution_archive[:archive_size]
-    solution_values = solution_values[:archive_size]
-    # Store the ongoing best value
-    best_soln_history[generation] = solution_values[0]
-    return solution_archive, solution_values
 
 
 @dataclass
@@ -112,6 +76,7 @@ class IOptimizer(abc.ABC):
         else:
             wrapped_fcn = fcn
         self.wrapped_fcn = wrapped_fcn
+        self.soln_deck = SolutionDeck(archive_size=config.solution_archive_size, num_vars=len(variables))
 
     @abc.abstractmethod
     def solve(self) -> OptimizerResult:

@@ -98,21 +98,19 @@ class AntColonyOptimizer(IOptimizer):
 
     def solve(self) -> OptimizerResult:
         self.validate_config()
-        solution_archive, solution_values = self.create_solution_archive()
-        self.fill_solution_archive(solution_archive, solution_values)
-
-        # Sort the solutions by their values
-        sorted_indices = np.argsort(solution_values)
-        solution_archive = solution_archive[sorted_indices]
-        solution_values = solution_values[sorted_indices]
+        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn)
+        self.soln_deck.sort()
         best_soln_history = np.zeros(self.config.num_generations)
 
         # Add the progress bar
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
             self.config
         )
+        is_local_optima = np.ones(len(self.soln_deck.solution_value), dtype=bool)
+        if self.config.local_grad_optim == "none":
+            is_local_optima = np.zeros(len(self.soln_deck.solution_value), dtype=bool)
         for generation in generation_pbar:
-            if check_stop_early(self.config, best_soln_history, solution_values):
+            if check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value):
                 break
 
             job_output = parallel(
@@ -121,7 +119,7 @@ class AntColonyOptimizer(IOptimizer):
                     self.config.q,
                     self.config.learning_rate,
                     self.config.local_grad_optim,
-                    solution_archive,
+                    self.soln_deck.solution_archive,
                     self.variables,
                     self.wrapped_fcn,
                 )
@@ -131,48 +129,16 @@ class AntColonyOptimizer(IOptimizer):
             for output in job_output:
                 ant_solutions = output[0]
                 ant_values = output[1]
-                solution_archive, solution_values = update_solution_archive(
-                    ant_solutions,
-                    ant_values,
-                    best_soln_history,
-                    generation,
-                    solution_archive,
-                    solution_values,
-                )
-            generation_pbar.set_postfix(best_value=solution_values[0])
+                self.soln_deck.append(ant_solutions, ant_values, is_local_optima)
+                self.soln_deck.deduplicate()
+            generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
         # Return the best solution
         return OptimizerResult(
-            solution_vector=solution_archive[0, :],
-            solution_score=solution_values[0],
+            solution_vector=self.soln_deck.solution_archive[0, :],
+            solution_score=self.soln_deck.solution_value[0],
             solution_history=best_soln_history,
         )
-
-    def update_solution_archive(
-        self,
-        ant_solutions: af64,
-        ant_values: af64,
-        best_soln_history: af64,
-        generation: int,
-        solution_archive: af64,
-        solution_values: af64,
-    ) -> tuple[af64, af64]:
-        # After the ants have generated their solutions, update the solution archive
-        solution_archive = np.vstack((solution_archive, ant_solutions))
-        solution_values = np.hstack((solution_values, ant_values))
-        # Sort the solutions by their values
-        sorted_indices = np.argsort(solution_values)
-        solution_archive = solution_archive[sorted_indices]
-        solution_values = solution_values[sorted_indices]
-        # Chop off the worst solutions
-        solution_archive = solution_archive[: self.config.solution_archive_size]
-        solution_values = solution_values[: self.config.solution_archive_size]
-        # Clear the temp archive
-        ant_solutions[:, :] = 0.0
-        ant_values[:] = 0.0
-        # Store the ongoing best value
-        best_soln_history[generation] = solution_values[0]
-        return solution_archive, solution_values
 
     def fill_solution_archive(
         self,
