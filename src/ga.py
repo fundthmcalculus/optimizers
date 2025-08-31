@@ -2,9 +2,9 @@ from dataclasses import dataclass
 
 import joblib
 import numpy as np
-import tqdm
 
 from local import apply_local_optimization
+from opt_types import af64
 from optimizer_base import (
     IOptimizer,
     OptimizerResult,
@@ -60,7 +60,7 @@ def crossover(
 def mutate(
     child: np.ndarray, mutation_rate: float, variables: InputVariables
 ) -> np.ndarray:
-    mutant_child = np.copy(child)
+    mutant_child: af64 = np.copy(child)
     for ij, variable in enumerate(variables):
         if np.random.random() < mutation_rate:
             mutant_child[ij] = variable.perturb_value(mutant_child[ij])
@@ -117,12 +117,12 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         self.config: GeneticAlgorithmOptimizerConfig = config
 
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
-        # Optimal solution history
-        best_soln_history = np.zeros(self.config.num_generations)
-
+        self.validate_config()
         self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn, preserve_percent)
         self.soln_deck.sort()
+        best_soln_history = np.zeros(self.config.num_generations)
 
+        # Add the progress bar
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
             self.config
         )
@@ -146,13 +146,16 @@ class GeneticAlgorithmOptimizer(IOptimizer):
                 )
                 for _ in range(n_jobs)
             )
+
+            # Merge candidates into the archive
             for output in job_output:
-                ant_solutions = output[0]
-                ant_values = output[1]
-                self.soln_deck.append(ant_solutions, ant_values, self.config.local_grad_optim != "none")
+                output_solutions = output[0]
+                output_values = output[1]
+                self.soln_deck.append(output_solutions, output_values, self.config.local_grad_optim != "none")
                 self.soln_deck.deduplicate()
             generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
+        # Return the best solution
         return OptimizerResult(
             solution_vector=self.soln_deck.solution_archive[0, :],
             solution_score=self.soln_deck.solution_value[0],
@@ -160,3 +163,10 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             stopped_early=stopped_early,
             generations_completed=generations_completed + 1
         )
+
+    def validate_config(self):
+        # Set the default values for the config
+        if self.config.solution_archive_size < 0:
+            self.config.solution_archive_size = len(self.variables) * 2
+        if self.config.population_size < 0:
+            self.config.population_size = self.config.solution_archive_size // 3

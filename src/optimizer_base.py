@@ -103,6 +103,13 @@ class IOptimizer(abc.ABC):
         """
         raise NotImplementedError("This method should be overridden by subclasses.")
 
+    @abc.abstractmethod
+    def validate_config(self) -> None:
+        """
+        Validate the configuration parameters.
+        """
+        pass
+
     def __str__(self):
         return f"Solver(name={self.name})"
 
