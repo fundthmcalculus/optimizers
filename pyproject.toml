@@ -24,6 +24,5 @@ dev = [
 	"black>=24.0"
 ]
 
-[tool.setuptools]
-packages = ["optimizers"]
-package-dir = {"" = "src"} # This tells setuptools to look for packages inside 'src'
+[tool.setuptools.packages.find]
+where = ["src"]
