@@ -23,5 +23,7 @@ dev = [
 	"pytest>=6.0",
 	"black>=24.0"
 ]
-[tool.setuptools.packages.find]
-where = ["src"]
+
+[tool.setuptools]
+packages = ["optimizers"]
+package-dir = {"" = "src"} # This tells setuptools to look for packages inside 'src'
