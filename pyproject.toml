@@ -29,4 +29,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["optimizers"]
+
+[project.scripts]
+optimizers = "optimizers.__init__:main"
