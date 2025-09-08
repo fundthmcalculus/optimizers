@@ -7,7 +7,7 @@ setup(
     author="fundthmcalculus",
     packages=find_packages(),
     install_requires=[],
-    python_requires='>=3.7',
+    python_requires=">=3.7",
     url="https://github.com/fundthmcalculus/optimizers",
     license="MIT",
 )

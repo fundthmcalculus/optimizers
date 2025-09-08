@@ -13,11 +13,7 @@ from optimizer_base import (
     InputArguments,
 )
 from tqdm_joblib import tqdm_joblib
-from variables import (
-    InputContinuousVariable,
-    InputDiscreteVariable,
-    InputVariables
-)
+from variables import InputContinuousVariable, InputDiscreteVariable, InputVariables
 
 
 @dataclass

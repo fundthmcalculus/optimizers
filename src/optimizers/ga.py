@@ -17,6 +17,7 @@ from optimizer_base import (
 from solution_deck import GoalFcn, LocalOptimType, SolutionDeck
 from variables import InputVariables
 
+
 @dataclass
 class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
     mutation_rate: float = 0.1
@@ -118,7 +119,9 @@ class GeneticAlgorithmOptimizer(IOptimizer):
 
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         self.validate_config()
-        self.soln_deck.initialize_solution_deck(self.variables, self.wrapped_fcn, preserve_percent)
+        self.soln_deck.initialize_solution_deck(
+            self.variables, self.wrapped_fcn, preserve_percent
+        )
         self.soln_deck.sort()
         best_soln_history = np.zeros(self.config.num_generations)
 
@@ -129,7 +132,9 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         stopped_early = False
         generations_completed = 0
         for generations_completed in generation_pbar:
-            stopped_early = check_stop_early(self.config, best_soln_history, self.soln_deck.solution_value)
+            stopped_early = check_stop_early(
+                self.config, best_soln_history, self.soln_deck.solution_value
+            )
             if stopped_early:
                 break
 
@@ -151,7 +156,11 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             for output in job_output:
                 output_solutions = output[0]
                 output_values = output[1]
-                self.soln_deck.append(output_solutions, output_values, self.config.local_grad_optim != "none")
+                self.soln_deck.append(
+                    output_solutions,
+                    output_values,
+                    self.config.local_grad_optim != "none",
+                )
                 self.soln_deck.deduplicate()
             generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
@@ -161,5 +170,5 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             solution_score=self.soln_deck.solution_value[0],
             solution_history=best_soln_history,
             stopped_early=stopped_early,
-            generations_completed=generations_completed + 1
+            generations_completed=generations_completed + 1,
         )

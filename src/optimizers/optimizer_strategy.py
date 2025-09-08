@@ -15,12 +15,15 @@ from gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
 
 StochasticOptimType = Literal["aco", "pso", "ga", "gd"]
 
+
 class IOptimizerSelection(ABC):
     @abstractmethod
     def select(self) -> StochasticOptimType:
         pass
 
-    def config_to_type(self, config: IOptimizerConfig, to_type: StochasticOptimType) -> IOptimizerConfig:
+    def config_to_type(
+        self, config: IOptimizerConfig, to_type: StochasticOptimType
+    ) -> IOptimizerConfig:
         if to_type == "aco":
             if isinstance(config, AntColonyOptimizerConfig):
                 return config
@@ -45,6 +48,7 @@ class IOptimizerSelection(ABC):
         else:
             raise ValueError(f"Unknown optimizer type: {to_type}")
 
+
 class RandomOptimizerSelection(IOptimizerSelection):
     def select(self) -> StochasticOptimType:
         # TODO - Find a better way to select optimizers
@@ -67,29 +71,55 @@ class MultiTypeOptimizer(IOptimizer):
         self.optimizer_selector = optimizer_selector
         self.fcn = fcn
 
-
-    def solve(self, restart_count: int = 0, max_restart: int = 5, generations_completed: int = 0) -> OptimizerResult:
-        selected_type = self.optimizer_selector.select() if restart_count > 0 else self.initial_optimizer
+    def solve(
+        self,
+        restart_count: int = 0,
+        max_restart: int = 5,
+        generations_completed: int = 0,
+    ) -> OptimizerResult:
+        selected_type = (
+            self.optimizer_selector.select()
+            if restart_count > 0
+            else self.initial_optimizer
+        )
         logging.info(f"Selected optimizer: {selected_type}")
-        converted_config = self.optimizer_selector.config_to_type(self.config, selected_type)
+        converted_config = self.optimizer_selector.config_to_type(
+            self.config, selected_type
+        )
         # Ensure we do not exceed the total number of generations
-        converted_config.num_generations = max(1, converted_config.num_generations - generations_completed)
+        converted_config.num_generations = max(
+            1, converted_config.num_generations - generations_completed
+        )
 
         if selected_type == "aco":
-            optimizer = AntColonyOptimizer(self.name, converted_config, self.fcn, self.variables, self.args)
+            optimizer = AntColonyOptimizer(
+                self.name, converted_config, self.fcn, self.variables, self.args
+            )
         elif selected_type == "pso":
-            optimizer = ParticleSwarmOptimizer(self.name, converted_config, self.fcn, self.variables, self.args)
+            optimizer = ParticleSwarmOptimizer(
+                self.name, converted_config, self.fcn, self.variables, self.args
+            )
         elif selected_type == "ga":
-            optimizer = GeneticAlgorithmOptimizer(self.name, converted_config, self.fcn, self.variables, self.args)
+            optimizer = GeneticAlgorithmOptimizer(
+                self.name, converted_config, self.fcn, self.variables, self.args
+            )
         elif selected_type == "gd":
-            optimizer = GradientDescentOptimizer(self.name, converted_config, self.fcn, self.variables, self.args)
+            optimizer = GradientDescentOptimizer(
+                self.name, converted_config, self.fcn, self.variables, self.args
+            )
         else:
             raise ValueError(f"Unknown optimizer type: {selected_type}")
 
         result = optimizer.solve(preserve_percent=0.0 if restart_count == 0 else 0.1)
         if result.stopped_early and restart_count < max_restart:
             # If the optimizer stopped early, we can try another optimizer
-            logging.warning(f"Optimizer {selected_type} stopped early, selecting a new optimizer.")
+            logging.warning(
+                f"Optimizer {selected_type} stopped early, selecting a new optimizer."
+            )
 
-            return result + self.solve(restart_count=restart_count+1, generations_completed=generations_completed + result.generations_completed)
+            return result + self.solve(
+                restart_count=restart_count + 1,
+                generations_completed=generations_completed
+                + result.generations_completed,
+            )
         return result
