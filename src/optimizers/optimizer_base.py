@@ -51,24 +51,31 @@ class OptimizerResult:
 
     def __str__(self):
         return self.__repr__()
-    
+
     def __plus__(self, other):
         if not isinstance(other, OptimizerResult):
             return NotImplemented
         combined_history = None
         if self.solution_history is not None and other.solution_history is not None:
-            combined_history = np.concatenate((self.solution_history, other.solution_history))
+            combined_history = np.concatenate(
+                (self.solution_history, other.solution_history)
+            )
         elif self.solution_history is not None:
             combined_history = self.solution_history
         elif other.solution_history is not None:
             combined_history = other.solution_history
-        
+
         return OptimizerResult(
             solution_score=min(self.solution_score, other.solution_score),
-            solution_vector=self.solution_vector if self.solution_score <= other.solution_score else other.solution_vector,
+            solution_vector=(
+                self.solution_vector
+                if self.solution_score <= other.solution_score
+                else other.solution_vector
+            ),
             solution_history=combined_history,
             stopped_early=self.stopped_early or other.stopped_early,
-            generations_completed=self.generations_completed + other.generations_completed
+            generations_completed=self.generations_completed
+            + other.generations_completed,
         )
 
 
@@ -94,7 +101,9 @@ class IOptimizer(abc.ABC):
         else:
             wrapped_fcn = fcn
         self.wrapped_fcn = wrapped_fcn
-        self.soln_deck = existing_soln_deck or SolutionDeck(archive_size=config.solution_archive_size, num_vars=len(variables))
+        self.soln_deck = existing_soln_deck or SolutionDeck(
+            archive_size=config.solution_archive_size, num_vars=len(variables)
+        )
 
     @abc.abstractmethod
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
@@ -102,6 +111,18 @@ class IOptimizer(abc.ABC):
         Solve the given problem.
         """
         raise NotImplementedError("This method should be overridden by subclasses.")
+
+    def validate_config(self) -> None:
+        """
+        Validate the configuration parameters.
+        """
+        # Set the default values for the config
+        if self.config.solution_archive_size < 0:
+            self.config.solution_archive_size = len(self.variables) * 2
+        if self.config.population_size < 0:
+            self.config.population_size = self.config.solution_archive_size // 3
+        if self.config.joblib_num_procs < 0:
+            self.config.joblib_num_procs = joblib.cpu_count() - 1
 
     def __str__(self):
         return f"Solver(name={self.name})"

@@ -3,6 +3,7 @@ import typing
 from abc import abstractmethod
 
 import numpy as np
+from numpy._typing import NDArray
 from numpy.random import Generator
 from scipy.stats import truncnorm
 
@@ -58,7 +59,9 @@ InputVariables = list[InputVariable]
 
 
 class InputDiscreteVariable(InputVariable):
-    def __init__(self, name: str, values: list[T], initial_value: T | None = None):
+    def __init__(
+        self, name: str, values: list[T] | NDArray[T], initial_value: T | None = None
+    ):
         super().__init__(name)
         self.values = values
         self.initial_value = initial_value or self.random_value()
@@ -89,7 +92,7 @@ class InputDiscreteVariable(InputVariable):
     def initial_random_value(self, perturbation: float = 0.1) -> f64:
         rng = np.random.default_rng()
         return rng.choice(self.values)
-    
+
     def range_value(self, p: f64) -> f64:
         # Map p in [0,1] to the discrete values
         idx = int(p * len(self.values))
@@ -164,7 +167,7 @@ class InputContinuousVariable(InputVariable):
         if rng is None:
             rng = np.random.default_rng()
         return rng.uniform(self.lower_bound, self.upper_bound)
-    
+
     def range_value(self, p: f64) -> f64:
         # Map p in [0,1] to the variable range
         return self.lower_bound + p * (self.upper_bound - self.lower_bound)

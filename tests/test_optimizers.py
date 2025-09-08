@@ -1,4 +1,5 @@
 import pytest
+import matplotlib.pyplot as plt
 
 from aco import AntColonyOptimizerConfig, AntColonyOptimizer
 from ga import (
@@ -12,7 +13,8 @@ from gd import (
 from optimizer_base import IOptimizerConfig
 from optimizer_strategy import MultiTypeOptimizer
 from pso import ParticleSwarmOptimizerConfig, ParticleSwarmOptimizer
-from variables import InputContinuousVariable, InputDiscreteVariable
+from solution_deck import SolutionDeck
+from variables import InputContinuousVariable, InputDiscreteVariable, InputVariable
 from opt_types import *
 
 
@@ -65,7 +67,10 @@ def test_aco():
     print(
         f"Best solution: {best_solution.solution_vector} with value: {best_solution.solution_score}"
     )
-    assert pytest.approx(best_solution.solution_score) == optim_ackley(best_solution.solution_vector)
+    assert pytest.approx(best_solution.solution_score) == optim_ackley(
+        best_solution.solution_vector
+    )
+
 
 def test_ga():
     input_variables = [
@@ -86,7 +91,10 @@ def test_ga():
     print(
         f"Best solution: {best_solution.solution_vector} with value: {best_solution.solution_score}"
     )
-    assert pytest.approx(best_solution.solution_score) == optim_ackley(best_solution.solution_vector)
+    assert pytest.approx(best_solution.solution_score) == optim_ackley(
+        best_solution.solution_vector
+    )
+
 
 def test_multi_optimizer():
     input_variables = [
@@ -107,11 +115,14 @@ def test_multi_optimizer():
     print(
         f"Best solution: {best_solution.solution_vector} with value: {best_solution.solution_score}"
     )
-    assert pytest.approx(best_solution.solution_score) == optim_ackley(best_solution.solution_vector)
+    assert pytest.approx(best_solution.solution_score) == optim_ackley(
+        best_solution.solution_vector
+    )
+
 
 def test_gd():
     n_dim = 10
-    input_variables = [
+    input_variables: list[InputVariable] = [
         InputContinuousVariable(f"cv-{ij}", lower_bound=-5, upper_bound=5)
         for ij in range(n_dim)
     ]
@@ -140,6 +151,7 @@ def test_gd():
     print("Best solution:", soln)
     assert soln is not None
 
+
 def test_rosenbrock():
     n_dim = 10
     input_variables = [
@@ -159,3 +171,32 @@ def test_rosenbrock():
     assert soln is not None
 
 
+def test_fibonacci():
+    n_dim = 3
+    n_deck = 100
+    input_variables = [
+        InputContinuousVariable(f"cv-{ij}", lower_bound=-5, upper_bound=5)
+        for ij in range(n_dim)
+    ]
+    soln_deck = SolutionDeck(archive_size=n_deck, num_vars=n_dim)
+    soln_deck.initialize_solution_deck(
+        input_variables, optim_para, init_type="fibonacci"
+    )
+
+    # Verify solution deck was created correctly
+    assert soln_deck.archive_size == n_deck
+    assert soln_deck.num_vars == n_dim
+
+    # Plot the solution deck points
+    solutions = soln_deck.solution_archive
+    plt.figure(figsize=(8, 8))
+    ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
+    ax.scatter(solutions[:, 0], solutions[:, 1], solutions[:, 2], c="blue", alpha=0.6)
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+    plt.title("Fibonacci Solution Distribution")
+    plt.grid(True)
+    plt.show()
+    # plt.savefig('fibonacci_solutions.png')
+    # plt.close()
