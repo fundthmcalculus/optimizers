@@ -3,6 +3,7 @@ import typing
 from abc import abstractmethod
 
 import numpy as np
+from numpy._typing import NDArray
 from numpy.random import Generator
 from scipy.stats import truncnorm
 
@@ -58,7 +59,7 @@ InputVariables = list[InputVariable]
 
 
 class InputDiscreteVariable(InputVariable):
-    def __init__(self, name: str, values: list[T], initial_value: T | None = None):
+    def __init__(self, name: str, values: list[T] | NDArray[T], initial_value: T | None = None):
         super().__init__(name)
         self.values = values
         self.initial_value = initial_value or self.random_value()

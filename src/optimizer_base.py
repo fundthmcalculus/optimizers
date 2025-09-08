@@ -103,12 +103,17 @@ class IOptimizer(abc.ABC):
         """
         raise NotImplementedError("This method should be overridden by subclasses.")
 
-    @abc.abstractmethod
     def validate_config(self) -> None:
         """
         Validate the configuration parameters.
         """
-        pass
+        # Set the default values for the config
+        if self.config.solution_archive_size < 0:
+            self.config.solution_archive_size = len(self.variables) * 2
+        if self.config.population_size < 0:
+            self.config.population_size = self.config.solution_archive_size // 3
+        if self.config.joblib_num_procs < 0:
+            self.config.joblib_num_procs = joblib.cpu_count() - 1
 
     def __str__(self):
         return f"Solver(name={self.name})"

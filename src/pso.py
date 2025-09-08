@@ -179,10 +179,3 @@ class ParticleSwarmOptimizer(IOptimizer):
             stopped_early=stopped_early,
             generations_completed=generations_completed + 1
         )
-
-    def validate_config(self):
-        # Set the default values for the config
-        if self.config.solution_archive_size < 0:
-            self.config.solution_archive_size = len(self.variables) * 2
-        if self.config.population_size < 0:
-            self.config.population_size = self.config.solution_archive_size // 3
