@@ -25,5 +25,15 @@ dev = [
 	"black>=24.0",
     "matplotlib"
 ]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"*" = ["*.*"] # <-- this changed
+
+[project.scripts]
+optimizers = "optimizers.__init__:main"
