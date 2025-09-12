@@ -1,12 +1,13 @@
 import abc
 import tqdm
 import joblib
+import numpy as np
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Optional
 
-from .solution_deck import SolutionDeck, GoalFcn, InputArguments
+from .solution_deck import SolutionDeck, GoalFcn, InputArguments, WrappedGoalFcn
 from .variables import InputVariables
-from .opt_types import *
+from .opt_types import af64, f64
 
 
 @dataclass
@@ -28,7 +29,7 @@ class IOptimizerConfig:
     joblib_num_procs: int = 4
     """The number of processes to use for parallel execution. -1 means use all available cores."""
     joblib_prefer: Literal["threads", "processes"] = "threads"
-    """The preferred execution mode for joblib. See https://joblib.readthedocs.io/en/latest/generated/joblib.Parallel.html#joblib.Parallel for more details."""
+    """The preferred execution mode for joblib."""
 
 
 @dataclass
@@ -39,7 +40,7 @@ class OptimizerResult:
     """The score of the best solution found by the optimizer."""
     solution_vector: af64
     """The best solution found by the optimizer."""
-    solution_history: af64 = None
+    solution_history: Optional[af64] = None
     """The history of the best solutions found by the optimizer."""
     stopped_early: bool = False
     """Whether the optimizer stopped early due to convergence criteria."""
@@ -52,9 +53,9 @@ class OptimizerResult:
     def __str__(self):
         return self.__repr__()
 
-    def __plus__(self, other):
+    def __add__(self, other: "OptimizerResult") -> "OptimizerResult":
         if not isinstance(other, OptimizerResult):
-            return NotImplemented
+            raise ValueError("Cannot add non-OptimizerResult object")
         combined_history = None
         if self.solution_history is not None and other.solution_history is not None:
             combined_history = np.concatenate(
@@ -94,13 +95,17 @@ class IOptimizer(abc.ABC):
         self.name: str = name
         self.config: IOptimizerConfig = config
         self.variables: InputVariables = variables
-        self.args: InputArguments = args
+        self.args: InputArguments | None = args
         # Wrap the goal function if needed
         if args:
-            wrapped_fcn = lambda x: fcn(x, args)
+
+            def __wrapped_fcn(x):
+                return fcn(x, args)
+
+            wrapped_fcn = __wrapped_fcn
         else:
             wrapped_fcn = fcn
-        self.wrapped_fcn = wrapped_fcn
+        self.wrapped_fcn: WrappedGoalFcn = wrapped_fcn
         self.soln_deck = existing_soln_deck or SolutionDeck(
             archive_size=config.solution_archive_size, num_vars=len(variables)
         )
@@ -129,7 +134,7 @@ class IOptimizer(abc.ABC):
 
 
 def setup_for_generations(config: IOptimizerConfig):
-    generation_pbar = tqdm.trange(config.num_generations, desc=f"Optimizer generation")
+    generation_pbar = tqdm.trange(config.num_generations, desc="Optimizer generation")
     n_jobs = config.joblib_num_procs
     if n_jobs < 1:
         n_jobs = joblib.cpu_count() - 1

@@ -12,6 +12,7 @@ from .optimizer_base import (
     OptimizerResult,
     InputArguments,
 )
+from .solution_deck import WrappedGoalFcn
 from .tqdm_joblib import tqdm_joblib
 from .variables import InputContinuousVariable, InputDiscreteVariable, InputVariables
 
@@ -22,7 +23,7 @@ class GradientDescentOptimizerConfig(IOptimizerConfig):
     discrete_search_size: int = -1  # Defaults to number of discrete variables
 
 
-def solve_gd(variables: InputVariables, fcn: GoalFcn) -> OptimizerResult:
+def solve_gd(variables: InputVariables, fcn: WrappedGoalFcn) -> OptimizerResult:
     x0 = [x.initial_value for x in variables]
     # Effectively pin the discrete values.
     bounds = [
@@ -38,7 +39,7 @@ def solve_gd(variables: InputVariables, fcn: GoalFcn) -> OptimizerResult:
 
 
 def solve_gd_from_x0(
-    x0: np.ndarray, variables: InputVariables, fcn: GoalFcn
+    x0: np.ndarray, variables: InputVariables, fcn: WrappedGoalFcn
 ) -> OptimizerResult:
     # Effectively pin the discrete values.
     bounds = [
@@ -54,7 +55,7 @@ def solve_gd_from_x0(
 
 
 def solve_gd_with_mutate(
-    variables: InputVariables, mutate_idx: int, fcn: GoalFcn
+    variables: InputVariables, mutate_idx: int, fcn: WrappedGoalFcn
 ) -> OptimizerResult:
     x0 = [x.initial_value for x in variables]
     # Effectively pin the discrete values.
@@ -74,7 +75,7 @@ def solve_gd_with_mutate(
 
 
 def solve_gd_for_1var(
-    x0: np.ndarray, variables: InputVariables, var_idx: int, fcn: GoalFcn
+    x0: np.ndarray, variables: InputVariables, var_idx: int, fcn: WrappedGoalFcn
 ) -> OptimizerResult:
     bounds = [(x0[ij], x0[ij]) for ij in range(len(x0))]
     bounds[var_idx] = (variables[var_idx].lower_bound, variables[var_idx].upper_bound)
@@ -95,15 +96,25 @@ class GradientDescentOptimizer(IOptimizer):
     def __init__(
         self,
         name: str,
-        config: GradientDescentOptimizerConfig,
+        config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
     ):
         super().__init__(name, config, fcn, variables, args)
-        self.config: GradientDescentOptimizerConfig = config
+        self.config: GradientDescentOptimizerConfig = GradientDescentOptimizerConfig(
+            **{**config.__dict__}
+        )
 
-    def solve(self) -> OptimizerResult:
+    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
+        """Solve the optimization problem using gradient descent.
+
+        Args:
+            preserve_percent: This variable left unused
+
+        Returns:
+            The result of the optimization.
+        """
 
         if self.config.parallel_discrete_search:
             # Look at the number of discrete variables
@@ -116,7 +127,7 @@ class GradientDescentOptimizer(IOptimizer):
             )
             with tqdm_joblib(
                 tqdm(desc="Gradient Descent Optimization", total=len(rand_vars))
-            ) as progress_bar:
+            ):
                 parallel = joblib.Parallel(
                     n_jobs=self.config.joblib_num_procs,
                     prefer=self.config.joblib_prefer,

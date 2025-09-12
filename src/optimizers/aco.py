@@ -14,7 +14,7 @@ from .optimizer_base import (
     cdf,
 )
 from .opt_types import af64
-from .solution_deck import GoalFcn, LocalOptimType, SolutionDeck
+from .solution_deck import GoalFcn, LocalOptimType, SolutionDeck, WrappedGoalFcn
 from .variables import InputVariables
 
 
@@ -34,7 +34,7 @@ def run_ants(
     local_optim: LocalOptimType,
     solution_archive: af64,
     variables: InputVariables,
-    fcn: GoalFcn,
+    fcn: WrappedGoalFcn,
 ) -> tuple[af64, af64]:
     cp_j = cdf(q_weight, len(solution_archive))
     ant_solutions = np.zeros((n_ants, len(variables)))
@@ -67,14 +67,16 @@ class AntColonyOptimizer(IOptimizer):
     def __init__(
         self,
         name: str,
-        config: AntColonyOptimizerConfig,
+        config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
     ):
         super().__init__(name, config, fcn, variables, args, existing_soln_deck)
-        self.config: AntColonyOptimizerConfig = config
+        self.config: AntColonyOptimizerConfig = AntColonyOptimizerConfig(
+            **{**config.__dict__}
+        )
 
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         self.validate_config()

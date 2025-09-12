@@ -14,7 +14,7 @@ from .optimizer_base import (
     check_stop_early,
 )
 
-from .solution_deck import GoalFcn, LocalOptimType, SolutionDeck
+from .solution_deck import GoalFcn, LocalOptimType, SolutionDeck, WrappedGoalFcn
 from .variables import InputVariables
 
 
@@ -76,7 +76,7 @@ def run_ga(
     solution_values: np.ndarray,
     solution_archive: np.ndarray,
     variables: InputVariables,
-    fcn: GoalFcn,
+    fcn: WrappedGoalFcn,
 ) -> tuple[np.ndarray, np.ndarray]:
     new_population = np.zeros((n_steps, len(variables)))
     new_population_fitness = np.zeros(n_steps)
@@ -108,14 +108,16 @@ class GeneticAlgorithmOptimizer(IOptimizer):
     def __init__(
         self,
         name: str,
-        config: GeneticAlgorithmOptimizerConfig,
+        config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
     ):
         super().__init__(name, config, fcn, variables, args, existing_soln_deck)
-        self.config: GeneticAlgorithmOptimizerConfig = config
+        self.config: GeneticAlgorithmOptimizerConfig = GeneticAlgorithmOptimizerConfig(
+            **{**config.__dict__}
+        )
 
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         self.validate_config()

@@ -1,11 +1,11 @@
 from .gd import solve_gd_for_1var, solve_gd_from_x0
-from .solution_deck import GoalFcn, LocalOptimType
+from .solution_deck import WrappedGoalFcn, LocalOptimType
 from .variables import InputVariable, InputDiscreteVariable
 from .opt_types import af64
 
 
 def apply_local_optimization(
-    fcn: GoalFcn,
+    fcn: WrappedGoalFcn,
     local_optim: LocalOptimType,
     new_solution: af64,
     variables: list[InputVariable],
@@ -23,7 +23,7 @@ def apply_local_optimization(
 
 
 def local_perturb_optim(
-    fcn: GoalFcn, new_solution: af64, variables: list[InputVariable]
+    fcn: WrappedGoalFcn, new_solution: af64, variables: list[InputVariable]
 ):
     new_value = fcn(new_solution)
     # One variable at a time, do a stepwise optimization.
@@ -39,7 +39,9 @@ def local_perturb_optim(
     return new_solution, new_value
 
 
-def full_grad_optim(fcn: GoalFcn, new_solution: af64, variables: list[InputVariable]):
+def full_grad_optim(
+    fcn: WrappedGoalFcn, new_solution: af64, variables: list[InputVariable]
+):
     # Configure a continuous only gradient optimizer around this (ACO handles the discrete variable searching already)
     # Don't fire this off on another process, to prevent overloading the OS.
     result = solve_gd_from_x0(new_solution, variables, fcn)
@@ -49,7 +51,7 @@ def full_grad_optim(fcn: GoalFcn, new_solution: af64, variables: list[InputVaria
 
 
 def single_var_grad_optim(
-    fcn: GoalFcn, new_solution: af64, variables: list[InputVariable]
+    fcn: WrappedGoalFcn, new_solution: af64, variables: list[InputVariable]
 ):
     new_value = fcn(new_solution)
     for var_idx, variable in enumerate(variables):

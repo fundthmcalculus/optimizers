@@ -1,14 +1,16 @@
-from typing import Any, Callable, Literal, Optional, Tuple
-import numpy as np
 from functools import lru_cache
+from typing import Any, Callable, Literal, Optional
+
+import numpy as np
 from kmodes.kmodes import KModes
 
 from .opt_types import f64, af64, ab8, b8
-from .variables import InputContinuousVariable, InputVariables
+from .variables import InputVariables
 
 # Some type hinting
 InputArguments = dict[str, Any]
-GoalFcn = Callable[[af64, Optional[InputArguments]], f64]
+GoalFcn = Callable[[af64, Optional[InputArguments]], float]
+WrappedGoalFcn = Callable[[af64], float]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
 InitializationType = Literal["random", "fibonacci"]
 
@@ -48,7 +50,7 @@ class SolutionDeck:
     def initialize_solution_deck(
         self,
         variables: InputVariables,
-        eval_fcn: GoalFcn,
+        eval_fcn: WrappedGoalFcn,
         preserve_percent: float = 0.0,
         init_type: InitializationType = "random",
     ) -> None:
@@ -57,7 +59,6 @@ class SolutionDeck:
                 "Number of variables does not match the initialized deck size."
             )
         num_preserve = int(self.archive_size * preserve_percent)
-        fibb_spiral_points: af64 = None
         if init_type == "fibonacci" and num_preserve < self.archive_size:
             fibb_spiral_points = fibonacci_sphere_points(
                 self.archive_size - num_preserve, self.num_vars
@@ -78,11 +79,11 @@ class SolutionDeck:
                 self.solution_value[k] = eval_fcn(self.solution_archive[k])
                 self.is_local_optima[k] = False  # Initially, none are local optima
 
-    def deduplicate(self, abs_err: f64 = 1e-4, rel_err: f64 = 1e-2) -> None:
+    def deduplicate(self, abs_err: float = 1e-4, rel_err: float = 1e-2) -> None:
         """Deduplicate solutions in the archive based on closeness. Keeps the best solutions.
         Args:
-            abs_err (f64): Absolute tolerance for closeness across all dimensions.
-            rel_err (f64): Relative tolerance for closeness across all dimensions.
+            abs_err (float): Absolute tolerance for closeness across all dimensions.
+            rel_err (float): Relative tolerance for closeness across all dimensions.
         """
         # TODO - Handle the case of discrete variables with manhattan distance?
         # Sort first

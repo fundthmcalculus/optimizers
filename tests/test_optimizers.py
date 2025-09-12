@@ -1,5 +1,6 @@
 import pytest
 import matplotlib.pyplot as plt
+import numpy as np
 
 from optimizers.aco import AntColonyOptimizerConfig, AntColonyOptimizer
 from optimizers.ga import (
@@ -14,8 +15,12 @@ from optimizers.optimizer_base import IOptimizerConfig
 from optimizers.optimizer_strategy import MultiTypeOptimizer
 from optimizers.pso import ParticleSwarmOptimizerConfig, ParticleSwarmOptimizer
 from optimizers.solution_deck import SolutionDeck
-from optimizers.variables import InputContinuousVariable, InputDiscreteVariable, InputVariable
-from optimizers.opt_types import *
+from optimizers.variables import (
+    InputContinuousVariable,
+    InputDiscreteVariable,
+    InputVariable,
+)
+from optimizers.opt_types import f64, af64
 
 
 def optim_ackley(x: af64) -> f64:
@@ -179,9 +184,7 @@ def test_fibonacci():
         for ij in range(n_dim)
     ]
     soln_deck = SolutionDeck(archive_size=n_deck, num_vars=n_dim)
-    soln_deck.initialize_solution_deck(
-        input_variables, optim_para, init_type="random"
-    )
+    soln_deck.initialize_solution_deck(input_variables, optim_para, init_type="random")
 
     # Verify solution deck was created correctly
     assert soln_deck.archive_size == n_deck

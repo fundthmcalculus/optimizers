@@ -12,9 +12,15 @@ from .optimizer_base import (
     check_stop_early,
     cdf,
 )
-from .variables import InputVariable, InputDiscreteVariable, InputVariables
+from .variables import InputDiscreteVariable, InputVariables
 from .opt_types import af64
-from .solution_deck import GoalFcn, LocalOptimType, InputArguments, SolutionDeck
+from .solution_deck import (
+    WrappedGoalFcn,
+    GoalFcn,
+    LocalOptimType,
+    InputArguments,
+    SolutionDeck,
+)
 
 
 @dataclass
@@ -42,7 +48,7 @@ def run_particles(
     local_optim: LocalOptimType,
     solution_archive: af64,
     variables: InputVariables,
-    fcn: GoalFcn,
+    fcn: WrappedGoalFcn,
 ) -> tuple[af64, af64]:
     """
     Generate new candidate solutions using a PSO-inspired step that leverages the
@@ -121,14 +127,16 @@ class ParticleSwarmOptimizer(IOptimizer):
     def __init__(
         self,
         name: str,
-        config: ParticleSwarmOptimizerConfig,
+        config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
     ):
         super().__init__(name, config, fcn, variables, args, existing_soln_deck)
-        self.config: ParticleSwarmOptimizerConfig = config
+        self.config: ParticleSwarmOptimizerConfig = ParticleSwarmOptimizerConfig(
+            **{**config.__dict__}
+        )
 
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         self.validate_config()
