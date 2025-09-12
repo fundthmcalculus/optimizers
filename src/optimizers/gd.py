@@ -5,15 +5,15 @@ import numpy as np
 from scipy.optimize import OptimizeResult, minimize
 from tqdm.std import tqdm
 
-from optimizer_base import (
+from .optimizer_base import (
     IOptimizerConfig,
     IOptimizer,
     GoalFcn,
     OptimizerResult,
     InputArguments,
 )
-from tqdm_joblib import tqdm_joblib
-from variables import InputContinuousVariable, InputDiscreteVariable, InputVariables
+from .tqdm_joblib import tqdm_joblib
+from .variables import InputContinuousVariable, InputDiscreteVariable, InputVariables
 
 
 @dataclass

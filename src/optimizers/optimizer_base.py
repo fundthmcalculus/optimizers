@@ -4,9 +4,9 @@ import joblib
 from dataclasses import dataclass
 from typing import Literal
 
-from solution_deck import SolutionDeck, GoalFcn, InputArguments
-from variables import InputVariables
-from opt_types import *
+from .solution_deck import SolutionDeck, GoalFcn, InputArguments
+from .variables import InputVariables
+from .opt_types import *
 
 
 @dataclass

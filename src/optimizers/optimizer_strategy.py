@@ -1,17 +1,15 @@
 import logging
-from typing import Literal
-
-from optimizer_base import IOptimizer, IOptimizerConfig, OptimizerResult
 import random
+from typing import Literal
 from abc import ABC, abstractmethod
 
-from solution_deck import GoalFcn, InputArguments, SolutionDeck
-from variables import InputVariables
-
-from aco import AntColonyOptimizer, AntColonyOptimizerConfig
-from pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
-from ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
-from gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
+from .optimizer_base import IOptimizer, IOptimizerConfig, OptimizerResult
+from .solution_deck import GoalFcn, InputArguments, SolutionDeck
+from .variables import InputVariables
+from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
+from .pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
+from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
+from .gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
 
 StochasticOptimType = Literal["aco", "pso", "ga", "gd"]
 

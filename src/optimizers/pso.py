@@ -3,8 +3,8 @@ from dataclasses import dataclass
 import joblib
 import numpy as np
 
-from local import apply_local_optimization
-from optimizer_base import (
+from .local import apply_local_optimization
+from .optimizer_base import (
     IOptimizer,
     IOptimizerConfig,
     OptimizerResult,
@@ -12,9 +12,9 @@ from optimizer_base import (
     check_stop_early,
     cdf,
 )
-from variables import InputVariable, InputDiscreteVariable, InputVariables
-from opt_types import af64
-from solution_deck import GoalFcn, LocalOptimType, InputArguments, SolutionDeck
+from .variables import InputVariable, InputDiscreteVariable, InputVariables
+from .opt_types import af64
+from .solution_deck import GoalFcn, LocalOptimType, InputArguments, SolutionDeck
 
 
 @dataclass

@@ -1,21 +1,21 @@
 import pytest
 import matplotlib.pyplot as plt
 
-from aco import AntColonyOptimizerConfig, AntColonyOptimizer
-from ga import (
+from optimizers.aco import AntColonyOptimizerConfig, AntColonyOptimizer
+from optimizers.ga import (
     GeneticAlgorithmOptimizerConfig,
     GeneticAlgorithmOptimizer,
 )
-from gd import (
+from optimizers.gd import (
     GradientDescentOptimizer,
     GradientDescentOptimizerConfig,
 )
-from optimizer_base import IOptimizerConfig
-from optimizer_strategy import MultiTypeOptimizer
-from pso import ParticleSwarmOptimizerConfig, ParticleSwarmOptimizer
-from solution_deck import SolutionDeck
-from variables import InputContinuousVariable, InputDiscreteVariable, InputVariable
-from opt_types import *
+from optimizers.optimizer_base import IOptimizerConfig
+from optimizers.optimizer_strategy import MultiTypeOptimizer
+from optimizers.pso import ParticleSwarmOptimizerConfig, ParticleSwarmOptimizer
+from optimizers.solution_deck import SolutionDeck
+from optimizers.variables import InputContinuousVariable, InputDiscreteVariable, InputVariable
+from optimizers.opt_types import *
 
 
 def optim_ackley(x: af64) -> f64:
@@ -180,7 +180,7 @@ def test_fibonacci():
     ]
     soln_deck = SolutionDeck(archive_size=n_deck, num_vars=n_dim)
     soln_deck.initialize_solution_deck(
-        input_variables, optim_para, init_type="fibonacci"
+        input_variables, optim_para, init_type="random"
     )
 
     # Verify solution deck was created correctly
@@ -191,7 +191,7 @@ def test_fibonacci():
     solutions = soln_deck.solution_archive
     plt.figure(figsize=(8, 8))
     ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
-    ax.scatter(solutions[:, 0], solutions[:, 1], solutions[:, 2], c="blue", alpha=0.6)
+    ax.plot(solutions[:, 0], solutions[:, 1], solutions[:, 2], c="blue", alpha=0.6)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("z")

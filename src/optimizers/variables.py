@@ -7,7 +7,7 @@ from numpy._typing import NDArray
 from numpy.random import Generator
 from scipy.stats import truncnorm
 
-from opt_types import f64, af64, T
+from .opt_types import f64, af64, T
 
 
 def get_truncated_normal(mean=0.0, stdev=1.0, low=0.0, high=10.0) -> float:

@@ -1,9 +1,10 @@
 from typing import Any, Callable, Literal, Optional, Tuple
 import numpy as np
-from opt_types import f64, af64, ab8, b8
-from variables import InputContinuousVariable, InputVariables
 from functools import lru_cache
 from kmodes.kmodes import KModes
+
+from .opt_types import f64, af64, ab8, b8
+from .variables import InputContinuousVariable, InputVariables
 
 # Some type hinting
 InputArguments = dict[str, Any]
