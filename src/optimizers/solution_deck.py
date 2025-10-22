@@ -4,8 +4,8 @@ from typing import Any, Callable, Literal, Optional
 import numpy as np
 from kmodes.kmodes import KModes
 
-from .opt_types import f64, af64, ab8, b8
-from .variables import InputVariables
+from .core.types import f64, af64, ab8, b8, i64
+from optimizers.core.variables import InputVariables
 
 # Some type hinting
 InputArguments = dict[str, Any]
@@ -16,7 +16,7 @@ InitializationType = Literal["random", "fibonacci"]
 
 
 class SolutionDeck:
-    def __init__(self, archive_size: int, num_vars: int, dtype=f64):
+    def __init__(self, archive_size: int, num_vars: int, dtype: f64 | i64 | b8 = f64):
         self.solution_archive = np.empty((archive_size, num_vars), dtype=dtype)
         self.solution_value = np.empty((archive_size,), dtype=dtype)
         self.is_local_optima = np.empty((archive_size,), dtype=b8)

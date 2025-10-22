@@ -3,9 +3,9 @@ import random
 from typing import Literal
 from abc import ABC, abstractmethod
 
-from .optimizer_base import IOptimizer, IOptimizerConfig, OptimizerResult
-from .solution_deck import GoalFcn, InputArguments
-from .variables import InputVariables
+from optimizers.core.base import IOptimizerConfig, OptimizerResult
+from .base import OptimizerBase
+from optimizers.solution_deck import GoalFcn, InputArguments, InputVariables
 from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from .pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
 from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
@@ -59,7 +59,7 @@ class RandomOptimizerSelection(IOptimizerSelection):
         return random.choice(["aco", "pso", "ga", "gd"])
 
 
-class MultiTypeOptimizer(IOptimizer):
+class MultiTypeOptimizer(OptimizerBase):
     def __init__(
         self,
         name: str,
@@ -94,7 +94,7 @@ class MultiTypeOptimizer(IOptimizer):
             1, converted_config.num_generations - generations_completed
         )
 
-        optimizer: IOptimizer
+        optimizer: OptimizerBase
 
         if selected_type == "aco":
             optimizer = AntColonyOptimizer(

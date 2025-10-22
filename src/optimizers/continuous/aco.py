@@ -4,18 +4,22 @@ import joblib
 import numpy as np
 
 from .local import apply_local_optimization
-from .optimizer_base import (
-    IOptimizer,
+from optimizers.core.base import (
     IOptimizerConfig,
     OptimizerResult,
-    InputArguments,
-    setup_for_generations,
-    check_stop_early,
-    cdf,
 )
-from .opt_types import af64
-from .solution_deck import GoalFcn, LocalOptimType, SolutionDeck, WrappedGoalFcn
-from .variables import InputVariables
+from optimizers.continuous.base import setup_for_generations, check_stop_early, cdf
+from optimizers.core.types import af64
+from optimizers.solution_deck import (
+    GoalFcn,
+    LocalOptimType,
+    SolutionDeck,
+    WrappedGoalFcn,
+    InputArguments,
+)
+
+from .base import OptimizerBase
+from ..core.variables import InputVariables
 
 
 @dataclass
@@ -63,7 +67,7 @@ def run_ants(
     return ant_solutions, ant_values
 
 
-class AntColonyOptimizer(IOptimizer):
+class AntColonyOptimizer(OptimizerBase):
     def __init__(
         self,
         name: str,

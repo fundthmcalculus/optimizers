@@ -1,5 +1,3 @@
-import abc
-from abc import abstractmethod
 from typing import Optional
 
 import numpy as np
@@ -7,55 +5,8 @@ from numpy._typing import NDArray
 from numpy.random import Generator
 from scipy.stats import truncnorm
 
-from .opt_types import af64
-
-
-def get_truncated_normal(mean=0.0, stdev=1.0, low=0.0, high=10.0) -> float:
-    if stdev == 0.0:
-        stdev = 1.0
-    return truncnorm(
-        (low - mean) / stdev, (high - mean) / stdev, loc=mean, scale=stdev
-    ).rvs()
-
-
-class InputVariable(abc.ABC):
-    def __init__(self, name: str):
-        self.name = name
-        self.initial_value = 0.0
-
-    @abstractmethod
-    def random_value(
-        self,
-        current_value: float = np.nan,
-        other_values: Optional[af64] = None,
-        learning_rate: float = 0.7,
-    ) -> float:
-        pass
-
-    @abstractmethod
-    def perturb_value(self, current_value: float) -> float:
-        pass
-
-    @abstractmethod
-    def initial_random_value(self, perturbation: float = 0.1) -> float:
-        pass
-
-    @abstractmethod
-    def range_value(self, p: float) -> float:
-        pass
-
-    @property
-    @abstractmethod
-    def lower_bound(self) -> float:
-        pass
-
-    @property
-    @abstractmethod
-    def upper_bound(self) -> float:
-        pass
-
-
-InputVariables = list[InputVariable]
+from ..core.types import AF
+from ..core.variables import InputVariable
 
 
 class InputDiscreteVariable(InputVariable):
@@ -72,6 +23,9 @@ class InputDiscreteVariable(InputVariable):
     def __repr__(self):
         return f"DV:{self.name} in {self.values}"
 
+    def __str__(self):
+        return self.__repr__()
+
     def perturb_value(self, current_value: float) -> float:
         # Just randomly tweak to another choice.
         return self.initial_random_value()
@@ -79,7 +33,7 @@ class InputDiscreteVariable(InputVariable):
     def random_value(
         self,
         current_value: float = np.nan,
-        other_values: Optional[af64] = None,
+        other_values: Optional[AF] = None,
         learning_rate: float = 0.7,
     ) -> float:
         rng = np.random.default_rng()
@@ -140,23 +94,33 @@ class InputContinuousVariable(InputVariable):
     def __repr__(self):
         return f"CV:{self.name} in [{self.lower_bound}, {self.upper_bound}]"
 
+    def __str__(self):
+        return self.__repr__()
+
     def perturb_value(self, current_value: float) -> float:
         # Move it in a gaussian spread around the current value.
         sigma = (self.upper_bound - self.lower_bound) / 10
         new_value = current_value + sigma * np.random.normal()
         return max(min(self.upper_bound, new_value), self.lower_bound)
 
+    def __get_truncated_normal(self, mean=0.0, stdev=1.0, low=0.0, high=10.0) -> float:
+        if stdev == 0.0:
+            stdev = 1.0
+        return truncnorm(
+            (low - mean) / stdev, (high - mean) / stdev, loc=mean, scale=stdev
+        ).rvs()
+
     def random_value(
         self,
         current_value: float = np.nan,
-        other_values: Optional[af64] = None,
+        other_values: Optional[AF] = None,
         learning_rate: float = 0.7,
     ):
         rng = np.random.default_rng()
         if other_values is not None:
-            # TODO - Other than Mahattan distance, what other distance metrics can be used?
+            # TODO - Other than Manhattan distance, what other distance metrics can be used?
             d2 = np.sum(np.abs(other_values - current_value)) / len(other_values)
-            return get_truncated_normal(
+            return self.__get_truncated_normal(
                 mean=current_value,
                 stdev=learning_rate * d2,
                 low=self.lower_bound,

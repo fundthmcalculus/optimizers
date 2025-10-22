@@ -1,7 +1,7 @@
 from .gd import solve_gd_for_1var, solve_gd_from_x0
-from .solution_deck import WrappedGoalFcn, LocalOptimType
+from optimizers.solution_deck import WrappedGoalFcn, LocalOptimType
 from .variables import InputVariable, InputDiscreteVariable
-from .opt_types import af64
+from optimizers.core.types import af64
 
 
 def apply_local_optimization(

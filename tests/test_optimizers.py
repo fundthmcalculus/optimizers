@@ -2,28 +2,31 @@ import pytest
 import matplotlib.pyplot as plt
 import numpy as np
 
-from optimizers.aco import AntColonyOptimizerConfig, AntColonyOptimizer
-from optimizers.ga import (
+from optimizers.continuous.aco import AntColonyOptimizerConfig, AntColonyOptimizer
+from optimizers.continuous.ga import (
     GeneticAlgorithmOptimizerConfig,
     GeneticAlgorithmOptimizer,
 )
-from optimizers.gd import (
+from optimizers.continuous.gd import (
     GradientDescentOptimizer,
     GradientDescentOptimizerConfig,
 )
-from optimizers.optimizer_base import IOptimizerConfig
-from optimizers.optimizer_strategy import MultiTypeOptimizer
-from optimizers.pso import ParticleSwarmOptimizerConfig, ParticleSwarmOptimizer
+from optimizers.core.base import IOptimizerConfig
+from optimizers.continuous.optimizer_strategy import MultiTypeOptimizer
+from optimizers.continuous.pso import (
+    ParticleSwarmOptimizerConfig,
+    ParticleSwarmOptimizer,
+)
 from optimizers.solution_deck import SolutionDeck
-from optimizers.variables import (
+from optimizers.continuous.variables import (
     InputContinuousVariable,
     InputDiscreteVariable,
     InputVariable,
 )
-from optimizers.opt_types import f64, af64
+from optimizers.core.types import AF, F
 
 
-def optim_ackley(x: af64) -> f64:
+def optim_ackley(x: AF) -> F:
     a = 20.0
     b = 0.2
     c = 2 * np.pi
@@ -36,12 +39,12 @@ def optim_ackley(x: af64) -> f64:
     )
 
 
-def optim_rosenbrock(x: af64) -> f64:
+def optim_rosenbrock(x: AF) -> F:
     # https://en.wikipedia.org/wiki/Rosenbrock_function
     return np.sum(100 * (x[0::2] ** 2 - x[1::2]) ** 2 + (x[0::2] - 1) ** 2)
 
 
-def optim_para(x: af64) -> f64:
+def optim_para(x: AF) -> F:
     # N-dimensional parabola
     return np.sqrt(np.sum(np.power(x - 1.414, 2)))
 
@@ -59,7 +62,7 @@ def test_aco():
         solution_archive_size=100,
         learning_rate=0.5,
         q=1.0,
-        local_grad_optim=True,
+        local_grad_optim="grad",
         joblib_prefer="processes",
     )
     optimizer = AntColonyOptimizer(
@@ -184,7 +187,9 @@ def test_fibonacci():
         for ij in range(n_dim)
     ]
     soln_deck = SolutionDeck(archive_size=n_deck, num_vars=n_dim)
-    soln_deck.initialize_solution_deck(input_variables, optim_para, init_type="random")
+    soln_deck.initialize_solution_deck(
+        input_variables, optim_para, init_type="fibonacci"
+    )
 
     # Verify solution deck was created correctly
     assert soln_deck.archive_size == n_deck

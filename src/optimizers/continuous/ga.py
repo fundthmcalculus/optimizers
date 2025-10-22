@@ -4,18 +4,25 @@ import joblib
 import numpy as np
 
 from .local import apply_local_optimization
-from .opt_types import af64
-from .optimizer_base import (
-    IOptimizer,
+from ..core.types import AF
+from ..core.base import (
     OptimizerResult,
     IOptimizerConfig,
-    InputArguments,
+)
+from .base import (
     setup_for_generations,
     check_stop_early,
 )
+from ..core.variables import InputVariables
+from .base import OptimizerBase
 
-from .solution_deck import GoalFcn, LocalOptimType, SolutionDeck, WrappedGoalFcn
-from .variables import InputVariables
+from optimizers.solution_deck import (
+    GoalFcn,
+    LocalOptimType,
+    SolutionDeck,
+    WrappedGoalFcn,
+    InputArguments,
+)
 
 
 @dataclass
@@ -28,10 +35,10 @@ class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
 
 
 def tournament_selection(
-    population_deck: np.ndarray,
-    population_fitness: np.ndarray,
+    population_deck: AF,
+    population_fitness: AF,
     tournament_size: int = 3,
-) -> np.ndarray:
+) -> AF:
     # Randomly sample row
     row_idxs = np.random.choice(
         len(population_deck), size=tournament_size, replace=False
@@ -41,9 +48,7 @@ def tournament_selection(
     return population_deck[row_idxs[row_idx_sort[0]], :]
 
 
-def crossover(
-    parent1: np.ndarray, parent2: np.ndarray, crossover_rate: float
-) -> tuple[np.ndarray, np.ndarray]:
+def crossover(parent1: AF, parent2: AF, crossover_rate: float) -> tuple[AF, AF]:
     # Randomly pick a point in the array that the swap starts
     if np.random.rand() < crossover_rate:
         crossover_idx = np.random.choice(len(parent1))
@@ -58,10 +63,8 @@ def crossover(
         return parent1, parent2
 
 
-def mutate(
-    child: np.ndarray, mutation_rate: float, variables: InputVariables
-) -> np.ndarray:
-    mutant_child: af64 = np.copy(child)
+def mutate(child: AF, mutation_rate: float, variables: InputVariables) -> AF:
+    mutant_child: AF = np.copy(child)
     for ij, variable in enumerate(variables):
         if np.random.random() < mutation_rate:
             mutant_child[ij] = variable.perturb_value(mutant_child[ij])
@@ -73,11 +76,11 @@ def run_ga(
     mutation_rate: float,
     crossover_rate: float,
     local_optim: LocalOptimType,
-    solution_values: np.ndarray,
-    solution_archive: np.ndarray,
+    solution_values: AF,
+    solution_archive: AF,
     variables: InputVariables,
     fcn: WrappedGoalFcn,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[AF, AF]:
     new_population = np.zeros((n_steps, len(variables)))
     new_population_fitness = np.zeros(n_steps)
     for row in range(n_steps):
@@ -104,7 +107,7 @@ def run_ga(
     return new_population, new_population_fitness
 
 
-class GeneticAlgorithmOptimizer(IOptimizer):
+class GeneticAlgorithmOptimizer(OptimizerBase):
     def __init__(
         self,
         name: str,

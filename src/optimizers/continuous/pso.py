@@ -4,21 +4,24 @@ import joblib
 import numpy as np
 
 from .local import apply_local_optimization
-from .optimizer_base import (
-    IOptimizer,
+from optimizers.core.base import (
     IOptimizerConfig,
     OptimizerResult,
+)
+from .base import (
+    OptimizerBase,
     setup_for_generations,
     check_stop_early,
     cdf,
 )
-from .variables import InputDiscreteVariable, InputVariables
-from .opt_types import af64
-from .solution_deck import (
+from .variables import InputDiscreteVariable
+from ..core.types import af64
+from optimizers.solution_deck import (
     WrappedGoalFcn,
     GoalFcn,
     LocalOptimType,
     InputArguments,
+    InputVariables,
     SolutionDeck,
 )
 
@@ -123,7 +126,7 @@ def run_particles(
     return new_solutions, new_values
 
 
-class ParticleSwarmOptimizer(IOptimizer):
+class ParticleSwarmOptimizer(OptimizerBase):
     def __init__(
         self,
         name: str,

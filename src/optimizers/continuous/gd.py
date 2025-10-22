@@ -5,16 +5,19 @@ import numpy as np
 from scipy.optimize import OptimizeResult, minimize
 from tqdm.std import tqdm
 
-from .optimizer_base import (
+from optimizers.core.base import (
     IOptimizerConfig,
-    IOptimizer,
-    GoalFcn,
     OptimizerResult,
-    InputArguments,
 )
-from .solution_deck import WrappedGoalFcn
-from .tqdm_joblib import tqdm_joblib
-from .variables import InputContinuousVariable, InputDiscreteVariable, InputVariables
+from optimizers.solution_deck import (
+    WrappedGoalFcn,
+    GoalFcn,
+    InputArguments,
+    InputVariables,
+)
+from optimizers.core.tqdm_joblib import tqdm_joblib
+from .variables import InputContinuousVariable, InputDiscreteVariable
+from .base import OptimizerBase
 
 
 @dataclass
@@ -92,7 +95,7 @@ def _count_discrete_vars(variables: InputVariables) -> tuple[int, list[int]]:
     return len(disc_vars), [p[1] for p in disc_vars]
 
 
-class GradientDescentOptimizer(IOptimizer):
+class GradientDescentOptimizer(OptimizerBase):
     def __init__(
         self,
         name: str,

@@ -16,14 +16,18 @@ dependencies = [
     "tqdm>=4.60",
     "joblib>=1.0",
     "contextlib2>=0.6.0",
-    "kmodes>=0.12.2"
+    "kmodes>=0.12.2",
+    "scipy>=1.16"
 ]
 
 [project.optional-dependencies]
 dev = [
 	"pytest>=6.0",
 	"black>=24.0",
-    "matplotlib"
+    "matplotlib>=3.10",
+    "flake8",
+    "Flake8-pyproject",
+    "plotly"
 ]
 
 [tool.setuptools]
@@ -40,4 +44,6 @@ optimizers = "optimizers.__init__:main"
 
 [tool.flake8]
 max-line-length = 120
-
+exclude = ".git,__pycache__,build,dist,.eggs,.tox,.venv,venv"
+include = "./src,./tests"
+extend-ignore = ["E203"]

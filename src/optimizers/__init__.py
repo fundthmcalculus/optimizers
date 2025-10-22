@@ -1,7 +1,20 @@
-from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
-from .gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
-from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
-from .optimizer_strategy import MultiTypeOptimizer, IOptimizerConfig
+from optimizers.continuous.aco import AntColonyOptimizer, AntColonyOptimizerConfig
+from optimizers.continuous.gd import (
+    GradientDescentOptimizer,
+    GradientDescentOptimizerConfig,
+)
+from optimizers.continuous.ga import (
+    GeneticAlgorithmOptimizer,
+    GeneticAlgorithmOptimizerConfig,
+)
+from optimizers.continuous.optimizer_strategy import (
+    MultiTypeOptimizer,
+    IOptimizerConfig,
+)
+from optimizers.continuous.pso import (
+    ParticleSwarmOptimizer,
+    ParticleSwarmOptimizerConfig,
+)
 
 __all__ = [
     "AntColonyOptimizer",
@@ -11,5 +24,7 @@ __all__ = [
     "GeneticAlgorithmOptimizer",
     "GeneticAlgorithmOptimizerConfig",
     "MultiTypeOptimizer",
+    "ParticleSwarmOptimizer",
+    "ParticleSwarmOptimizerConfig",
     "IOptimizerConfig",
 ]
