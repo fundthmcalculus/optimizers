@@ -11,7 +11,7 @@ def plot_convergence(tour_lengths: np.ndarray):
         fig.add_trace(
             go.Scatter(
                 x=np.r_[0 : tour_lengths.shape[-1]],
-                y=tour_lengths[trace,:],
+                y=tour_lengths[trace, :],
                 mode="lines+markers",
                 name=f"Tour Length-{trace+1}",
                 line=dict(width=2),

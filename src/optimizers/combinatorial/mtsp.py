@@ -24,7 +24,7 @@ class AntColonyMTSPConfig(AntColonyTSPConfig):
 
 
 class AntColonyMTSP:
-    def __init__(self,config: AntColonyMTSPConfig, city_locations: AF):
+    def __init__(self, config: AntColonyMTSPConfig, city_locations: AF):
         self.config = config
         self.city_locations: AF = city_locations.copy()
 
@@ -35,8 +35,13 @@ class AntColonyMTSP:
         elif self.config.clustering_method == "TSP":
             # Create n_cities DiscreteVariable with the options being each cluster
             cluster_ids = np.arange(self.config.n_clusters)
-            variables = [InputDiscreteVariable(f"cluster_{i}", cluster_ids) for i in range(self.city_locations.shape[0])]
-            solver_config = create_from_dict(self.config.__dict__, AntColonyOptimizerConfig)
+            variables = [
+                InputDiscreteVariable(f"cluster_{i}", cluster_ids)
+                for i in range(self.city_locations.shape[0])
+            ]
+            solver_config = create_from_dict(
+                self.config.__dict__, AntColonyOptimizerConfig
+            )
             tsp_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
             # Because this is a multi-level optimization, don't parallelize here.
             solver_config.joblib_num_procs = 1
@@ -49,20 +54,28 @@ class AntColonyMTSP:
                     cluster_cities = self.city_locations[x == cluster_id, :]
                     if len(cluster_cities) == 0:
                         continue
-                    tsp_solve = AntColonyTSP(f"tsp-cluster-{cluster_id+1}",tsp_config, city_locations=cluster_cities)
+                    tsp_solve = AntColonyTSP(
+                        f"tsp-cluster-{cluster_id+1}",
+                        tsp_config,
+                        city_locations=cluster_cities,
+                    )
                     tsp_result = tsp_solve.solve()
                     total_value += tsp_result.optimal_value
                 return total_value
 
-            solver = AntColonyOptimizer(name="TSP cluster optimizer",
-                                        config=solver_config,
-                                        variables=variables,
-                                        fcn=goal_fcn)
+            solver = AntColonyOptimizer(
+                name="TSP cluster optimizer",
+                config=solver_config,
+                variables=variables,
+                fcn=goal_fcn,
+            )
             result = solver.solve()
 
             raise ValueError("TSP clustering is not yet supported")
         else:
-            raise ValueError(f"Unknown clustering method: {self.config.clustering_method}")
+            raise ValueError(
+                f"Unknown clustering method: {self.config.clustering_method}"
+            )
 
     def solve_kmeans(self) -> CombinatoricsResult:
         # Perform k-means clustering
@@ -84,12 +97,14 @@ class AntColonyMTSP:
             tsp_solve = AntColonyTSP(cluster_config, city_locations=cluster_cities)
             cluster_result = tsp_solve.solve()
             # Map cluster indices back to original indices
-            cluster_result.optimal_path = np.array([cluster[i] for i in cluster_result.optimal_path])
+            cluster_result.optimal_path = np.array(
+                [cluster[i] for i in cluster_result.optimal_path]
+            )
 
             results.append(cluster_result)
         return CombinatoricsResult(
             value_history=np.vstack([result.value_history for result in results]),
             optimal_value=np.sum([result.optimal_value for result in results]),
             stop_reason="max_iterations",
-            optimal_path=np.vstack([result.optimal_path for result in results])
+            optimal_path=np.vstack([result.optimal_path for result in results]),
         )

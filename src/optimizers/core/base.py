@@ -4,7 +4,7 @@ import numpy as np
 
 from .types import AF, F
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def create_from_dict(data: dict, cls: Type[T]) -> T:

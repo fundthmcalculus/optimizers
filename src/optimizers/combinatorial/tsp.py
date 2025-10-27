@@ -30,7 +30,12 @@ class AntColonyTSPConfig(IOptimizerConfig):
 
 
 class AntColonyTSP:
-    def __init__(self,config: AntColonyTSPConfig, network_routes: Optional[AF] = None, city_locations: Optional[AF] = None):
+    def __init__(
+        self,
+        config: AntColonyTSPConfig,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
         self.config = config
         # If we have network routes, use that, otherwise, use the city locations
         if network_routes is None:
@@ -42,7 +47,6 @@ class AntColonyTSP:
             self.network_routes = pairwise_distances(city_locations)
         else:
             self.network_routes = network_routes.copy()
-
 
     def solve(self) -> CombinatoricsResult:
         self.network_routes[self.network_routes == 0] = -1
@@ -75,7 +79,8 @@ class AntColonyTSP:
                     return run_ant(self.network_routes, eta, tau, self.config)
 
                 all_results = parallel(
-                    delayed(parallel_ant)(i_ant) for i_ant in range(self.config.population_size)
+                    delayed(parallel_ant)(i_ant)
+                    for i_ant in range(self.config.population_size)
                 )
 
                 for ant in range(self.config.population_size):
@@ -89,9 +94,13 @@ class AntColonyTSP:
                         optimal_ant_len = tour_length
                         optimal_ant_city_order = city_order
                     for i in range(len(city_order) - 1):
-                        delta_tau[city_order[i], city_order[i + 1]] += self.config.q / tour_length
+                        delta_tau[city_order[i], city_order[i + 1]] += (
+                            self.config.q / tour_length
+                        )
                     if self.config.back_to_start:
-                        delta_tau[city_order[-1], city_order[0]] += self.config.q / tour_length
+                        delta_tau[city_order[-1], city_order[0]] += (
+                            self.config.q / tour_length
+                        )
                 # Update the per-generation information
                 if optimal_ant_len < optimal_tour_length:
                     optimal_tour_length = optimal_ant_len
@@ -99,10 +108,12 @@ class AntColonyTSP:
                 tour_lengths.append(optimal_tour_length)
                 # Once all ants are done, update the pheromone
                 tau = pheromone_update(tau, delta_tau, self.config.rho)
-        return CombinatoricsResult(optimal_path=np.array(optimal_city_order),
-                                   optimal_value=optimal_tour_length,
-                                   value_history=np.array(tour_lengths),
-                                   stop_reason="max_iterations")
+        return CombinatoricsResult(
+            optimal_path=np.array(optimal_city_order),
+            optimal_value=optimal_tour_length,
+            value_history=np.array(tour_lengths),
+            stop_reason="max_iterations",
+        )
 
 
 def pheromone_update(tau_xy, delta_tau_xy, rho):

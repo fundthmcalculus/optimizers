@@ -57,31 +57,37 @@ def plot_cities_and_route(cities, route):
     fig = go.Figure()
 
     # Plot cities
-    fig.add_trace(go.Scatter(
-        x=cities[:, 0],
-        y=cities[:, 1],
-        mode='markers',
-        name='Cities',
-        marker=dict(size=8, color='blue')
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=cities[:, 0],
+            y=cities[:, 1],
+            mode="markers",
+            name="Cities",
+            marker=dict(size=8, color="blue"),
+        )
+    )
 
     # Plot route
     for ir, route in enumerate(route):
-        route_cities = np.vstack((cities[route], cities[route[0]]))  # Connect back to start
-        fig.add_trace(go.Scatter(
-            x=route_cities[:, 0],
-            y=route_cities[:, 1],
-            mode='lines',
-            name=f'Route-{ir+1}',
-            line=dict(width=2)
-        ))
+        route_cities = np.vstack(
+            (cities[route], cities[route[0]])
+        )  # Connect back to start
+        fig.add_trace(
+            go.Scatter(
+                x=route_cities[:, 0],
+                y=route_cities[:, 1],
+                mode="lines",
+                name=f"Route-{ir+1}",
+                line=dict(width=2),
+            )
+        )
 
     fig.update_layout(
-        title='TSP Route',
-        xaxis_title='X',
-        yaxis_title='Y',
+        title="TSP Route",
+        xaxis_title="X",
+        yaxis_title="Y",
         showlegend=True,
-        template='plotly_white'
+        template="plotly_white",
     )
 
     fig.show()
@@ -95,9 +101,9 @@ def test_tsp():
     print("Distance-shape", distances.shape)
 
     approx_optimal_dist = (
-            N_CLUSTERS * poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_DIAMETER / 2.0)
-            + poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_SPACING)
-            - N_CLUSTERS * CLUSTER_DIAMETER
+        N_CLUSTERS * poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_DIAMETER / 2.0)
+        + poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_SPACING)
+        - N_CLUSTERS * CLUSTER_DIAMETER
     )
     if HALF_CIRCLE:
         approx_optimal_dist /= 2.0
@@ -122,9 +128,9 @@ def test_mtsp():
     print("Distance-shape", distances.shape)
 
     approx_optimal_dist = (
-            N_CLUSTERS * poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_DIAMETER / 2.0)
-            + poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_SPACING)
-            - N_CLUSTERS * CLUSTER_DIAMETER
+        N_CLUSTERS * poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_DIAMETER / 2.0)
+        + poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_SPACING)
+        - N_CLUSTERS * CLUSTER_DIAMETER
     )
     if HALF_CIRCLE:
         approx_optimal_dist /= 2.0
@@ -133,8 +139,11 @@ def test_mtsp():
     )
     # Compute TSP optimized distance
     config = AntColonyMTSPConfig(
-        name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS, n_clusters=N_CLUSTERS,
-        clustering_method="kmeans"
+        name="Test TSP",
+        num_generations=N_GENERATIONS,
+        population_size=N_ANTS,
+        n_clusters=N_CLUSTERS,
+        clustering_method="kmeans",
     )
     optimizer = AntColonyMTSP(config, all_cities)
     result = optimizer.solve()
