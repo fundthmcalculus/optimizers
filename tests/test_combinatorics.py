@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.base import check_path_distance
+from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.tsp import AntColonyTSPConfig, AntColonyTSP
 from optimizers.core.types import AF
 from optimizers.plot import plot_convergence
@@ -65,14 +66,15 @@ def plot_cities_and_route(cities, route):
     ))
 
     # Plot route
-    route_cities = np.vstack((cities[route], cities[route[0]]))  # Connect back to start
-    fig.add_trace(go.Scatter(
-        x=route_cities[:, 0],
-        y=route_cities[:, 1],
-        mode='lines',
-        name='Route',
-        line=dict(color='red', width=2)
-    ))
+    for ir, route in enumerate(route):
+        route_cities = np.vstack((cities[route], cities[route[0]]))  # Connect back to start
+        fig.add_trace(go.Scatter(
+            x=route_cities[:, 0],
+            y=route_cities[:, 1],
+            mode='lines',
+            name=f'Route-{ir+1}',
+            line=dict(width=2)
+        ))
 
     fig.update_layout(
         title='TSP Route',
@@ -107,6 +109,33 @@ def test_tsp():
         name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS
     )
     optimizer = AntColonyTSP(config, distances)
-    optimal_order, optimal_length, tour_lengths = optimizer.solve()
-    plot_convergence(tour_lengths)
-    plot_cities_and_route(all_cities, optimal_order)
+    result = optimizer.solve()
+    plot_convergence(result.value_history)
+    plot_cities_and_route(all_cities, result.optimal_path)
+
+
+def test_mtsp():
+    print("Configuring random")
+    all_cities = circle_random_clusters()
+    # Compute all distances
+    distances: AF = pairwise_distances(all_cities)
+    print("Distance-shape", distances.shape)
+
+    approx_optimal_dist = (
+            N_CLUSTERS * poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_DIAMETER / 2.0)
+            + poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_SPACING)
+            - N_CLUSTERS * CLUSTER_DIAMETER
+    )
+    if HALF_CIRCLE:
+        approx_optimal_dist /= 2.0
+    rand_dist = check_path_distance(
+        distances, np.random.permutation(np.arange(N_CLUSTERS * N_CITIES_CLUSTER))
+    )
+    # Compute TSP optimized distance
+    config = AntColonyMTSPConfig(
+        name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS, n_clusters=N_CLUSTERS
+    )
+    optimizer = AntColonyMTSP(config, distances)
+    result = optimizer.solve()
+    plot_convergence(result.value_history)
+    plot_cities_and_route(all_cities, result.optimal_path)

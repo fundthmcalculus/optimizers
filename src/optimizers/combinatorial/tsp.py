@@ -6,12 +6,9 @@ from dataclasses import dataclass
 import tqdm
 from joblib import Parallel, delayed
 
-from .base import check_path_distance
+from .base import check_path_distance, CombinatoricsResult
 from ..core.base import IOptimizerConfig
 from ..core.types import AI, AF, F, i32, i16
-
-
-# TODO - Handle multi-TSP solutions with k-means or a GA for cluster selection?
 
 
 @dataclass
@@ -32,11 +29,16 @@ class AntColonyTSPConfig(IOptimizerConfig):
 
 
 class AntColonyTSP:
-    def __init__(self, config: AntColonyTSPConfig, network_routes: AF):
+    def __init__(self, config: AntColonyTSPConfig, network_routes: Optional[AF] = None, city_locations: Optional[AF] = None):
         self.config = config
+        # If we have network routes, use that, otherwise, use the city locations
+        if network_routes is None:
+            assert city_locations is not None
+            # TODO - Compute the pairwise distances
+            network_routes = np.sqrt(np.sum((city_locations[:, None, :] - city_locations[None, :, :]) ** 2, axis=-1))
         self.network_routes: AF = network_routes.copy()
 
-    def solve(self) -> tuple[list[int], float, list[float]]:
+    def solve(self) -> CombinatoricsResult:
         self.network_routes[self.network_routes == 0] = -1
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes
@@ -91,7 +93,10 @@ class AntColonyTSP:
                 tour_lengths.append(optimal_tour_length)
                 # Once all ants are done, update the pheromone
                 tau = pheromone_update(tau, delta_tau, self.config.rho)
-        return optimal_city_order, optimal_tour_length, tour_lengths
+        return CombinatoricsResult(optimal_path=np.array(optimal_city_order),
+                                   optimal_value=optimal_tour_length,
+                                   value_history=np.array(tour_lengths),
+                                   stop_reason="max_iterations")
 
 
 def pheromone_update(tau_xy, delta_tau_xy, rho):

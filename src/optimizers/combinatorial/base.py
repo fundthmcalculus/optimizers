@@ -1,4 +1,14 @@
 from ..core.types import AF, AI, F
+from ..core.base import StopReason
+from dataclasses import dataclass
+
+
+@dataclass
+class CombinatoricsResult:
+    optimal_path: AI
+    optimal_value: F
+    value_history: AF
+    stop_reason: StopReason
 
 
 def check_path_distance(distances: AF, order_path: AI, return_to_start=False) -> F:
