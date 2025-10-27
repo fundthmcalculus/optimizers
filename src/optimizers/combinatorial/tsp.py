@@ -30,7 +30,7 @@ class AntColonyTSPConfig(IOptimizerConfig):
 
 
 class AntColonyTSP:
-    def __init__(self, config: AntColonyTSPConfig, network_routes: Optional[AF] = None, city_locations: Optional[AF] = None):
+    def __init__(self,config: AntColonyTSPConfig, network_routes: Optional[AF] = None, city_locations: Optional[AF] = None):
         self.config = config
         # If we have network routes, use that, otherwise, use the city locations
         if network_routes is None:
@@ -44,7 +44,7 @@ class AntColonyTSP:
             self.network_routes = network_routes.copy()
 
 
-def solve(self) -> CombinatoricsResult:
+    def solve(self) -> CombinatoricsResult:
         self.network_routes[self.network_routes == 0] = -1
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes

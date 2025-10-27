@@ -23,5 +23,5 @@ T = typing.TypeVar("T")
 AF = typing.Union[af64, af32, af16]
 AI = typing.Union[ai64, ai32, ai16]
 F = typing.Union[f64, f32, f16]
-# I = typing.Union[i64, i32, i16]
+I = typing.Union[i64, i32, i16]
 B = typing.Union[b8]

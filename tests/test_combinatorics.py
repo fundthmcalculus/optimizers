@@ -133,9 +133,10 @@ def test_mtsp():
     )
     # Compute TSP optimized distance
     config = AntColonyMTSPConfig(
-        name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS, n_clusters=N_CLUSTERS
+        name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS, n_clusters=N_CLUSTERS,
+        clustering_method="kmeans"
     )
-    optimizer = AntColonyMTSP(config, distances)
+    optimizer = AntColonyMTSP(config, all_cities)
     result = optimizer.solve()
     plot_convergence(result.value_history)
     plot_cities_and_route(all_cities, result.optimal_path)

@@ -1,11 +1,10 @@
 from typing import Optional
 
 import numpy as np
-from numpy._typing import NDArray
 from numpy.random import Generator
 from scipy.stats import truncnorm
 
-from ..core.types import AF
+from ..core.types import AF, AI, F, I
 from ..core.variables import InputVariable
 
 
@@ -13,8 +12,8 @@ class InputDiscreteVariable(InputVariable):
     def __init__(
         self,
         name: str,
-        values: list[float] | NDArray[np.float64],
-        initial_value: float | None = None,
+        values: AF | AI,
+        initial_value: Optional[F | I] = None,
     ):
         super().__init__(name)
         self.values = values
@@ -26,16 +25,16 @@ class InputDiscreteVariable(InputVariable):
     def __str__(self):
         return self.__repr__()
 
-    def perturb_value(self, current_value: float) -> float:
+    def perturb_value(self, current_value: F | I) -> F | I:
         # Just randomly tweak to another choice.
         return self.initial_random_value()
 
     def random_value(
         self,
-        current_value: float = np.nan,
+        current_value: F | I = np.nan,
         other_values: Optional[AF] = None,
         learning_rate: float = 0.7,
-    ) -> float:
+    ) -> F | I:
         rng = np.random.default_rng()
         if other_values is not None:
             # Convert into a weighted count, but ensure every option has a non-zero probability
@@ -46,11 +45,11 @@ class InputDiscreteVariable(InputVariable):
             return rng.choice(self.values, p=p_count)
         return rng.choice(self.values)
 
-    def initial_random_value(self, perturbation: float = 0.1) -> float:
+    def initial_random_value(self, perturbation: float = 0.1) -> F | I:
         rng = np.random.default_rng()
         return rng.choice(self.values)
 
-    def range_value(self, p: float) -> float:
+    def range_value(self, p: float) -> F | I:
         # Map p in [0,1] to the discrete values
         idx = int(p * len(self.values))
         idx = min(max(idx, 0), len(self.values) - 1)

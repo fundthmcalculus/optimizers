@@ -62,7 +62,6 @@ class RandomOptimizerSelection(IOptimizerSelection):
 class MultiTypeOptimizer(OptimizerBase):
     def __init__(
         self,
-        name: str,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
@@ -70,7 +69,7 @@ class MultiTypeOptimizer(OptimizerBase):
         initial_optimizer: StochasticOptimType = "aco",
         optimizer_selector: IOptimizerSelection = RandomOptimizerSelection(),
     ):
-        super().__init__(name, config, fcn, variables, args)
+        super().__init__(config, fcn, variables, args)
         self.initial_optimizer = initial_optimizer
         self.optimizer_selector = optimizer_selector
         self.fcn = fcn

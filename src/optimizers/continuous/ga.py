@@ -110,14 +110,13 @@ def run_ga(
 class GeneticAlgorithmOptimizer(OptimizerBase):
     def __init__(
         self,
-        name: str,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
     ):
-        super().__init__(name, config, fcn, variables, args, existing_soln_deck)
+        super().__init__(config, fcn, variables, args, existing_soln_deck)
         self.config: GeneticAlgorithmOptimizerConfig = GeneticAlgorithmOptimizerConfig(
             **{**config.__dict__}
         )
