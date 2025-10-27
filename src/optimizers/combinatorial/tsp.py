@@ -11,7 +11,7 @@ from ..core.base import IOptimizerConfig
 from ..core.types import AI, AF, F, i32, i16
 
 
-# TODO - Handle multi-TSP solutions
+# TODO - Handle multi-TSP solutions with k-means or a GA for cluster selection?
 
 
 @dataclass
