@@ -22,7 +22,6 @@ class AntColonyMTSPConfig(AntColonyTSPConfig):
     n_clusters: int = 10
     """Number of clusters to split the cities into"""
     clustering_method: ClusterMethod = "kmeans"
-    # TODO - Other values?
 
 
 class AntColonyMTSP:

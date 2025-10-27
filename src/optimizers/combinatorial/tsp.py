@@ -2,6 +2,7 @@ import joblib
 import numpy as np
 from typing import Optional
 from dataclasses import dataclass
+from sklearn.metrics import pairwise_distances
 
 import tqdm
 from joblib import Parallel, delayed
@@ -34,11 +35,16 @@ class AntColonyTSP:
         # If we have network routes, use that, otherwise, use the city locations
         if network_routes is None:
             assert city_locations is not None
-            # TODO - Compute the pairwise distances
-            network_routes = np.sqrt(np.sum((city_locations[:, None, :] - city_locations[None, :, :]) ** 2, axis=-1))
-        self.network_routes: AF = network_routes.copy()
 
-    def solve(self) -> CombinatoricsResult:
+            # Compute pairwise distances between all cities
+            assert len(city_locations.shape) == 2, "City locations must be a 2D array"
+            self.city_locations = city_locations.copy()
+            self.network_routes = pairwise_distances(city_locations)
+        else:
+            self.network_routes = network_routes.copy()
+
+
+def solve(self) -> CombinatoricsResult:
         self.network_routes[self.network_routes == 0] = -1
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes
