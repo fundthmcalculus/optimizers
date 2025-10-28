@@ -67,6 +67,9 @@ def plot_cities_and_route(cities, route):
         )
     )
 
+    if len(route.shape) == 1:
+        route = route.reshape(1, -1)
+
     # Plot route
     for ir, route in enumerate(route):
         route_cities = np.vstack(

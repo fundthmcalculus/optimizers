@@ -97,25 +97,25 @@ class MultiTypeOptimizer(OptimizerBase):
 
         if selected_type == "aco":
             optimizer = AntColonyOptimizer(
-                self.name, converted_config, self.fcn, self.variables, self.args
+                converted_config, self.fcn, self.variables, self.args
             )
         elif selected_type == "pso":
             optimizer = ParticleSwarmOptimizer(
-                self.name, converted_config, self.fcn, self.variables, self.args
+                converted_config, self.fcn, self.variables, self.args
             )
         elif selected_type == "ga":
             optimizer = GeneticAlgorithmOptimizer(
-                self.name, converted_config, self.fcn, self.variables, self.args
+                converted_config, self.fcn, self.variables, self.args
             )
         elif selected_type == "gd":
             optimizer = GradientDescentOptimizer(
-                self.name, converted_config, self.fcn, self.variables, self.args
+                converted_config, self.fcn, self.variables, self.args
             )
         else:
             raise ValueError(f"Unknown optimizer type: {selected_type}")
 
         result = optimizer.solve(preserve_percent=0.0 if restart_count == 0 else 0.1)
-        if result.stopped_early and restart_count < max_restart:
+        if result.stop_reason == "no_improvement" and restart_count < max_restart:
             # If the optimizer stopped early, we can try another optimizer
             logging.warning(
                 f"Optimizer {selected_type} stopped early, selecting a new optimizer."

@@ -66,7 +66,6 @@ def test_aco():
         joblib_prefer="processes",
     )
     optimizer = AntColonyOptimizer(
-        name="ACO-AckleyFunction",
         config=config,
         variables=input_variables,
         fcn=optim_ackley,
@@ -90,7 +89,6 @@ def test_ga():
         name="GA Optimizer",
     )
     optimizer = GeneticAlgorithmOptimizer(
-        name="GA-AckleyFunction",
         config=config,
         variables=input_variables,
         fcn=optim_ackley,
@@ -114,7 +112,6 @@ def test_multi_optimizer():
         name="Various-types Optimizer",
     )
     optimizer = MultiTypeOptimizer(
-        name="Multi-strategy-AckleyFunction",
         config=config,
         variables=input_variables,
         fcn=optim_ackley,
@@ -144,7 +141,6 @@ def test_gd():
         ]
     )
     gd_soln = GradientDescentOptimizer(
-        "GD",
         config=GradientDescentOptimizerConfig(
             name="GD-optim",
             parallel_discrete_search=True,
@@ -167,7 +163,6 @@ def test_rosenbrock():
         for ij in range(n_dim)
     ]
     pso_soln = ParticleSwarmOptimizer(
-        "PSO",
         config=ParticleSwarmOptimizerConfig(
             name="PSO-optim",
         ),

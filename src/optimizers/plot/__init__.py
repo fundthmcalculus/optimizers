@@ -6,6 +6,9 @@ def plot_convergence(tour_lengths: np.ndarray):
     # Create the figure
     fig = go.Figure()
 
+    if len(tour_lengths.shape) == 1:
+        tour_lengths = tour_lengths.reshape(1, -1)
+
     # Add the line trace
     for trace in range(tour_lengths.shape[0]):
         fig.add_trace(
