@@ -19,14 +19,12 @@ class OptimizerBase(abc.ABC):
 
     def __init__(
         self,
-        name: str,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
     ):
-        self.name: str = name
         self.config: IOptimizerConfig = config
         self.variables: InputVariables = variables
         self.args: InputArguments | None = args

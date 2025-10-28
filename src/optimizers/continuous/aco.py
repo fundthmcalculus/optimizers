@@ -70,14 +70,13 @@ def run_ants(
 class AntColonyOptimizer(OptimizerBase):
     def __init__(
         self,
-        name: str,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
     ):
-        super().__init__(name, config, fcn, variables, args, existing_soln_deck)
+        super().__init__(config, fcn, variables, args, existing_soln_deck)
         self.config: AntColonyOptimizerConfig = AntColonyOptimizerConfig(
             **{**config.__dict__}
         )
@@ -133,6 +132,6 @@ class AntColonyOptimizer(OptimizerBase):
             solution_vector=self.soln_deck.solution_archive[0, :],
             solution_score=self.soln_deck.solution_value[0],
             solution_history=best_soln_history,
-            stopped_early=stopped_early,
+            stop_reason="no_improvement" if stopped_early else "max_iterations",
             generations_completed=generations_completed + 1,
         )

@@ -1,8 +1,26 @@
-from typing import Literal, Optional
-from dataclasses import dataclass
+from typing import Literal, Optional, TypeVar, Type
+from dataclasses import dataclass, fields
 import numpy as np
 
 from .types import AF, F
+
+T = TypeVar("T")
+
+
+def create_from_dict(data: dict, cls: Type[T]) -> T:
+    """Create a dataclass instance from a dictionary.
+
+    Args:
+        data: Dictionary containing field values
+        cls: Dataclass type to instantiate
+
+    Returns:
+        Instance of the dataclass with fields populated from the dictionary
+    """
+    field_names = {f.name for f in fields(cls)}
+    filtered_data = {k: v for k, v in data.items() if k in field_names}
+    return cls(**filtered_data)
+
 
 StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
 
