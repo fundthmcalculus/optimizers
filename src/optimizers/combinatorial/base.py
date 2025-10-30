@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 @dataclass
 class CombinatoricsResult:
-    optimal_path: AI
+    optimal_path: AI | list[AI]
     optimal_value: F
     value_history: AF
     stop_reason: StopReason

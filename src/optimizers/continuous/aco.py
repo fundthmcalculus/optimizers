@@ -8,7 +8,7 @@ from optimizers.core.base import (
     IOptimizerConfig,
     OptimizerResult,
 )
-from optimizers.continuous.base import setup_for_generations, check_stop_early, cdf
+from optimizers.continuous.base import check_stop_early, cdf
 from optimizers.core.types import af64
 from optimizers.solution_deck import (
     GoalFcn,

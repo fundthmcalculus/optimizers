@@ -1,6 +1,6 @@
 import logging
 import random
-from typing import Literal
+from typing import Literal, get_args, Optional
 from abc import ABC, abstractmethod
 
 from optimizers.core.base import IOptimizerConfig, OptimizerResult
@@ -11,11 +11,11 @@ from .pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
 from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
 from .gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
 
-StochasticOptimType = Literal["aco", "pso", "ga", "gd"]
+OptimizationType = Literal["aco", "pso", "ga", "gd"]
 
 
 def config_to_type(
-    config: IOptimizerConfig, to_type: StochasticOptimType
+    config: IOptimizerConfig, to_type: OptimizationType
 ) -> (
     AntColonyOptimizerConfig
     | ParticleSwarmOptimizerConfig
@@ -49,14 +49,17 @@ def config_to_type(
 
 class IOptimizerSelection(ABC):
     @abstractmethod
-    def select(self) -> StochasticOptimType:
+    def select(self, existing_optim: Optional[OptimizationType] = None) -> OptimizationType:
         pass
 
 
 class RandomOptimizerSelection(IOptimizerSelection):
-    def select(self) -> StochasticOptimType:
+    def select(self, existing_optim: Optional[OptimizationType] = None) -> OptimizationType:
+        choices = list(get_args(OptimizationType))
+        if existing_optim is not None:
+            choices.remove(existing_optim)
         # TODO - Find a better way to select optimizers
-        return random.choice(["aco", "pso", "ga", "gd"])
+        return random.choice(choices)
 
 
 class MultiTypeOptimizer(IOptimizer):
@@ -66,13 +69,14 @@ class MultiTypeOptimizer(IOptimizer):
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
-        initial_optimizer: StochasticOptimType = "aco",
+        initial_optimizer: OptimizationType = "aco",
         optimizer_selector: IOptimizerSelection = RandomOptimizerSelection(),
     ):
         super().__init__(config, fcn, variables, args)
         self.initial_optimizer = initial_optimizer
         self.optimizer_selector = optimizer_selector
         self.fcn = fcn
+        self.optimizer_choice_history = []
 
     def solve(
         self,
@@ -82,10 +86,11 @@ class MultiTypeOptimizer(IOptimizer):
         generations_completed: int = 0,
     ) -> OptimizerResult:
         selected_type = (
-            self.optimizer_selector.select()
+            self.optimizer_selector.select(self.optimizer_choice_history[-1])
             if restart_count > 0
             else self.initial_optimizer
         )
+        self.optimizer_choice_history.append(selected_type)
         logging.info(f"Selected optimizer: {selected_type}")
         converted_config = config_to_type(self.config, selected_type)
         # Ensure we do not exceed the total number of generations

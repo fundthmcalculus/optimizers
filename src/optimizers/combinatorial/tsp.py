@@ -7,7 +7,7 @@ import tqdm
 from joblib import Parallel, delayed
 
 from .base import check_path_distance, CombinatoricsResult, TSPBase
-from ..core.base import IOptimizerConfig
+from ..core.base import IOptimizerConfig, StopReason
 from ..core.types import AI, AF, F, i32, i16
 
 
@@ -194,6 +194,14 @@ class ConvexHullTSP(TSPBase):
         )
 
 
+def _check_stop_early(config: IOptimizerConfig, soln_history) -> StopReason:
+    if len(soln_history) < config.stop_after_iterations:
+        return "none"
+    if np.allclose(soln_history[-config.stop_after_iterations], soln_history[-1], rtol=1e-2, atol=1e-2):
+        return "no_improvement"
+    return "none"
+
+
 @dataclass
 class AntColonyTSPConfig(IOptimizerConfig):
     rho: float = 0.5
@@ -205,10 +213,13 @@ class AntColonyTSPConfig(IOptimizerConfig):
     q: float = 1.0
     """Weighting parameter for selecting better ranked solutions"""
     back_to_start: bool = True
+    local_optimize: bool = False
+    """Local optimization using 2OPT method"""
     """Whether to return to the start node"""
     hot_start: Optional[list[int]] = None
     """Hot start solution"""
     hot_start_length: Optional[float] = None
+    """Hot start length"""
 
 
 class AntColonyTSP(TSPBase):
@@ -277,11 +288,16 @@ class AntColonyTSP(TSPBase):
                 tour_lengths.append(optimal_tour_length)
                 # Once all ants are done, update the pheromone
                 tau = pheromone_update(tau, delta_tau, self.config.rho)
+                # Check for stopping early
+                stop_reason = _check_stop_early(self.config, tour_lengths)
+                if stop_reason != "none":
+                    break
+
         return CombinatoricsResult(
             optimal_path=np.array(optimal_city_order),
             optimal_value=optimal_tour_length,
             value_history=np.array(tour_lengths),
-            stop_reason="max_iterations",
+            stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
         )
 
 

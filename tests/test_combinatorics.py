@@ -2,14 +2,13 @@ import numpy as np
 import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
 
-from optimizers.combinatorial.base import check_path_distance
 from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.tsp import AntColonyTSPConfig, AntColonyTSP, NearestNeighborTSPConfig, NearestNeighborTSP, \
     ConvexHullTSP, ConvexHullTSPConfig, TwoOptTSPConfig, TwoOptTSP
 from optimizers.core.types import AF
 from optimizers.plot import plot_convergence
 
-N_CITIES_CLUSTER = 10
+N_CITIES_CLUSTER = 20
 N_CLUSTERS = N_CITIES_CLUSTER // 2
 
 N_ANTS = 10 * N_CITIES_CLUSTER
@@ -68,8 +67,8 @@ def plot_cities_and_route(cities, route):
         )
     )
 
-    if len(route.shape) == 1:
-        route = route.reshape(1, -1)
+    if not isinstance(route, list):
+        route = [route]
 
     # Plot route
     for ir, route in enumerate(route):
@@ -103,7 +102,8 @@ def test_aco_tsp():
     distances: AF = pairwise_distances(all_cities)
     # Compute TSP optimized distance
     config = AntColonyTSPConfig(
-        name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS
+        name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS,
+        stop_after_iterations=5, joblib_prefer="threads"
     )
     optimizer = AntColonyTSP(config, distances)
     result = optimizer.solve()
@@ -149,6 +149,7 @@ def test_mtsp():
         population_size=N_ANTS,
         n_clusters=N_CLUSTERS,
         clustering_method="kmeans",
+        stop_after_iterations=5
     )
     optimizer = AntColonyMTSP(config, all_cities)
     result = optimizer.solve()
