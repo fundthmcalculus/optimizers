@@ -122,8 +122,15 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         )
 
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
-        best_soln_history, generation_pbar, generations_completed, individuals_per_job, n_jobs, parallel, stopped_early = self.initialize(
-            preserve_percent)
+        (
+            best_soln_history,
+            generation_pbar,
+            generations_completed,
+            individuals_per_job,
+            n_jobs,
+            parallel,
+            stopped_early,
+        ) = self.initialize(preserve_percent)
         for generations_completed in generation_pbar:
             stopped_early = check_stop_early(
                 self.config, best_soln_history, self.soln_deck.solution_value

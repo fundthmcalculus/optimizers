@@ -4,7 +4,8 @@ from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.base import check_path_distance
 from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
-from optimizers.combinatorial.tsp import AntColonyTSPConfig, AntColonyTSP
+from optimizers.combinatorial.tsp import AntColonyTSPConfig, AntColonyTSP, NearestNeighborTSPConfig, NearestNeighborTSP, \
+    ConvexHullTSP, ConvexHullTSPConfig
 from optimizers.core.types import AF
 from optimizers.plot import plot_convergence
 
@@ -96,23 +97,10 @@ def plot_cities_and_route(cities, route):
     fig.show()
 
 
-def test_tsp():
-    print("Configuring random")
+def test_aco_tsp():
     all_cities = circle_random_clusters()
     # Compute all distances
     distances: AF = pairwise_distances(all_cities)
-    print("Distance-shape", distances.shape)
-
-    approx_optimal_dist = (
-        N_CLUSTERS * poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_DIAMETER / 2.0)
-        + poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_SPACING)
-        - N_CLUSTERS * CLUSTER_DIAMETER
-    )
-    if HALF_CIRCLE:
-        approx_optimal_dist /= 2.0
-    rand_dist = check_path_distance(
-        distances, np.random.permutation(np.arange(N_CLUSTERS * N_CITIES_CLUSTER))
-    )
     # Compute TSP optimized distance
     config = AntColonyTSPConfig(
         name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS
@@ -123,23 +111,31 @@ def test_tsp():
     plot_cities_and_route(all_cities, result.optimal_path)
 
 
-def test_mtsp():
-    print("Configuring random")
+def test_nn_tsp():
     all_cities = circle_random_clusters()
     # Compute all distances
     distances: AF = pairwise_distances(all_cities)
-    print("Distance-shape", distances.shape)
+    # Compute TSP optimized distance
+    config = NearestNeighborTSPConfig(name="Test NN", back_to_start=True)
+    optimizer = NearestNeighborTSP(config, distances)
+    result = optimizer.solve()
+    plot_cities_and_route(all_cities, result.optimal_path)
 
-    approx_optimal_dist = (
-        N_CLUSTERS * poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_DIAMETER / 2.0)
-        + poly_perimeter(N_CITIES_CLUSTER, r=CLUSTER_SPACING)
-        - N_CLUSTERS * CLUSTER_DIAMETER
-    )
-    if HALF_CIRCLE:
-        approx_optimal_dist /= 2.0
-    rand_dist = check_path_distance(
-        distances, np.random.permutation(np.arange(N_CLUSTERS * N_CITIES_CLUSTER))
-    )
+
+def test_convex_hull_tsp():
+    all_cities = circle_random_clusters()
+    # Compute all distances
+    distances: AF = pairwise_distances(all_cities)
+    # Compute TSP optimized distance
+    config = ConvexHullTSPConfig(name="Test Convex Hull", back_to_start=True)
+    optimizer = ConvexHullTSP(config, city_locations=all_cities)
+    result = optimizer.solve()
+    plot_cities_and_route(all_cities, result.optimal_path)
+
+
+def test_mtsp():
+    all_cities = circle_random_clusters()
+    # Compute all distances
     # Compute TSP optimized distance
     config = AntColonyMTSPConfig(
         name="Test TSP",

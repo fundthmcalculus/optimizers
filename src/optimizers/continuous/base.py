@@ -45,7 +45,9 @@ class IOptimizer(abc.ABC):
         """
         raise NotImplementedError("This method should be overridden by subclasses.")
 
-    def initialize(self, preserve_percent: float) -> tuple[AF, tqdm.tqdm, int, int, int, joblib.Parallel, bool]:
+    def initialize(
+        self, preserve_percent: float
+    ) -> tuple[AF, tqdm.tqdm, int, int, int, joblib.Parallel, bool]:
         self.validate_config()
         self.soln_deck.initialize_solution_deck(
             self.variables, self.wrapped_fcn, preserve_percent
@@ -59,7 +61,15 @@ class IOptimizer(abc.ABC):
         )
         stopped_early = False
         generations_completed = 0
-        return best_soln_history, generation_pbar, generations_completed, individuals_per_job, n_jobs, parallel, stopped_early
+        return (
+            best_soln_history,
+            generation_pbar,
+            generations_completed,
+            individuals_per_job,
+            n_jobs,
+            parallel,
+            stopped_early,
+        )
 
     def validate_config(self) -> None:
         """

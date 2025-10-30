@@ -6,7 +6,6 @@ from src.optimizers.variables import InputContinuousVariable
 from tests.test_optimizers import optim_ackley
 
 
-
 def main():
     print(f"GIL Enabled={sys._is_gil_enabled()}")
     num_runs = 1
@@ -24,7 +23,7 @@ def main():
         q=1.0,
         local_grad_optim=True,
         joblib_prefer="processes",
-        n_jobs=4
+        n_jobs=4,
     )
     optimizer = AntColonyOptimizer(
         name="ACO-AckleyFunction",
@@ -47,8 +46,12 @@ def main():
         best_solution = optimizer.solve()
     thread_time = time.perf_counter() - start_time
 
-    print(f"{num_runs}-run Process-based execution time: {process_time/num_runs:.4f} seconds")
-    print(f"{num_runs}-run Thread-based execution time: {thread_time/num_runs:.4f} seconds")
+    print(
+        f"{num_runs}-run Process-based execution time: {process_time/num_runs:.4f} seconds"
+    )
+    print(
+        f"{num_runs}-run Thread-based execution time: {thread_time/num_runs:.4f} seconds"
+    )
 
 
 if __name__ == "__main__":

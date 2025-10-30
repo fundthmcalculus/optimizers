@@ -1,3 +1,5 @@
+from abc import ABC, abstractmethod
+
 import joblib
 import numpy as np
 from typing import Optional
@@ -10,6 +12,164 @@ from joblib import Parallel, delayed
 from .base import check_path_distance, CombinatoricsResult
 from ..core.base import IOptimizerConfig
 from ..core.types import AI, AF, F, i32, i16
+
+
+class TSPBase(ABC):
+    def __init__(self,
+                 network_routes: Optional[AF] = None,
+                 city_locations: Optional[AF] = None,
+                 ):
+        self.city_locations = None
+        self.network_routes = None
+        self.set_network_routes(network_routes, city_locations)
+
+    def set_network_routes(self,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None):
+        """Set the network routes for the TSP solver"""
+        # If we have network routes, use that, otherwise, use the city locations
+        if network_routes is None:
+            assert city_locations is not None
+
+            # Compute pairwise distances between all cities
+            assert len(city_locations.shape) == 2, "City locations must be a 2D array"
+            self.city_locations = city_locations.copy()
+            self.network_routes = pairwise_distances(city_locations)
+        else:
+            self.network_routes = network_routes.copy()
+
+    @abstractmethod
+    def solve(self) -> CombinatoricsResult:
+        raise NotImplementedError("")
+
+
+@dataclass
+class NearestNeighborTSPConfig(IOptimizerConfig):
+    back_to_start: bool = True
+    """Whether to return to the start node"""
+
+
+class NearestNeighborTSP(TSPBase):
+    def __init__(
+        self,
+        config: NearestNeighborTSPConfig,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
+        super().__init__(network_routes, city_locations)
+        self.config = config
+
+    
+    def solve(self) -> CombinatoricsResult:
+        # Start at the first node, pick the nearest neighbor
+        route = [0]
+
+        # Initialize variables for tracking visited nodes and total distance
+        visited = set()
+        total_distance = 0
+
+        current_node = 0  # Start at first node (index 0)
+        visited.add(current_node)
+
+        while len(visited) < self.network_routes.shape[0]:
+            # Find the nearest unvisited neighbor
+            min_distance = float('inf')
+            nearest_neighbor = -1
+
+            for i in range(self.network_routes.shape[0]):
+                if i not in visited and self.network_routes[current_node][i] < min_distance:
+                    min_distance = self.network_routes[current_node][i]
+                    nearest_neighbor = i
+
+            # Check if we found a valid neighbor
+            if nearest_neighbor == -1:
+                break
+
+            # Add to route and update distance 
+            route.append(nearest_neighbor)
+            visited.add(nearest_neighbor)
+            total_distance += min_distance
+            current_node = nearest_neighbor
+
+        # If back_to_start is True, add the final connection
+        if self.config.back_to_start:
+            total_distance += self.network_routes[current_node][0]
+            route.append(0)
+
+        return CombinatoricsResult(
+            optimal_path=np.array(route),
+            optimal_value=total_distance,
+            value_history=np.array([total_distance]),
+            stop_reason="none"
+        )
+
+
+@dataclass
+class ConvexHullTSPConfig(IOptimizerConfig):
+    back_to_start: bool = True
+    """Whether to return to the start node"""
+
+
+class ConvexHullTSP(TSPBase):
+    def __init__(self, config: ConvexHullTSPConfig, network_routes: Optional[AF] = None,
+                 city_locations: Optional[AF] = None):
+        super().__init__(network_routes, city_locations)
+        self.config = config
+
+    def solve(self) -> CombinatoricsResult:
+        # Use the windmill method starting at point-0.
+        # NOTE - This will give us the convex hull PLUS the sequence required to get there.
+        current_node = 0
+        total_distance = 0
+        tour = [current_node]
+        visited = set()
+        visited.add(current_node)
+        start_theta = 0.0
+
+        def atan2pos(v):
+            t = np.atan2(v[1],v[0])
+            if t < 0:
+                t += 2 * np.pi
+            return t
+
+        restarted = False
+        while True:
+            # Find the point which is CCW from this point by the least amount.
+            min_idx = -1
+            min_theta = float('inf')
+            p0 = self.city_locations[current_node]
+            for i in range(self.city_locations.shape[0]):
+                if i != current_node:
+                    p_i = self.city_locations[i]
+                    dp = p_i - p0
+                    theta = atan2pos(dp)
+                    if min_theta > theta >= start_theta:
+                        min_theta = theta
+                        min_idx = i
+            if min_idx == -1:
+                if not restarted:
+                    # Retry this once for the mod 2pi issue
+                    start_theta -= 2.0 * np.pi
+                    continue
+                else:
+                    break
+            start_theta = min_theta
+            total_distance += self.network_routes[current_node][min_idx]
+            current_node = min_idx
+            tour.append(current_node)
+            if current_node in visited:
+                break
+            visited.add(current_node)
+
+        return CombinatoricsResult(
+            optimal_path=np.array(tour),
+            optimal_value=total_distance,
+            value_history=np.array([total_distance]),
+            stop_reason="none",
+        )
+
+
+
 
 
 @dataclass
@@ -29,24 +189,11 @@ class AntColonyTSPConfig(IOptimizerConfig):
     hot_start_length: Optional[float] = None
 
 
-class AntColonyTSP:
-    def __init__(
-        self,
-        config: AntColonyTSPConfig,
-        network_routes: Optional[AF] = None,
-        city_locations: Optional[AF] = None,
-    ):
+class AntColonyTSP(TSPBase):
+    def __init__(self, config: AntColonyTSPConfig, network_routes: Optional[AF] = None,
+                 city_locations: Optional[AF] = None):
+        super().__init__(network_routes, city_locations)
         self.config = config
-        # If we have network routes, use that, otherwise, use the city locations
-        if network_routes is None:
-            assert city_locations is not None
-
-            # Compute pairwise distances between all cities
-            assert len(city_locations.shape) == 2, "City locations must be a 2D array"
-            self.city_locations = city_locations.copy()
-            self.network_routes = pairwise_distances(city_locations)
-        else:
-            self.network_routes = network_routes.copy()
 
     def solve(self) -> CombinatoricsResult:
         self.network_routes[self.network_routes == 0] = -1
