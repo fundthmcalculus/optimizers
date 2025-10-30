@@ -2,19 +2,87 @@ import abc
 import tqdm
 import joblib
 import numpy as np
+from dataclasses import dataclass
+from typing import Literal, Optional
 
-from ..solution_deck import (
-    SolutionDeck,
-    GoalFcn,
-    InputArguments,
-    WrappedGoalFcn,
-    InputVariables,
+from joblib import Parallel
+
+from .solution_deck import SolutionDeck, GoalFcn, InputArguments, WrappedGoalFcn
+from .variables import InputVariables
+from .opt_types import af64, f64
+
+
+@dataclass
+class IOptimizerConfig:
+    """Base class for optimizer configurations."""
+
+    name: str
+    """The name of the optimizer. This is used for logging purposes."""
+    num_generations: int = 50
+    """The number of generations to run the optimizer"""
+    population_size: int = 30
+    """The population size for each generation of the optimizer."""
+    solution_archive_size: int = 100
+    """Size of solution archive used as memory of good solutions"""
+    stop_after_iterations: int = 50
+    """Stop after a certain number of iterations. This is used for early stopping if nothing improves"""
+    target_score: float = 0.0
+    """The target score for the optimizer to achieve. This is used for early stopping."""
+    n_jobs: int = 4
+    """The number of jobs to use for parallel execution. -1 means use all available cores."""
+    joblib_prefer: Literal["threads", "processes"] = "threads"
+    """The preferred execution mode for joblib."""
+
+
+@dataclass
+class OptimizerResult:
+    """Base class for optimizer results."""
+
+    solution_score: f64
+    """The score of the best solution found by the optimizer."""
+    solution_vector: af64
+    """The best solution found by the optimizer."""
+    solution_history: Optional[af64] = None
+    """The history of the best solutions found by the optimizer."""
+    stopped_early: bool = False
+    """Whether the optimizer stopped early due to convergence criteria."""
+    generations_completed: int = 0
+    """Number of generations completed before stopping."""
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(val={self.solution_score}, x={self.solution_vector})"
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __add__(self, other: "OptimizerResult") -> "OptimizerResult":
+        if not isinstance(other, OptimizerResult):
+            raise ValueError("Cannot add non-OptimizerResult object")
+        combined_history = None
+        if self.solution_history is not None and other.solution_history is not None:
+            combined_history = np.concatenate(
+                (self.solution_history, other.solution_history)
 )
-from ..core.types import AF, F
-from ..core.base import IOptimizerConfig, OptimizerResult
+        elif self.solution_history is not None:
+            combined_history = self.solution_history
+        elif other.solution_history is not None:
+            combined_history = other.solution_history
+
+        return OptimizerResult(
+            solution_score=min(self.solution_score, other.solution_score),
+            solution_vector=(
+                self.solution_vector
+                if self.solution_score <= other.solution_score
+                else other.solution_vector
+            ),
+            solution_history=combined_history,
+            stopped_early=self.stopped_early or other.stopped_early,
+            generations_completed=self.generations_completed
+            + other.generations_completed,
+        )
 
 
-class OptimizerBase(abc.ABC):
+class IOptimizer(abc.ABC):
     """Base class for all optimizer implementations"""
 
     def __init__(
@@ -49,6 +117,22 @@ class OptimizerBase(abc.ABC):
         """
         raise NotImplementedError("This method should be overridden by subclasses.")
 
+    def initialize(self, preserve_percent: float) -> tuple[AF, tqdm.tqdm, int, int, int, joblib.Parallel, bool]:
+        self.validate_config()
+        self.soln_deck.initialize_solution_deck(
+            self.variables, self.wrapped_fcn, preserve_percent
+        )
+        self.soln_deck.sort()
+        best_soln_history = np.zeros(self.config.num_generations)
+
+        # Add the progress bar
+        generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
+            self.config
+        )
+        stopped_early = False
+        generations_completed = 0
+        return best_soln_history, generation_pbar, generations_completed, individuals_per_job, n_jobs, parallel, stopped_early
+
     def validate_config(self) -> None:
         """
         Validate the configuration parameters.
@@ -58,8 +142,8 @@ class OptimizerBase(abc.ABC):
             self.config.solution_archive_size = len(self.variables) * 2
         if self.config.population_size < 0:
             self.config.population_size = self.config.solution_archive_size // 3
-        if self.config.joblib_num_procs < 0:
-            self.config.joblib_num_procs = joblib.cpu_count() - 1
+        if self.config.n_jobs < 0:
+            self.config.n_jobs = joblib.cpu_count() - 1
 
     def __str__(self):
         return f"Solver(name={self.name})"
@@ -67,7 +151,7 @@ class OptimizerBase(abc.ABC):
 
 def setup_for_generations(config: IOptimizerConfig):
     generation_pbar = tqdm.trange(config.num_generations, desc="Optimizer generation")
-    n_jobs = config.joblib_num_procs
+    n_jobs = config.n_jobs
     if n_jobs < 1:
         n_jobs = joblib.cpu_count() - 1
     individuals_per_job = max(1, config.population_size // n_jobs)

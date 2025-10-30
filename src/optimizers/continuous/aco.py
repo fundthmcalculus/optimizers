@@ -82,19 +82,8 @@ class AntColonyOptimizer(OptimizerBase):
         )
 
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
-        self.validate_config()
-        self.soln_deck.initialize_solution_deck(
-            self.variables, self.wrapped_fcn, preserve_percent
-        )
-        self.soln_deck.sort()
-        best_soln_history = np.zeros(self.config.num_generations)
-
-        # Add the progress bar
-        generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
-            self.config
-        )
-        stopped_early = False
-        generations_completed = 0
+        best_soln_history, generation_pbar, generations_completed, individuals_per_job, n_jobs, parallel, stopped_early = self.initialize(
+            preserve_percent)
         for generations_completed in generation_pbar:
             stopped_early = check_stop_early(
                 self.config, best_soln_history, self.soln_deck.solution_value

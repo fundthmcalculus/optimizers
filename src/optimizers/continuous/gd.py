@@ -131,7 +131,7 @@ class GradientDescentOptimizer(OptimizerBase):
                 tqdm(desc="Gradient Descent Optimization", total=len(rand_vars))
             ):
                 parallel = joblib.Parallel(
-                    n_jobs=self.config.joblib_num_procs,
+                    n_jobs=self.config.n_jobs,
                     prefer=self.config.joblib_prefer,
                 )
                 job_output: list[OptimizerResult] = parallel(

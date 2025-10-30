@@ -145,7 +145,7 @@ def test_gd():
             name="GD-optim",
             parallel_discrete_search=True,
             discrete_search_size=40,
-            joblib_num_procs=4,
+            n_jobs=4,
             joblib_prefer="processes",
         ),
         variables=input_variables,
