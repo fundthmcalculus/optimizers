@@ -37,7 +37,7 @@ class IOptimizerConfig:
     """The population size for each generation of the optimizer."""
     solution_archive_size: int = 100
     """Size of solution archive used as memory of good solutions"""
-    stop_after_iterations: int = 50
+    stop_after_iterations: int = 15
     """Stop after a certain number of iterations. This is used for early stopping if nothing improves"""
     target_score: F = 0.0
     """The target score for the optimizer to achieve. This is used for early stopping."""

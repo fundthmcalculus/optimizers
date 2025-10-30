@@ -102,6 +102,7 @@ class SolutionDeck:
                     self.solution_archive = np.delete(
                         self.solution_archive, i_row, axis=0
                     )
+                    i_row -= 1
                     self.solution_value = np.delete(self.solution_value, i_row, axis=0)
                     self.is_local_optima = np.delete(
                         self.is_local_optima, i_row, axis=0

@@ -12,7 +12,8 @@ from optimizers.continuous.gd import (
     GradientDescentOptimizerConfig,
 )
 from optimizers.core.base import IOptimizerConfig
-from optimizers.continuous.optimizer_strategy import MultiTypeOptimizer
+from optimizers.continuous.optimizer_strategy import MultiTypeOptimizer, GroupedVariableOptimizerConfig, \
+    InputVariableGroup, GroupedVariableOptimizer
 from optimizers.continuous.pso import (
     ParticleSwarmOptimizerConfig,
     ParticleSwarmOptimizer,
@@ -89,6 +90,31 @@ def test_ga():
         name="GA Optimizer",
     )
     optimizer = GeneticAlgorithmOptimizer(
+        config=config,
+        variables=input_variables,
+        fcn=optim_ackley,
+    )
+    best_solution = optimizer.solve()
+    print(
+        f"Best solution: {best_solution.solution_vector} with value: {best_solution.solution_score}"
+    )
+    assert pytest.approx(best_solution.solution_score) == optim_ackley(
+        best_solution.solution_vector
+    )
+
+
+def test_group_optimize():
+    input_variables = [
+        InputContinuousVariable("x", -15, 30),
+        InputContinuousVariable("y", -15, 30),
+    ]
+
+    config = GroupedVariableOptimizerConfig(
+        name="Grouped Var Optimizer",
+        groups=[InputVariableGroup(name="x",variables=["x"], optimizer_type="aco"),
+                InputVariableGroup(name="y",variables=["y"], optimizer_type="ga")],
+    )
+    optimizer = GroupedVariableOptimizer(
         config=config,
         variables=input_variables,
         fcn=optim_ackley,

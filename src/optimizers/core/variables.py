@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
 import numpy as np
 from typing import Optional, List
 from .types import af64
