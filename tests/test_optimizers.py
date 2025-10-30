@@ -12,8 +12,12 @@ from optimizers.continuous.gd import (
     GradientDescentOptimizerConfig,
 )
 from optimizers.core.base import IOptimizerConfig
-from optimizers.continuous.optimizer_strategy import MultiTypeOptimizer, GroupedVariableOptimizerConfig, \
-    InputVariableGroup, GroupedVariableOptimizer
+from optimizers.continuous.optimizer_strategy import (
+    MultiTypeOptimizer,
+    GroupedVariableOptimizerConfig,
+    InputVariableGroup,
+    GroupedVariableOptimizer,
+)
 from optimizers.continuous.pso import (
     ParticleSwarmOptimizerConfig,
     ParticleSwarmOptimizer,
@@ -111,8 +115,10 @@ def test_group_optimize():
 
     config = GroupedVariableOptimizerConfig(
         name="Grouped Var Optimizer",
-        groups=[InputVariableGroup(name="x",variables=["x"], optimizer_type="aco"),
-                InputVariableGroup(name="y",variables=["y"], optimizer_type="ga")],
+        groups=[
+            InputVariableGroup(name="x", variables=["x"], optimizer_type="aco"),
+            InputVariableGroup(name="y", variables=["y"], optimizer_type="ga"),
+        ],
     )
     optimizer = GroupedVariableOptimizer(
         config=config,

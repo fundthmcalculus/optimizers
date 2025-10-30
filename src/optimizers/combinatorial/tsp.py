@@ -35,11 +35,12 @@ class TwoOptTSP(TSPBase):
         self.initial_value = initial_value
         self.initial_route = initial_route
 
-    
     def solve(self) -> CombinatoricsResult:
         if self.initial_route is None or self.initial_value == None:
             # Use the nearest neighbor
-            nn_config = NearestNeighborTSPConfig(back_to_start=self.config.back_to_start, name=self.config.name)
+            nn_config = NearestNeighborTSPConfig(
+                back_to_start=self.config.back_to_start, name=self.config.name
+            )
             nn_solver = NearestNeighborTSP(nn_config)
             solution = nn_solver.solve()
             self.initial_route = solution.optimal_path
@@ -47,24 +48,37 @@ class TwoOptTSP(TSPBase):
         new_route = self.initial_route.copy()
         N = self.network_routes.shape[0]
         for cur_iter in range(self.config.num_iterations):
-           for ij in range(0,N-2):
-               k_nn = N
-               if self.config.nearest_neighbors > 0:
-                   k_nn = min(k_nn, ij+self.config.nearest_neighbors)
-               for jk in range(ij+2,k_nn):
-                   d1 = self.network_routes[new_route[ij],new_route[ij+1]] + self.network_routes[new_route[jk],new_route[jk+1]]
-                   d2 = self.network_routes[new_route[ij],new_route[jk]] + self.network_routes[new_route[ij+1],new_route[jk+1]]
-                   if d1 > d2:
-                       new_route[jk], new_route[ij+1] = new_route[ij+1], new_route[jk]
+            for ij in range(0, N - 2):
+                k_nn = N
+                if self.config.nearest_neighbors > 0:
+                    k_nn = min(k_nn, ij + self.config.nearest_neighbors)
+                for jk in range(ij + 2, k_nn):
+                    d1 = (
+                        self.network_routes[new_route[ij], new_route[ij + 1]]
+                        + self.network_routes[new_route[jk], new_route[jk + 1]]
+                    )
+                    d2 = (
+                        self.network_routes[new_route[ij], new_route[jk]]
+                        + self.network_routes[new_route[ij + 1], new_route[jk + 1]]
+                    )
+                    if d1 > d2:
+                        new_route[jk], new_route[ij + 1] = (
+                            new_route[ij + 1],
+                            new_route[jk],
+                        )
 
-        history = [check_path_distance(self.network_routes, new_route, self.config.back_to_start)]
+        history = [
+            check_path_distance(
+                self.network_routes, new_route, self.config.back_to_start
+            )
+        ]
 
         return CombinatoricsResult(
-               optimal_path=np.array(new_route),
-               optimal_value=history[-1],
-               value_history=np.array(history),
-               stop_reason="none"
-            )
+            optimal_path=np.array(new_route),
+            optimal_value=history[-1],
+            value_history=np.array(history),
+            stop_reason="none",
+        )
 
 
 @dataclass
@@ -83,7 +97,6 @@ class NearestNeighborTSP(TSPBase):
         super().__init__(network_routes, city_locations)
         self.config = config
 
-
     def solve(self) -> CombinatoricsResult:
         # Start at the first node, pick the nearest neighbor
         route = [0]
@@ -97,11 +110,14 @@ class NearestNeighborTSP(TSPBase):
 
         while len(visited) < self.network_routes.shape[0]:
             # Find the nearest unvisited neighbor
-            min_distance = float('inf')
+            min_distance = float("inf")
             nearest_neighbor = -1
 
             for i in range(self.network_routes.shape[0]):
-                if i not in visited and self.network_routes[current_node][i] < min_distance:
+                if (
+                    i not in visited
+                    and self.network_routes[current_node][i] < min_distance
+                ):
                     min_distance = self.network_routes[current_node][i]
                     nearest_neighbor = i
 
@@ -124,7 +140,7 @@ class NearestNeighborTSP(TSPBase):
             optimal_path=np.array(route),
             optimal_value=total_distance,
             value_history=np.array([total_distance]),
-            stop_reason="none"
+            stop_reason="none",
         )
 
 
@@ -135,8 +151,12 @@ class ConvexHullTSPConfig(IOptimizerConfig):
 
 
 class ConvexHullTSP(TSPBase):
-    def __init__(self, config: ConvexHullTSPConfig, network_routes: Optional[AF] = None,
-                 city_locations: Optional[AF] = None):
+    def __init__(
+        self,
+        config: ConvexHullTSPConfig,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
         super().__init__(network_routes, city_locations)
         self.config = config
 
@@ -151,7 +171,7 @@ class ConvexHullTSP(TSPBase):
         start_theta = 0.0
 
         def atan2pos(v):
-            t = np.atan2(v[1],v[0])
+            t = np.atan2(v[1], v[0])
             if t < 0:
                 t += 2 * np.pi
             return t
@@ -160,7 +180,7 @@ class ConvexHullTSP(TSPBase):
         while True:
             # Find the point which is CCW from this point by the least amount.
             min_idx = -1
-            min_theta = float('inf')
+            min_theta = float("inf")
             p0 = self.city_locations[current_node]
             for i in range(self.city_locations.shape[0]):
                 if i != current_node:
@@ -196,7 +216,12 @@ class ConvexHullTSP(TSPBase):
 def _check_stop_early(config: IOptimizerConfig, soln_history) -> StopReason:
     if len(soln_history) < config.stop_after_iterations:
         return "none"
-    if np.allclose(soln_history[-config.stop_after_iterations], soln_history[-1], rtol=1e-2, atol=1e-2):
+    if np.allclose(
+        soln_history[-config.stop_after_iterations],
+        soln_history[-1],
+        rtol=1e-2,
+        atol=1e-2,
+    ):
         return "no_improvement"
     return "none"
 
@@ -222,8 +247,12 @@ class AntColonyTSPConfig(IOptimizerConfig):
 
 
 class AntColonyTSP(TSPBase):
-    def __init__(self, config: AntColonyTSPConfig, network_routes: Optional[AF] = None,
-                 city_locations: Optional[AF] = None):
+    def __init__(
+        self,
+        config: AntColonyTSPConfig,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
         super().__init__(network_routes, city_locations)
         self.config = config
 
@@ -294,10 +323,12 @@ class AntColonyTSP(TSPBase):
 
         # TODO - Better parameters?
         two_opt_config = TwoOptTSPConfig()
-        two_opt_optimize = TwoOptTSP(two_opt_config,
-                                     initial_route=optimal_city_order,
-                                     initial_value=optimal_tour_length,
-                                     city_locations=self.city_locations)
+        two_opt_optimize = TwoOptTSP(
+            two_opt_config,
+            initial_route=optimal_city_order,
+            initial_value=optimal_tour_length,
+            city_locations=self.city_locations,
+        )
         result = two_opt_optimize.solve()
         tour_lengths.append(result.optimal_value)
 

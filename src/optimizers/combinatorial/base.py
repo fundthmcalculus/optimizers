@@ -28,17 +28,18 @@ def check_path_distance(distances: AF, order_path: AI, return_to_start=False) ->
 
 
 class TSPBase(ABC):
-    def __init__(self,
-                 network_routes: Optional[AF] = None,
-                 city_locations: Optional[AF] = None,
-                 ):
+    def __init__(
+        self,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
         self.city_locations = None
         self.network_routes = None
         self.set_network_routes(network_routes, city_locations)
 
-    def set_network_routes(self,
-        network_routes: Optional[AF] = None,
-        city_locations: Optional[AF] = None):
+    def set_network_routes(
+        self, network_routes: Optional[AF] = None, city_locations: Optional[AF] = None
+    ):
         """Set the network routes for the TSP solver"""
         # If we have network routes, use that, otherwise, use the city locations
         if network_routes is None:
@@ -53,4 +54,6 @@ class TSPBase(ABC):
 
     @abstractmethod
     def solve(self) -> CombinatoricsResult:
-        raise NotImplementedError("This method should be implemented in the base classes")
+        raise NotImplementedError(
+            "This method should be implemented in the base classes"
+        )

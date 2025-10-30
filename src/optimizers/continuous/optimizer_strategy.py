@@ -41,12 +41,16 @@ def config_to_type(
 
 class IOptimizerSelection(ABC):
     @abstractmethod
-    def select(self, existing_optim: Optional[OptimizationType] = None) -> OptimizationType:
+    def select(
+        self, existing_optim: Optional[OptimizationType] = None
+    ) -> OptimizationType:
         pass
 
 
 class RandomOptimizerSelection(IOptimizerSelection):
-    def select(self, existing_optim: Optional[OptimizationType] = None) -> OptimizationType:
+    def select(
+        self, existing_optim: Optional[OptimizationType] = None
+    ) -> OptimizationType:
         choices = list(get_args(OptimizationType))
         if existing_optim is not None:
             choices.remove(existing_optim)
@@ -142,7 +146,13 @@ class GroupedVariableOptimizerConfig(IOptimizerConfig):
 
 
 class GroupedVariableOptimizer(IOptimizer):
-    def __init__(self, config: GroupedVariableOptimizerConfig, fcn: GoalFcn, variables: InputVariables, args: InputArguments | None = None):
+    def __init__(
+        self,
+        config: GroupedVariableOptimizerConfig,
+        fcn: GoalFcn,
+        variables: InputVariables,
+        args: InputArguments | None = None,
+    ):
         super().__init__(config, fcn, variables, args)
         self.config: GroupedVariableOptimizerConfig = config
         if config.groups is None:
@@ -164,6 +174,7 @@ class GroupedVariableOptimizer(IOptimizer):
         for cur_round in range(self.config.num_rounds):
             for group in self.config.groups:
                 group_vars = [v for v in self.variables if v.name in group.variables]
+
                 def new_fcn(x):
                     y = np.array(default_values)
                     y = self.interleave_variables(group, x, y)
@@ -183,7 +194,11 @@ class GroupedVariableOptimizer(IOptimizer):
                     raise NotImplementedError("Optimizer not implemented")
                 result = optim.solve()
                 # TODO - Update the solution deck here?
-                default_values = list(self.interleave_variables(group, result.solution_vector, default_values))
+                default_values = list(
+                    self.interleave_variables(
+                        group, result.solution_vector, default_values
+                    )
+                )
         return OptimizerResult(
             solution_vector=np.array(default_values),
             solution_score=self.wrapped_fcn(np.array(default_values)),

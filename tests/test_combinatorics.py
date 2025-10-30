@@ -3,8 +3,16 @@ import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
-from optimizers.combinatorial.tsp import AntColonyTSPConfig, AntColonyTSP, NearestNeighborTSPConfig, NearestNeighborTSP, \
-    ConvexHullTSP, ConvexHullTSPConfig, TwoOptTSPConfig, TwoOptTSP
+from optimizers.combinatorial.tsp import (
+    AntColonyTSPConfig,
+    AntColonyTSP,
+    NearestNeighborTSPConfig,
+    NearestNeighborTSP,
+    ConvexHullTSP,
+    ConvexHullTSPConfig,
+    TwoOptTSPConfig,
+    TwoOptTSP,
+)
 from optimizers.core.types import AF
 from optimizers.plot import plot_convergence
 
@@ -102,8 +110,11 @@ def test_aco_tsp():
     distances: AF = pairwise_distances(all_cities)
     # Compute TSP optimized distance
     config = AntColonyTSPConfig(
-        name="Test TSP", num_generations=N_GENERATIONS, population_size=N_ANTS,
-        stop_after_iterations=5, joblib_prefer="threads"
+        name="Test TSP",
+        num_generations=N_GENERATIONS,
+        population_size=N_ANTS,
+        stop_after_iterations=5,
+        joblib_prefer="threads",
     )
     optimizer = AntColonyTSP(config, distances)
     result = optimizer.solve()
@@ -120,12 +131,27 @@ def test_nn_tsp():
     optimizer = NearestNeighborTSP(config, distances)
     result = optimizer.solve()
     topt_config = TwoOptTSPConfig(name="2opt TSP", back_to_start=True)
-    topt_optimizer = TwoOptTSP(topt_config, initial_route=result.optimal_path, initial_value=result.optimal_value, network_routes=distances)
+    topt_optimizer = TwoOptTSP(
+        topt_config,
+        initial_route=result.optimal_path,
+        initial_value=result.optimal_value,
+        network_routes=distances,
+    )
     result2 = topt_optimizer.solve()
-    topt_config2 = TwoOptTSPConfig(name="2opt TSP", back_to_start=True, nearest_neighbors=5)
-    topt_optimizer2 = TwoOptTSP(topt_config2, initial_route=result.optimal_path, initial_value=result.optimal_value, network_routes=distances)
+    topt_config2 = TwoOptTSPConfig(
+        name="2opt TSP", back_to_start=True, nearest_neighbors=5
+    )
+    topt_optimizer2 = TwoOptTSP(
+        topt_config2,
+        initial_route=result.optimal_path,
+        initial_value=result.optimal_value,
+        network_routes=distances,
+    )
     result3 = topt_optimizer2.solve()
-    plot_cities_and_route(all_cities, np.vstack([result.optimal_path, result2.optimal_path, result3.optimal_path]))
+    plot_cities_and_route(
+        all_cities,
+        np.vstack([result.optimal_path, result2.optimal_path, result3.optimal_path]),
+    )
 
 
 def test_convex_hull_tsp():
@@ -150,7 +176,7 @@ def test_mtsp():
         n_clusters=N_CLUSTERS,
         clustering_method="kmeans",
         stop_after_iterations=5,
-        local_optimize=True
+        local_optimize=True,
     )
     optimizer = AntColonyMTSP(config, all_cities)
     result = optimizer.solve()
