@@ -14,7 +14,7 @@ from .base import (
     check_stop_early,
 )
 from ..core.variables import InputVariables
-from .base import OptimizerBase
+from .base import IOptimizer
 
 from optimizers.solution_deck import (
     GoalFcn,
@@ -107,7 +107,7 @@ def run_ga(
     return new_population, new_population_fitness
 
 
-class GeneticAlgorithmOptimizer(OptimizerBase):
+class GeneticAlgorithmOptimizer(IOptimizer):
     def __init__(
         self,
         config: IOptimizerConfig,

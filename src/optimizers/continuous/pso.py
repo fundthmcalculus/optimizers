@@ -9,7 +9,7 @@ from optimizers.core.base import (
     OptimizerResult,
 )
 from .base import (
-    OptimizerBase,
+    IOptimizer,
     setup_for_generations,
     check_stop_early,
     cdf,
@@ -126,7 +126,7 @@ def run_particles(
     return new_solutions, new_values
 
 
-class ParticleSwarmOptimizer(OptimizerBase):
+class ParticleSwarmOptimizer(IOptimizer):
     def __init__(
         self,
         config: IOptimizerConfig,

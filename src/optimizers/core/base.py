@@ -41,8 +41,8 @@ class IOptimizerConfig:
     """Stop after a certain number of iterations. This is used for early stopping if nothing improves"""
     target_score: F = 0.0
     """The target score for the optimizer to achieve. This is used for early stopping."""
-    joblib_num_procs: int = 4
-    """The number of processes to use for parallel execution. -1 means use all available cores."""
+    n_jobs: int = 4
+    """The number of jobs to use for parallel execution. -1 means use all available cores."""
     joblib_prefer: Literal["threads", "processes"] = "threads"
     """The preferred execution mode for joblib."""
 

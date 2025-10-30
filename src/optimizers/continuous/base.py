@@ -2,84 +2,12 @@ import abc
 import tqdm
 import joblib
 import numpy as np
-from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Optional
 
-from joblib import Parallel
-
-from .solution_deck import SolutionDeck, GoalFcn, InputArguments, WrappedGoalFcn
-from .variables import InputVariables
-from .opt_types import af64, f64
-
-
-@dataclass
-class IOptimizerConfig:
-    """Base class for optimizer configurations."""
-
-    name: str
-    """The name of the optimizer. This is used for logging purposes."""
-    num_generations: int = 50
-    """The number of generations to run the optimizer"""
-    population_size: int = 30
-    """The population size for each generation of the optimizer."""
-    solution_archive_size: int = 100
-    """Size of solution archive used as memory of good solutions"""
-    stop_after_iterations: int = 50
-    """Stop after a certain number of iterations. This is used for early stopping if nothing improves"""
-    target_score: float = 0.0
-    """The target score for the optimizer to achieve. This is used for early stopping."""
-    n_jobs: int = 4
-    """The number of jobs to use for parallel execution. -1 means use all available cores."""
-    joblib_prefer: Literal["threads", "processes"] = "threads"
-    """The preferred execution mode for joblib."""
-
-
-@dataclass
-class OptimizerResult:
-    """Base class for optimizer results."""
-
-    solution_score: f64
-    """The score of the best solution found by the optimizer."""
-    solution_vector: af64
-    """The best solution found by the optimizer."""
-    solution_history: Optional[af64] = None
-    """The history of the best solutions found by the optimizer."""
-    stopped_early: bool = False
-    """Whether the optimizer stopped early due to convergence criteria."""
-    generations_completed: int = 0
-    """Number of generations completed before stopping."""
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(val={self.solution_score}, x={self.solution_vector})"
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __add__(self, other: "OptimizerResult") -> "OptimizerResult":
-        if not isinstance(other, OptimizerResult):
-            raise ValueError("Cannot add non-OptimizerResult object")
-        combined_history = None
-        if self.solution_history is not None and other.solution_history is not None:
-            combined_history = np.concatenate(
-                (self.solution_history, other.solution_history)
-)
-        elif self.solution_history is not None:
-            combined_history = self.solution_history
-        elif other.solution_history is not None:
-            combined_history = other.solution_history
-
-        return OptimizerResult(
-            solution_score=min(self.solution_score, other.solution_score),
-            solution_vector=(
-                self.solution_vector
-                if self.solution_score <= other.solution_score
-                else other.solution_vector
-            ),
-            solution_history=combined_history,
-            stopped_early=self.stopped_early or other.stopped_early,
-            generations_completed=self.generations_completed
-            + other.generations_completed,
-        )
+from ..core import InputVariables
+from ..core.base import IOptimizerConfig, OptimizerResult
+from ..core.types import AF, F
+from ..solution_deck import GoalFcn, InputArguments, SolutionDeck, WrappedGoalFcn
 
 
 class IOptimizer(abc.ABC):
@@ -90,12 +18,12 @@ class IOptimizer(abc.ABC):
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
-        args: InputArguments | None = None,
-        existing_soln_deck: SolutionDeck | None = None,
+        args: Optional[InputArguments] = None,
+        existing_soln_deck: Optional[SolutionDeck] = None,
     ):
         self.config: IOptimizerConfig = config
         self.variables: InputVariables = variables
-        self.args: InputArguments | None = args
+        self.args: Optional[InputArguments] = args
         # Wrap the goal function if needed
         if args:
 
@@ -146,7 +74,7 @@ class IOptimizer(abc.ABC):
             self.config.n_jobs = joblib.cpu_count() - 1
 
     def __str__(self):
-        return f"Solver(name={self.name})"
+        return f"Solver(name={self.config.name})"
 
 
 def setup_for_generations(config: IOptimizerConfig):

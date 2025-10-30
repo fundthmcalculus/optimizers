@@ -18,7 +18,7 @@ from optimizers.solution_deck import (
     InputArguments,
 )
 
-from .base import OptimizerBase
+from .base import IOptimizer
 from ..core.variables import InputVariables
 
 
@@ -67,7 +67,7 @@ def run_ants(
     return ant_solutions, ant_values
 
 
-class AntColonyOptimizer(OptimizerBase):
+class AntColonyOptimizer(IOptimizer):
     def __init__(
         self,
         config: IOptimizerConfig,
