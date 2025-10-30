@@ -5,7 +5,7 @@ from sklearn.metrics import pairwise_distances
 from optimizers.combinatorial.base import check_path_distance
 from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.tsp import AntColonyTSPConfig, AntColonyTSP, NearestNeighborTSPConfig, NearestNeighborTSP, \
-    ConvexHullTSP, ConvexHullTSPConfig
+    ConvexHullTSP, ConvexHullTSPConfig, TwoOptTSPConfig, TwoOptTSP
 from optimizers.core.types import AF
 from optimizers.plot import plot_convergence
 
@@ -16,7 +16,7 @@ N_ANTS = 10 * N_CITIES_CLUSTER
 N_GENERATIONS = 5 * N_CLUSTERS
 
 CLUSTER_DIAMETER = 3
-CLUSTER_SPACING = 10 * CLUSTER_DIAMETER
+CLUSTER_SPACING = 1 * CLUSTER_DIAMETER
 
 HALF_CIRCLE = False
 
@@ -119,7 +119,13 @@ def test_nn_tsp():
     config = NearestNeighborTSPConfig(name="Test NN", back_to_start=True)
     optimizer = NearestNeighborTSP(config, distances)
     result = optimizer.solve()
-    plot_cities_and_route(all_cities, result.optimal_path)
+    topt_config = TwoOptTSPConfig(name="2opt TSP", back_to_start=True)
+    topt_optimizer = TwoOptTSP(topt_config, initial_route=result.optimal_path, initial_value=result.optimal_value, network_routes=distances)
+    result2 = topt_optimizer.solve()
+    topt_config2 = TwoOptTSPConfig(name="2opt TSP", back_to_start=True, nearest_neighbors=5)
+    topt_optimizer2 = TwoOptTSP(topt_config2, initial_route=result.optimal_path, initial_value=result.optimal_value, network_routes=distances)
+    result3 = topt_optimizer2.solve()
+    plot_cities_and_route(all_cities, np.vstack([result.optimal_path, result2.optimal_path, result3.optimal_path]))
 
 
 def test_convex_hull_tsp():

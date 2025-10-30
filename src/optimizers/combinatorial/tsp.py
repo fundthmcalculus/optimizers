@@ -1,46 +1,71 @@
-from abc import ABC, abstractmethod
-
 import joblib
 import numpy as np
 from typing import Optional
 from dataclasses import dataclass
-from sklearn.metrics import pairwise_distances
 
 import tqdm
 from joblib import Parallel, delayed
 
-from .base import check_path_distance, CombinatoricsResult
+from .base import check_path_distance, CombinatoricsResult, TSPBase
 from ..core.base import IOptimizerConfig
 from ..core.types import AI, AF, F, i32, i16
 
 
-class TSPBase(ABC):
-    def __init__(self,
-                 network_routes: Optional[AF] = None,
-                 city_locations: Optional[AF] = None,
-                 ):
-        self.city_locations = None
-        self.network_routes = None
-        self.set_network_routes(network_routes, city_locations)
+@dataclass
+class TwoOptTSPConfig(IOptimizerConfig):
+    back_to_start: bool = True
+    """Whether to return to the start node"""
+    num_iterations: int = 10
+    """Number of iterations to run"""
+    nearest_neighbors: int = -1
+    """Only check the next nodes, which makes this O(n), but lower chance of finding crossovers"""
 
-    def set_network_routes(self,
+
+class TwoOptTSP(TSPBase):
+    def __init__(
+        self,
+        config: TwoOptTSPConfig,
+        initial_route: Optional[AI] = None,
+        initial_value: Optional[F] = None,
         network_routes: Optional[AF] = None,
-        city_locations: Optional[AF] = None):
-        """Set the network routes for the TSP solver"""
-        # If we have network routes, use that, otherwise, use the city locations
-        if network_routes is None:
-            assert city_locations is not None
+        city_locations: Optional[AF] = None,
+    ):
+        super().__init__(network_routes, city_locations)
+        self.config = config
+        self.initial_value = initial_value
+        self.initial_route = initial_route
 
-            # Compute pairwise distances between all cities
-            assert len(city_locations.shape) == 2, "City locations must be a 2D array"
-            self.city_locations = city_locations.copy()
-            self.network_routes = pairwise_distances(city_locations)
-        else:
-            self.network_routes = network_routes.copy()
-
-    @abstractmethod
+    
     def solve(self) -> CombinatoricsResult:
-        raise NotImplementedError("")
+        if self.initial_route is None or self.initial_value == None:
+            # Use the nearest neighbor
+            nn_config = NearestNeighborTSPConfig(back_to_start=self.config.back_to_start, name=self.config.name)
+            nn_solver = NearestNeighborTSP(nn_config)
+            solution = nn_solver.solve()
+            self.initial_route = solution.optimal_path
+            self.initial_value = solution.optimal_value
+        new_route = self.initial_route.copy()
+        history = [self.initial_value]
+        N = self.network_routes.shape[0]
+        for cur_iter in range(self.config.num_iterations):
+           for ij in range(0,N-2):
+               k_nn = N
+               if self.config.nearest_neighbors > 0:
+                   k_nn = min(k_nn, ij+self.config.nearest_neighbors)
+               for jk in range(ij+2,k_nn):
+                   d1 = self.network_routes[new_route[ij],new_route[ij+1]] + self.network_routes[new_route[jk],new_route[jk+1]]
+                   d2 = self.network_routes[new_route[ij],new_route[jk]] + self.network_routes[new_route[ij+1],new_route[jk+1]]
+                   if d1 > d2:
+                       new_route[jk], new_route[ij+1] = new_route[ij+1], new_route[jk]
+                       history.append(history[-1]-d1+d2)
+
+
+        return CombinatoricsResult(
+               optimal_path=np.array(new_route),
+               optimal_value=history[-1],
+               value_history=np.array(history),
+               stop_reason="none"
+            )
 
 
 @dataclass
@@ -59,7 +84,7 @@ class NearestNeighborTSP(TSPBase):
         super().__init__(network_routes, city_locations)
         self.config = config
 
-    
+
     def solve(self) -> CombinatoricsResult:
         # Start at the first node, pick the nearest neighbor
         route = [0]
@@ -85,7 +110,7 @@ class NearestNeighborTSP(TSPBase):
             if nearest_neighbor == -1:
                 break
 
-            # Add to route and update distance 
+            # Add to route and update distance
             route.append(nearest_neighbor)
             visited.add(nearest_neighbor)
             total_distance += min_distance
@@ -167,9 +192,6 @@ class ConvexHullTSP(TSPBase):
             value_history=np.array([total_distance]),
             stop_reason="none",
         )
-
-
-
 
 
 @dataclass
