@@ -64,7 +64,6 @@ class AntColonyMTSP:
                 return total_value
 
             solver = AntColonyOptimizer(
-                name="TSP cluster optimizer",
                 config=solver_config,
                 variables=variables,
                 fcn=goal_fcn,
@@ -79,6 +78,7 @@ class AntColonyMTSP:
 
     def solve_kmeans(self) -> CombinatoricsResult:
         # Perform k-means clustering
+        # TODO - Allow a different random state
         kmeans = KMeans(n_clusters=self.config.n_clusters, random_state=42)
         cluster_labels = kmeans.fit_predict(self.city_locations)
         cluster_centers = kmeans.cluster_centers_

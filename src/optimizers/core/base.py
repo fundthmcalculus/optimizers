@@ -29,7 +29,7 @@ StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
 class IOptimizerConfig:
     """Base class for optimizer configurations."""
 
-    name: str
+    name: str = ""
     """The name of the optimizer. This is used for logging purposes."""
     num_generations: int = 50
     """The number of generations to run the optimizer"""

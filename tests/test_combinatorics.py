@@ -149,7 +149,8 @@ def test_mtsp():
         population_size=N_ANTS,
         n_clusters=N_CLUSTERS,
         clustering_method="kmeans",
-        stop_after_iterations=5
+        stop_after_iterations=5,
+        local_optimize=True
     )
     optimizer = AntColonyMTSP(config, all_cities)
     result = optimizer.solve()

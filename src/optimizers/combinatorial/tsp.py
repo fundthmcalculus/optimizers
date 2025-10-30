@@ -45,7 +45,6 @@ class TwoOptTSP(TSPBase):
             self.initial_route = solution.optimal_path
             self.initial_value = solution.optimal_value
         new_route = self.initial_route.copy()
-        history = [self.initial_value]
         N = self.network_routes.shape[0]
         for cur_iter in range(self.config.num_iterations):
            for ij in range(0,N-2):
@@ -57,8 +56,8 @@ class TwoOptTSP(TSPBase):
                    d2 = self.network_routes[new_route[ij],new_route[jk]] + self.network_routes[new_route[ij+1],new_route[jk+1]]
                    if d1 > d2:
                        new_route[jk], new_route[ij+1] = new_route[ij+1], new_route[jk]
-                       history.append(history[-1]-d1+d2)
 
+        history = [check_path_distance(self.network_routes, new_route, self.config.back_to_start)]
 
         return CombinatoricsResult(
                optimal_path=np.array(new_route),
@@ -293,9 +292,18 @@ class AntColonyTSP(TSPBase):
                 if stop_reason != "none":
                     break
 
+        # TODO - Better parameters?
+        two_opt_config = TwoOptTSPConfig()
+        two_opt_optimize = TwoOptTSP(two_opt_config,
+                                     initial_route=optimal_city_order,
+                                     initial_value=optimal_tour_length,
+                                     city_locations=self.city_locations)
+        result = two_opt_optimize.solve()
+        tour_lengths.append(result.optimal_value)
+
         return CombinatoricsResult(
-            optimal_path=np.array(optimal_city_order),
-            optimal_value=optimal_tour_length,
+            optimal_path=result.optimal_path,
+            optimal_value=result.optimal_value,
             value_history=np.array(tour_lengths),
             stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
         )
