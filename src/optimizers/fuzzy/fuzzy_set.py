@@ -11,7 +11,7 @@ from ..core.types import AF, F
 FuzzyInput = Union[AF, FuzzyVariable, List[FuzzyVariable]]
 
 
-class FuzzySet(ABC):
+class FuzzySet:
     def __init__(self, var_name: str, mf: list[MembershipFunction]):
         self.membership_functions = mf
         self.var_name = var_name
