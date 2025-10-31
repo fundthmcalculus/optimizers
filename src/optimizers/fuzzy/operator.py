@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Union, List
 
-import numpy as np
-
 from .base import default_norm
 from .membership import FuzzyVariable
 from ..core.types import AF
