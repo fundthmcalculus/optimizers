@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
@@ -13,7 +15,7 @@ from optimizers.combinatorial.tsp import (
     TwoOptTSPConfig,
     TwoOptTSP,
 )
-from optimizers.core.types import AF
+from optimizers.core.types import AF, AI
 from optimizers.plot import plot_convergence
 
 N_CITIES_CLUSTER = 20
@@ -61,7 +63,7 @@ def poly_perimeter(n_sides, r):
     return n_sides * 2 * r * np.sin(2 * np.pi / (2 * n_sides))
 
 
-def plot_cities_and_route(cities, route):
+def plot_cities_and_route(cities: AF, route: AI | List[AI]):
     fig = go.Figure()
 
     # Plot cities
@@ -116,7 +118,9 @@ def test_aco_tsp():
         stop_after_iterations=5,
         joblib_prefer="threads",
     )
-    optimizer = AntColonyTSP(config, distances)
+    optimizer = AntColonyTSP(
+        config, network_routes=distances, city_locations=all_cities
+    )
     result = optimizer.solve()
     plot_convergence(result.value_history)
     plot_cities_and_route(all_cities, result.optimal_path)
@@ -150,7 +154,7 @@ def test_nn_tsp():
     result3 = topt_optimizer2.solve()
     plot_cities_and_route(
         all_cities,
-        np.vstack([result.optimal_path, result2.optimal_path, result3.optimal_path]),
+        [result.optimal_path, result2.optimal_path, result3.optimal_path],
     )
 
 

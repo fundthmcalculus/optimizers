@@ -327,6 +327,7 @@ class AntColonyTSP(TSPBase):
             two_opt_config,
             initial_route=optimal_city_order,
             initial_value=optimal_tour_length,
+            network_routes=self.network_routes,
             city_locations=self.city_locations,
         )
         result = two_opt_optimize.solve()
