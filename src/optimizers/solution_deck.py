@@ -222,6 +222,4 @@ def spiral_points(n: int, k: int) -> np.ndarray:
     for i in range(1,n):
         points[i, :] *= r_scale*np.dot(r_theta_n(theta_step),points[i-1,:])
 
-    # Scale everything from [-1,1]^k to [0,1]^k
-    points = points / 2.0 + 0.5
     return points
