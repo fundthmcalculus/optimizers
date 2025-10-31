@@ -74,9 +74,39 @@ def test_project1():
     power_4 = 110
 
     # Disabled for simplicity.
-    # flow_0, flow_1, flow_2, flow_3, flow_4, level_0, level_1, level_2, level_3, level_4, power_0, power_1, power_2, power_3, power_4 = optimize_system(
-    #     flow_0, flow_1, flow_2, flow_3, flow_4, level_0, level_1, level_2, level_3, level_4, power_0, power_1, power_2,
-    #     power_3, power_4)
+    (
+        flow_0,
+        flow_1,
+        flow_2,
+        flow_3,
+        flow_4,
+        level_0,
+        level_1,
+        level_2,
+        level_3,
+        level_4,
+        power_0,
+        power_1,
+        power_2,
+        power_3,
+        power_4,
+    ) = optimize_system(
+        flow_0,
+        flow_1,
+        flow_2,
+        flow_3,
+        flow_4,
+        level_0,
+        level_1,
+        level_2,
+        level_3,
+        level_4,
+        power_0,
+        power_1,
+        power_2,
+        power_3,
+        power_4,
+    )
 
     all_rules, flow_rate, water_level, power_output = create_system(
         flow_0,
@@ -156,22 +186,23 @@ def optimize_system(
     power_4,
 ):
     # Use the ACO solver to optimize the membership functions!
+    df = 4200 / 5
     input_variables = [
-        InputContinuousVariable("flow_0", -200, 4200, flow_0),
-        InputContinuousVariable("flow_1", -200, 4200, flow_1),
-        InputContinuousVariable("flow_2", -200, 4200, flow_2),
-        InputContinuousVariable("flow_3", -200, 4200, flow_3),
-        InputContinuousVariable("flow_4", -200, 4200, flow_4),
-        InputContinuousVariable("level_0", -50, 200, level_0),
-        InputContinuousVariable("level_1", -50, 200, level_1),
-        InputContinuousVariable("level_2", -50, 200, level_2),
-        InputContinuousVariable("level_3", -50, 200, level_3),
-        InputContinuousVariable("level_4", -50, 200, level_4),
-        InputContinuousVariable("power_0", 0, 120, power_0),
-        InputContinuousVariable("power_1", 0, 120, power_1),
-        InputContinuousVariable("power_2", 0, 120, power_2),
-        InputContinuousVariable("power_3", 0, 120, power_3),
-        InputContinuousVariable("power_4", 0, 120, power_4),
+        InputContinuousVariable("flow_0", 0, df, flow_0),
+        InputContinuousVariable("flow_1", df, 2 * df, flow_1),
+        InputContinuousVariable("flow_2", 2 * df, 3 * df, flow_2),
+        InputContinuousVariable("flow_3", 3 * df, 4 * df, flow_3),
+        InputContinuousVariable("flow_4", 4 * df, 5 * df, flow_4),
+        InputContinuousVariable("level_0", 0, 40, level_0),
+        InputContinuousVariable("level_1", 40, 80, level_1),
+        InputContinuousVariable("level_2", 80, 120, level_2),
+        InputContinuousVariable("level_3", 120, 160, level_3),
+        InputContinuousVariable("level_4", 160, 200, level_4),
+        InputContinuousVariable("power_0", 0, 24, power_0),
+        InputContinuousVariable("power_1", 24, 48, power_1),
+        InputContinuousVariable("power_2", 48, 72, power_2),
+        InputContinuousVariable("power_3", 72, 96, power_3),
+        InputContinuousVariable("power_4", 96, 120, power_4),
     ]
     config = AntColonyOptimizerConfig(
         name="Test 1 ACO",

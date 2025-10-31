@@ -25,10 +25,10 @@ class TNormBase(ABC):
 
 class MinMaxNorm(TNormBase):
     def norm(self, a: AF, b: AF) -> AF:
-        return np.min(a, b)
+        return np.minimum(a, b)
 
     def conorm(self, a: AF, b: AF) -> AF:
-        return np.max(a, b)
+        return np.maximum(a, b)
 
 
 class ProbabilityNorm(TNormBase):
@@ -41,10 +41,10 @@ class ProbabilityNorm(TNormBase):
 
 class LukasiewiczNorm(TNormBase):
     def norm(self, a: AF, b: AF) -> AF:
-        return np.max(0, a + b - 1)
+        return np.maximum(0, a + b - 1)
 
     def conorm(self, a: AF, b: AF) -> AF:
-        return np.min(1, a + b)
+        return np.minimum(1, a + b)
 
 
 class DrasticNorm(TNormBase):
@@ -65,20 +65,20 @@ class NilpotentNorm(TNormBase):
     def norm(self, a: AF, b: AF) -> AF:
         s = a + b
         p = np.zeros_like(s)
-        p[s > epsilon_one] = np.min(a, b)
+        p[s > epsilon_one] = np.minimum(a, b)
         return p
 
     def conorm(self, a: AF, b: AF) -> AF:
         s = a + b
         p = np.ones_like(s)
-        p[s < epsilon_one] = np.max(a, b)
+        p[s < epsilon_one] = np.maximum(a, b)
         return p
 
 
 class HamacherNorm(TNormBase):
     def norm(self, a: AF, b: AF) -> AF:
         p = np.zeros_like(a)
-        valid_mask = a >= epsilon_zero & b >= epsilon_zero
+        valid_mask = np.logical_and(a >= epsilon_zero, b >= epsilon_zero)
         p[valid_mask] = (
             a[valid_mask]
             * b[valid_mask]
@@ -92,7 +92,7 @@ class HamacherNorm(TNormBase):
 
 # TODO - This is a terrible inversion of control, but without resorting to Python metaclass magic, it's the easiest way to do this.
 # TODO - Allow the user to define other t-norms and t-conorms!
-default_norm: TNormBase = ProbabilityNorm()
+default_norm: TNormBase = MinMaxNorm()
 
 
 def get_default_norm() -> TNormBase:

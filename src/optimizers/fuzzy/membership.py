@@ -198,11 +198,15 @@ class SinusoidMF(MembershipFunction):
         self.c = c
 
     def mu(self, x: AF) -> AF:
-        m1 = (1.0-np.cos(np.pi*(x-self.a)/(self.b-self.a)))/2.0
-        m2 = (1.0+np.cos(np.pi*(x-self.b)/(self.c-self.b)))/2.0
+        m1 = (1.0 - np.cos(np.pi * (x - self.a) / (self.b - self.a))) / 2.0
+        m2 = (1.0 + np.cos(np.pi * (x - self.b) / (self.c - self.b))) / 2.0
         m = np.zeros_like(x)
-        m[np.logical_and(self.a <= x, x <= self.b)] = m1[np.logical_and(self.a <= x, x <= self.b)]
-        m[np.logical_and(self.b <= x, x <= self.c)] = m2[np.logical_and(self.b <= x, x <= self.c)]
+        m[np.logical_and(self.a <= x, x <= self.b)] = m1[
+            np.logical_and(self.a <= x, x <= self.b)
+        ]
+        m[np.logical_and(self.b <= x, x <= self.c)] = m2[
+            np.logical_and(self.b <= x, x <= self.c)
+        ]
         return m
 
     def domain(self) -> AF:
@@ -210,13 +214,13 @@ class SinusoidMF(MembershipFunction):
 
     def centroid(self) -> float:
         # Left sinusoid
-        l_A = (self.c-self.b) / 2.0
+        l_A = (self.c - self.b) / 2.0
         # Right sinsuoid
-        r_A = (self.b-self.a) / 2.0
-        l_C = ((4+np.pi **2) * self.b + (np.pi**2-4)*self.c)/(2*np.pi**2)
-        r_C = (np.pi **2 * (self.a + self.b)-4*self.a+4*self.b)/(2*np.pi**2)
+        r_A = (self.b - self.a) / 2.0
+        l_C = ((4 + np.pi**2) * self.b + (np.pi**2 - 4) * self.c) / (2 * np.pi**2)
+        r_C = (np.pi**2 * (self.a + self.b) - 4 * self.a + 4 * self.b) / (2 * np.pi**2)
 
-        return (l_A*l_C + r_A*r_C)/(l_A+r_A)
+        return (l_A * l_C + r_A * r_C) / (l_A + r_A)
 
 
 class LeftSinusoidMF(MembershipFunction):
@@ -227,16 +231,18 @@ class LeftSinusoidMF(MembershipFunction):
         self.b = b
 
     def mu(self, x: AF) -> AF:
-        m2 = (1.0+np.cos(np.pi*(x-self.a)/(self.b-self.a)))/2.0
+        m2 = (1.0 + np.cos(np.pi * (x - self.a) / (self.b - self.a))) / 2.0
         m = np.zeros_like(x)
-        m[np.logical_and(self.a <= x, x <= self.b)] = m2[np.logical_and(self.a <= x, x <= self.b)]
+        m[np.logical_and(self.a <= x, x <= self.b)] = m2[
+            np.logical_and(self.a <= x, x <= self.b)
+        ]
         return m
 
     def domain(self) -> AF:
         return np.array([self.a, self.b])
 
     def centroid(self) -> float:
-        return ((4+np.pi **2) * self.a + (np.pi**2-4)*self.b)/(2*np.pi**2)
+        return ((4 + np.pi**2) * self.a + (np.pi**2 - 4) * self.b) / (2 * np.pi**2)
 
 
 class RightSinusoidMF(MembershipFunction):
@@ -247,23 +253,27 @@ class RightSinusoidMF(MembershipFunction):
         self.b = b
 
     def mu(self, x: AF) -> AF:
-        m1 = (1.0-np.cos(np.pi*(x-self.a)/(self.b-self.a)))/2.0
+        m1 = (1.0 - np.cos(np.pi * (x - self.a) / (self.b - self.a))) / 2.0
         m = np.zeros_like(x)
-        m[np.logical_and(self.a <= x, x <= self.b)] = m1[np.logical_and(self.a <= x, x <= self.b)]
+        m[np.logical_and(self.a <= x, x <= self.b)] = m1[
+            np.logical_and(self.a <= x, x <= self.b)
+        ]
         return m
 
     def domain(self) -> AF:
         return np.array([self.a, self.b])
 
     def centroid(self) -> float:
-        return (np.pi **2 * (self.a + self.b)-4*self.a+4*self.b)/(2*np.pi**2)
+        return (np.pi**2 * (self.a + self.b) - 4 * self.a + 4 * self.b) / (2 * np.pi**2)
 
 
 # Type Hint
 SinusoidMembershipSequence = Union[LeftSinusoidMF, RightSinusoidMF, SinusoidMF]
 
 
-def create_sinusoid_memberships(triangle_data: dict[str, float]) -> list[SinusoidMembershipSequence]:
+def create_sinusoid_memberships(
+    triangle_data: dict[str, float],
+) -> list[SinusoidMembershipSequence]:
     all_mus: list[SinusoidMembershipSequence] = []
     items = list(triangle_data.items())
     for idx, (name, value) in enumerate(items):
@@ -277,8 +287,8 @@ def create_sinusoid_memberships(triangle_data: dict[str, float]) -> list[Sinusoi
     return all_mus
 
 
-
 # Other interesting membership functions
+
 
 class CauchyMF(MembershipFunction):
     def __init__(self, name: str, a: float, b: float):
