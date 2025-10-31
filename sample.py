@@ -1,8 +1,8 @@
 import sys
 import time
 
+from optimizers.continuous.variables import InputContinuousVariable
 from src.optimizers import AntColonyOptimizerConfig, AntColonyOptimizer
-from src.optimizers.variables import InputContinuousVariable
 from tests.test_optimizers import optim_ackley
 
 
@@ -26,7 +26,6 @@ def main():
         n_jobs=4,
     )
     optimizer = AntColonyOptimizer(
-        name="ACO-AckleyFunction",
         config=config,
         variables=input_variables,
         fcn=optim_ackley,
