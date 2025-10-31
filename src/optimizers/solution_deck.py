@@ -98,7 +98,10 @@ class SolutionDeck:
                     rtol=rel_err,
                     atol=abs_err,
                 ):
-                    if len(self.solution_value) - len(rows_to_delete) <= self.archive_size:
+                    if (
+                        len(self.solution_value) - len(rows_to_delete)
+                        <= self.archive_size
+                    ):
                         # Keep skipping
                         break
                     rows_to_delete.append(j_row)
@@ -106,13 +109,9 @@ class SolutionDeck:
                     # Because sorted, we can break early
                     break
 
-        self.solution_archive = np.delete(
-            self.solution_archive, rows_to_delete, axis=0
-        )
+        self.solution_archive = np.delete(self.solution_archive, rows_to_delete, axis=0)
         self.solution_value = np.delete(self.solution_value, rows_to_delete, axis=0)
-        self.is_local_optima = np.delete(
-            self.is_local_optima, rows_to_delete, axis=0
-        )
+        self.is_local_optima = np.delete(self.is_local_optima, rows_to_delete, axis=0)
 
     def sort(self) -> None:
         idx = np.argsort(self.solution_value)
