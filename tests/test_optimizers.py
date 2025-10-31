@@ -22,7 +22,7 @@ from optimizers.continuous.pso import (
     ParticleSwarmOptimizerConfig,
     ParticleSwarmOptimizer,
 )
-from optimizers.solution_deck import SolutionDeck
+from optimizers.solution_deck import SolutionDeck, fibonacci_sphere_points, spiral_points
 from optimizers.continuous.variables import (
     InputContinuousVariable,
     InputDiscreteVariable,
@@ -209,29 +209,31 @@ def test_rosenbrock():
 def test_fibonacci():
     n_dim = 3
     n_deck = 100
-    input_variables = [
-        InputContinuousVariable(f"cv-{ij}", lower_bound=-5, upper_bound=5)
-        for ij in range(n_dim)
-    ]
-    soln_deck = SolutionDeck(archive_size=n_deck, num_vars=n_dim)
-    soln_deck.initialize_solution_deck(
-        input_variables, optim_para, init_type="fibonacci"
-    )
-
-    # Verify solution deck was created correctly
-    assert soln_deck.archive_size == n_deck
-    assert soln_deck.num_vars == n_dim
+    points = fibonacci_sphere_points(n_deck, n_dim)
 
     # Plot the solution deck points
-    solutions = soln_deck.solution_archive
-    plt.figure(figsize=(8, 8))
-    ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
-    ax.plot(solutions[:, 0], solutions[:, 1], solutions[:, 2], c="blue", alpha=0.6)
+    plot_solution_spiral(n_dim, points)
+
+
+def test_spiral():
+    n_dim = 3
+    n_deck = 100
+    points = spiral_points(n_deck, n_dim)
+
+    # Plot the solution deck points
+    plot_solution_spiral(n_dim, points)
+
+
+def plot_solution_spiral(n_dim: int, points: AF):
+    if n_dim == 3:
+        ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
+        ax.plot(points[:, 0], points[:, 1], points[:, 2], c="blue", alpha=0.6)
+        ax.set_zlabel("z")
+    elif n_dim == 2:
+        ax = plt.figure(figsize=(8, 8)).add_subplot()
+        ax.plot(points[:, 0], points[:, 1], c="blue", alpha=0.6)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_zlabel("z")
-    plt.title("Fibonacci Solution Distribution")
+    plt.title("Solution Distribution")
     plt.grid(True)
     plt.show()
-    # plt.savefig('fibonacci_solutions.png')
-    # plt.close()

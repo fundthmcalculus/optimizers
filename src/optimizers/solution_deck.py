@@ -1,4 +1,4 @@
-from functools import lru_cache
+from functools import lru_cache, cache
 from typing import Any, Callable, Literal, Optional
 
 import numpy as np
@@ -12,7 +12,7 @@ InputArguments = dict[str, Any]
 GoalFcn = Callable[[af64, Optional[InputArguments]], float]
 WrappedGoalFcn = Callable[[af64], float]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
-InitializationType = Literal["random", "fibonacci"]
+InitializationType = Literal["random", "fibonacci", "spiral"]
 
 
 class SolutionDeck:
@@ -70,6 +70,10 @@ class SolutionDeck:
                         self.solution_archive[k, i] = variable.initial_random_value()
                     elif init_type == "fibonacci":
                         # http://www.math.vanderbilt.edu/saffeb/texts/161.pdf
+                        self.solution_archive[k, i] = variable.range_value(
+                            fibb_spiral_points[k - num_preserve, i]
+                        )
+                    elif init_type == "spiral":
                         self.solution_archive[k, i] = variable.range_value(
                             fibb_spiral_points[k - num_preserve, i]
                         )
@@ -174,4 +178,50 @@ def fibonacci_sphere_points(n: int, k: int) -> np.ndarray:
 
     # Normalize to unit sphere
     points = points / 2.0 + 0.5  # Scale to [0,1]
+    return points
+
+
+@lru_cache(maxsize=16)
+def spiral_points(n: int, k: int) -> np.ndarray:
+    """
+    Generates N points in a k-dimensional space using rotation matrices. Source: https://www.fujipress.jp/jaciii/jc/jacii001500081116/
+
+    Args:
+        n (int): Number of points.
+        k (int): Dimension of the sphere.
+
+    Returns:
+        np.ndarray: Array of shape (n, k) with coordinates in [0,1].
+    """
+    if k < 2:
+        raise ValueError("Dimension k must be at least 2.")
+    if n < 1:
+        raise ValueError("Number of points n must be at least 1.")
+    points = np.ones((n, k), dtype=np.float64)
+
+    def r_theta_ij(ij: int, jk: int, theta: float) -> np.ndarray:
+        # Create the rotation matrix in k-dimensional space
+        r = np.eye(k)
+        r[jk,jk] = r[ij,ij] = np.cos(theta)
+        r[jk, ij] = np.sin(theta)
+        r[ij,jk] = -r[jk, ij]
+        return r
+
+    @cache
+    def r_theta_n(theta:float) -> np.ndarray:
+        r1 = np.eye(k)
+        # TODO - Handle the curse of dimensionality with the full spiral model - or maybe a separate process?
+        for ii in range(k):
+            for jj in range(ii):
+                r1 = np.dot(r_theta_ij(ii, jj, theta), r1)
+        return r1
+
+    r_scale = 0.97 # TODO - Make this reverse scaling so we don't hit the center until the end!
+    theta_step = np.pi * (np.sqrt(5.0) + 1.0)  # golden angle
+    # Start in the corner
+    for i in range(1,n):
+        points[i, :] *= r_scale*np.dot(r_theta_n(theta_step),points[i-1,:])
+
+    # Scale everything from [-1,1]^k to [0,1]^k
+    points = points / 2.0 + 0.5
     return points
