@@ -220,7 +220,7 @@ def test_fibonacci():
 
 
 def test_spiral():
-    n_dim = 3
+    n_dim = 2
     n_deck = 100
     points = spiral_points(n_deck, n_dim)
 
@@ -231,11 +231,11 @@ def test_spiral():
 def plot_solution_spiral(n_dim: int, points: AF):
     if n_dim == 3:
         ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
-        ax.plot(points[:, 0], points[:, 1], points[:, 2], c="blue", alpha=0.6)
+        ax.scatter(points[:, 0], points[:, 1], points[:, 2], c="blue", alpha=0.6)
         ax.set_zlabel("z")
     elif n_dim == 2:
         ax = plt.figure(figsize=(8, 8)).add_subplot()
-        ax.plot(points[:, 0], points[:, 1], c="blue", alpha=0.6)
+        ax.scatter(points[:, 0], points[:, 1], c="blue", alpha=0.6)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     plt.title("Solution Distribution")

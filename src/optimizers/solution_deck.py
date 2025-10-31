@@ -210,16 +210,16 @@ def spiral_points(n: int, k: int) -> np.ndarray:
     @cache
     def r_theta_n(theta: float) -> np.ndarray:
         r1 = np.eye(k)
-        # TODO - Handle the curse of dimensionality with the full spiral model - or maybe a separate process?
         for ii in range(k):
             for jj in range(ii):
                 r1 = np.dot(r_theta_ij(ii, jj, theta), r1)
         return r1
 
-    r_scale = 0.97  # TODO - Make this reverse scaling so we don't hit the center until the end!
+    r_scale = 0.97
     theta_step = np.pi * (np.sqrt(5.0) + 1.0)  # golden angle
     # Start in the corner
     for i in range(1, n):
-        points[i, :] *= r_scale * np.dot(r_theta_n(theta_step), points[i - 1, :])
+        reverse_r_scale = (r_scale+(1.0-r_scale)*i/(2*n))
+        points[i, :] *= reverse_r_scale * np.dot(r_theta_n(theta_step*i/n), points[i - 1, :])
 
     return points
