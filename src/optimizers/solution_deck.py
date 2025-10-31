@@ -202,13 +202,13 @@ def spiral_points(n: int, k: int) -> np.ndarray:
     def r_theta_ij(ij: int, jk: int, theta: float) -> np.ndarray:
         # Create the rotation matrix in k-dimensional space
         r = np.eye(k)
-        r[jk,jk] = r[ij,ij] = np.cos(theta)
+        r[jk, jk] = r[ij, ij] = np.cos(theta)
         r[jk, ij] = np.sin(theta)
-        r[ij,jk] = -r[jk, ij]
+        r[ij, jk] = -r[jk, ij]
         return r
 
     @cache
-    def r_theta_n(theta:float) -> np.ndarray:
+    def r_theta_n(theta: float) -> np.ndarray:
         r1 = np.eye(k)
         # TODO - Handle the curse of dimensionality with the full spiral model - or maybe a separate process?
         for ii in range(k):
@@ -216,10 +216,10 @@ def spiral_points(n: int, k: int) -> np.ndarray:
                 r1 = np.dot(r_theta_ij(ii, jj, theta), r1)
         return r1
 
-    r_scale = 0.97 # TODO - Make this reverse scaling so we don't hit the center until the end!
+    r_scale = 0.97  # TODO - Make this reverse scaling so we don't hit the center until the end!
     theta_step = np.pi * (np.sqrt(5.0) + 1.0)  # golden angle
     # Start in the corner
-    for i in range(1,n):
-        points[i, :] *= r_scale*np.dot(r_theta_n(theta_step),points[i-1,:])
+    for i in range(1, n):
+        points[i, :] *= r_scale * np.dot(r_theta_n(theta_step), points[i - 1, :])
 
     return points

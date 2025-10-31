@@ -22,7 +22,11 @@ from optimizers.continuous.pso import (
     ParticleSwarmOptimizerConfig,
     ParticleSwarmOptimizer,
 )
-from optimizers.solution_deck import SolutionDeck, fibonacci_sphere_points, spiral_points
+from optimizers.solution_deck import (
+    SolutionDeck,
+    fibonacci_sphere_points,
+    spiral_points,
+)
 from optimizers.continuous.variables import (
     InputContinuousVariable,
     InputDiscreteVariable,
