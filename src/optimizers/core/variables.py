@@ -42,6 +42,14 @@ class InputVariable(ABC):
     def upper_bound(self) -> float:
         pass
 
+    @property
+    def domain(self) -> float:
+        return abs(self.upper_bound - self.lower_bound)
+
+    def initial_random_velocity(self) -> float:
+        # NOTE - This doesn't mean as much for discrete variables, so we should probably ignore them?
+        return np.random.uniform(-self.domain, self.domain)
+
 
 # Type hinting
 InputVariables = List[InputVariable]

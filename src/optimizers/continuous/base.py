@@ -5,7 +5,7 @@ import numpy as np
 from typing import Optional
 
 from ..core import InputVariables
-from ..core.base import IOptimizerConfig, OptimizerResult
+from ..core.base import IOptimizerConfig, OptimizerResult, OptimizerRun, StopReason
 from ..core.types import AF, F
 from ..solution_deck import GoalFcn, InputArguments, SolutionDeck, WrappedGoalFcn
 
@@ -71,6 +71,18 @@ class IOptimizer(abc.ABC):
             stopped_early,
         )
 
+    def update_solution_deck(
+        self, generation_pbar: tqdm, job_output: list[OptimizerRun]
+    ):
+        for output in job_output:
+            self.soln_deck.append(
+                solutions=output.population_solutions,
+                values=output.population_values,
+                local_optima=self.config.local_grad_optim != "none",
+            )
+            self.soln_deck.deduplicate()
+        generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
+
     def validate_config(self) -> None:
         """
         Validate the configuration parameters.
@@ -99,11 +111,11 @@ def setup_for_generations(config: IOptimizerConfig):
 
 def check_stop_early(
     config: IOptimizerConfig, best_soln_history: AF, solution_values: AF
-) -> bool:
+) -> StopReason:
     stop_early = False
     if solution_values[0] <= config.target_score:
         print("Target score reached, terminating early.")
-        stop_early = True
+        return "target_score"
     # Check if the solution hasn't improved
     recent_history = best_soln_history[-config.stop_after_iterations :]
     if np.allclose(recent_history, recent_history[0], rtol=1e-2, atol=1e-2) and np.all(
@@ -112,8 +124,8 @@ def check_stop_early(
         print(
             f"No improvement in last {config.stop_after_iterations} iterations. Stopping early."
         )
-        stop_early = True
-    return stop_early
+        return "no_improvement"
+    return "none"
 
 
 def cdf(q: F, N: int) -> AF:
