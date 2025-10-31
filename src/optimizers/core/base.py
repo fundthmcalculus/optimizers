@@ -26,6 +26,14 @@ StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
 
 
 @dataclass
+class OptimizerRun:
+    """Structured return values from a given optimizer run: PSO, ACO, etc"""
+
+    population_values: AF  # (N_generations x N_vars)
+    population_solutions: AF  # (1 x N_vars)
+
+
+@dataclass
 class IOptimizerConfig:
     """Base class for optimizer configurations."""
 

@@ -8,6 +8,7 @@ from ..core.types import AF
 from ..core.base import (
     OptimizerResult,
     IOptimizerConfig,
+    OptimizerRun,
 )
 from .base import (
     setup_for_generations,
@@ -80,7 +81,7 @@ def run_ga(
     solution_archive: AF,
     variables: InputVariables,
     fcn: WrappedGoalFcn,
-) -> tuple[AF, AF]:
+) -> OptimizerRun:
     new_population = np.zeros((n_steps, len(variables)))
     new_population_fitness = np.zeros(n_steps)
     for row in range(n_steps):
@@ -104,7 +105,9 @@ def run_ga(
         else:
             new_population[row, :] = child_2
             new_population_fitness[row] = child_2_fitness
-    return new_population, new_population_fitness
+    return OptimizerRun(
+        population_solutions=new_population, population_values=new_population_fitness
+    )
 
 
 class GeneticAlgorithmOptimizer(IOptimizer):
@@ -138,7 +141,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             if stopped_early:
                 break
 
-            job_output = parallel(
+            job_output: list[OptimizerRun] = parallel(
                 joblib.delayed(run_ga)(
                     individuals_per_job,
                     local_optim=self.config.local_grad_optim,
@@ -153,22 +156,14 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             )
 
             # Merge candidates into the archive
-            for output in job_output:
-                output_solutions = output[0]
-                output_values = output[1]
-                self.soln_deck.append(
-                    output_solutions,
-                    output_values,
-                    self.config.local_grad_optim != "none",
-                )
-                self.soln_deck.deduplicate()
-            generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
+            self.update_solution_deck(generation_pbar, job_output)
 
+        stopped_early = stopped_early if stopped_early != "none" else "max_iterations"
         # Return the best solution
         return OptimizerResult(
             solution_vector=self.soln_deck.solution_archive[0, :],
             solution_score=self.soln_deck.solution_value[0],
             solution_history=best_soln_history,
-            stop_reason="no_improvement" if stopped_early else "max_iterations",
+            stop_reason=stopped_early,
             generations_completed=generations_completed + 1,
         )

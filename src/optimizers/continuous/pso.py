@@ -7,6 +7,7 @@ from .local import apply_local_optimization
 from optimizers.core.base import (
     IOptimizerConfig,
     OptimizerResult,
+    OptimizerRun,
 )
 from .base import (
     IOptimizer,
@@ -52,7 +53,7 @@ def run_particles(
     solution_archive: af64,
     variables: InputVariables,
     fcn: WrappedGoalFcn,
-) -> tuple[af64, af64]:
+) -> OptimizerRun:
     """
     Generate new candidate solutions using a PSO-inspired step that leverages the
     current solution archive as memory for personal bests and global best.
@@ -61,69 +62,54 @@ def run_particles(
     parallel pattern), but still moves candidates towards historically good
     solutions (p-best from archive, g-best as current best) with velocity clamping.
     """
-    # Pre-compute selection CDF (rank-biased) and global best
-    cp_j = cdf(q_weight, len(solution_archive))
-    gbest = solution_archive[0, :]
-
-    dim = len(variables)
-    new_solutions = np.zeros((n_particles, dim))
-    new_values = np.zeros(n_particles)
-
-    rng = np.random.default_rng()
-
-    # Precompute per-dimension velocity clamps based on variable ranges
-    var_ranges = np.array([var.upper_bound - var.lower_bound for var in variables])
-    v_max = np.maximum(1e-12, velocity_clamp * var_ranges)
-
+    # Lifted from: https://en.wikipedia.org/wiki/Particle_swarm_optimization#Algorithm
+    # Precompute the initial vector for each particle
+    p_best_pos = np.zeros((n_particles, len(variables)))  # Best Position
+    p_pos = np.zeros((n_particles, len(variables)))  # Current Position
+    p_vel = np.zeros((n_particles, len(variables)))  # Current Velocity
+    p_best_val = np.zeros(n_particles)  # Particle best value
+    # Swarm best position
+    swarm_best_pos = np.zeros(len(variables))
+    swarm_best_val = 0.0
     for k in range(n_particles):
-        # Choose a base current position x and a personal best pbest from the archive (rank-biased)
-        p = rng.uniform()
-        base_idx = int(np.searchsorted(cp_j, p))
-        x = solution_archive[base_idx, :]
+        for d, v in enumerate(variables):
+            p_pos[k, d] = p_best_pos[k, d] = v.initial_random_value()
+            p_vel[k, d] = v.initial_random_velocity()
+        p_best_val[k] = fcn(p_best_pos[k, :])
+    # Get the best position
+    best_idx = np.argmin(p_best_val)
+    swarm_best_pos = p_best_pos[best_idx, :]
+    swarm_best_val = p_best_val[best_idx]
 
-        p2 = rng.uniform()
-        pbest_idx = int(np.searchsorted(cp_j, p2))
-        pbest = solution_archive[pbest_idx, :]
-
-        # Ensure pbest has better fitness than x
-        if p2 < x:  # Assuming minimization
-            x, pbest = pbest, x
-
-        # Random factors
-        r1 = rng.uniform(size=dim)
-        r2 = rng.uniform(size=dim)
-
-        # Velocity (stateless approximation): move towards pbest and gbest
-        v = (
-            inertia * (pbest - x)
-            + cognitive * r1 * (pbest - x)
-            + social * r2 * (gbest - x)
-        )
-
-        # Clamp velocity to avoid overshoot
-        v = np.clip(v, -v_max, v_max)
-
-        # Update position and clip to bounds
-        x_new = x + v
-        for i, var in enumerate(variables):
-            lb = var.lower_bound
-            ub = var.upper_bound
-            if x_new[i] < lb:
-                x_new[i] = lb
-            elif x_new[i] > ub:
-                x_new[i] = ub
-
-            # Handle discrete variables by rounding to the nearest valid option
-            if isinstance(var, InputDiscreteVariable):
-                x_new[i] = var.get_nearest_value(x_new[i])
-
-        # Optional local refinement and evaluation
-        x_new, f_new = apply_local_optimization(fcn, local_optim, x_new, variables)
-
-        new_solutions[k, :] = x_new
-        new_values[k] = f_new
-
-    return new_solutions, new_values
+    # Run for a certain number of iterations, or maybe till the solution doesn't get much better?
+    w = 0.5  # Inertial weight
+    phi_p = 1.5  # Typically between [1,3]
+    phi_g = 1.5  # Typically between [1,3]
+    n_iterations = 10
+    for cur_iter in range(n_iterations):
+        # TODO - Vectorize this!
+        for k in range(n_particles):
+            for d, v in enumerate(variables):
+                r_p, r_g = np.random.rand(), np.random.rand()
+                # Update velocity
+                p_vel[k, d] = (
+                    w * p_vel[k, d]
+                    + r_p * phi_p * (p_best_pos[k, d] - p_pos[k, d])
+                    + phi_g * r_g * (swarm_best_pos[d] - p_pos[k, d])
+                )
+        # Update the particle position for this time step.
+        p_pos += p_vel
+        # Do the best position for each particle
+        for k in range(n_particles):
+            new_val = fcn(p_pos[k, :])
+            if new_val < p_best_val[k]:
+                p_best_val[k] = new_val
+                p_best_pos[k, :] = p_pos[k, :]
+            if new_val < swarm_best_val:
+                swarm_best_val = new_val
+                swarm_best_pos = p_pos[k, :]
+    # Return the positions and values
+    return OptimizerRun(population_values=p_best_val, population_solutions=p_best_pos)
 
 
 class ParticleSwarmOptimizer(IOptimizer):
@@ -157,7 +143,7 @@ class ParticleSwarmOptimizer(IOptimizer):
             if stopped_early:
                 break
 
-            job_output = parallel(
+            job_output: list[OptimizerRun] = parallel(
                 joblib.delayed(run_particles)(
                     individuals_per_job,
                     self.config.inertia,
@@ -174,22 +160,14 @@ class ParticleSwarmOptimizer(IOptimizer):
             )
 
             # Merge candidates into the archive
-            for output in job_output:
-                output_solutions = output[0]
-                output_values = output[1]
-                self.soln_deck.append(
-                    output_solutions,
-                    output_values,
-                    self.config.local_grad_optim != "none",
-                )
-                self.soln_deck.deduplicate()
-            generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
+            self.update_solution_deck(generation_pbar, job_output)
 
+        stopped_early = stopped_early if stopped_early != "none" else "max_iterations"
         # Return the best solution
         return OptimizerResult(
             solution_vector=self.soln_deck.solution_archive[0, :],
             solution_score=self.soln_deck.solution_value[0],
             solution_history=best_soln_history,
-            stopped_early=stopped_early,
+            stop_reason=stopped_early,
             generations_completed=generations_completed + 1,
         )
