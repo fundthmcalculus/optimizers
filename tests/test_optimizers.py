@@ -17,7 +17,7 @@ from optimizers.continuous.pso import (
     ParticleSwarmOptimizerConfig,
     ParticleSwarmOptimizer,
 )
-from optimizers.solution_deck import SolutionDeck
+from optimizers.solution_deck import SolutionDeck, fibonacci_sphere_points, lloyds_algorithm_points
 from optimizers.continuous.variables import (
     InputContinuousVariable,
     InputDiscreteVariable,
@@ -177,29 +177,36 @@ def test_rosenbrock():
 def test_fibonacci():
     n_dim = 3
     n_deck = 100
-    input_variables = [
-        InputContinuousVariable(f"cv-{ij}", lower_bound=-5, upper_bound=5)
-        for ij in range(n_dim)
-    ]
-    soln_deck = SolutionDeck(archive_size=n_deck, num_vars=n_dim)
-    soln_deck.initialize_solution_deck(
-        input_variables, optim_para, init_type="fibonacci"
+    solutions = fibonacci_sphere_points(n_deck, n_dim)
+    print(
+        f"Fibonacci points: {solutions.shape} with min: {solutions.min()} and max: {solutions.max()}"
     )
+    plot_distributed_points(n_dim, solutions)
 
-    # Verify solution deck was created correctly
-    assert soln_deck.archive_size == n_deck
-    assert soln_deck.num_vars == n_dim
 
-    # Plot the solution deck points
-    solutions = soln_deck.solution_archive
-    plt.figure(figsize=(8, 8))
-    ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
-    ax.plot(solutions[:, 0], solutions[:, 1], solutions[:, 2], c="blue", alpha=0.6)
+def test_peano():
+    n_dim = 3
+    n_deck = 100
+    solutions = lloyds_algorithm_points(n_deck, n_dim)
+    print(
+        f"Peano Curve points: {solutions.shape} with min: {solutions.min()} and max: {solutions.max()}"
+    )
+    plot_distributed_points(n_dim, solutions)
+
+
+def plot_distributed_points(n_dim: int, solutions: np.ndarray) -> None:
+    if n_dim >= 3:
+        ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
+        ax.scatter(solutions[:, 0], solutions[:, 1], solutions[:, 2], c="blue", alpha=0.6)
+        ax.set_zlabel("z")
+        ax.set_zlim(bottom=-0.1, top=1.1)
+    elif n_dim == 2:
+        ax = plt.figure(figsize=(8, 8)).add_subplot()
+        ax.scatter(solutions[:, 0], solutions[:, 1], c="blue", alpha=0.6)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_zlabel("z")
-    plt.title("Fibonacci Solution Distribution")
+    ax.set_xlim(left=-0.1, right=1.1)
+    ax.set_ylim(bottom=-0.1, top=1.1)
+    plt.title("Solution Distribution")
     plt.grid(True)
     plt.show()
-    # plt.savefig('fibonacci_solutions.png')
-    # plt.close()

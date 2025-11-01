@@ -2,6 +2,7 @@ from functools import lru_cache
 from typing import Any, Callable, Literal, Optional
 
 import numpy as np
+import scipy
 from kmodes.kmodes import KModes
 
 from .core.types import f64, af64, ab8, b8, i64
@@ -139,6 +140,31 @@ class SolutionDeck:
 
 
 @lru_cache(maxsize=16)
+def lloyds_algorithm_points(n: int, k: int, n_steps:int = 10) -> np.ndarray:
+    """
+    Generate N points uniformly distributed on the unit hyper-cube [0,1]^k using Lloyd's algorithm.
+
+    Args:
+        n (int): Number of points.
+        k (int): Dimension of the hyper-cube.
+        n_steps (int): Number of iterations for Lloyd's algorithm.
+    """
+    from sklearn.cluster import KMeans
+    kmeans = KMeans(n_clusters=n, random_state=42)
+    points = np.sort(np.random.random(size=(n, k)), axis=0)
+    
+    for step in range(n_steps):
+        labels = kmeans.fit_predict(points)
+        centers = kmeans.cluster_centers_
+        centers = np.sort(centers, axis=0)
+        # Early stopping if converged
+        if np.allclose(points, centers, rtol=1e-4, atol=1e-4):
+            return centers
+        points = centers
+    return points
+
+
+@lru_cache(maxsize=16)
 def fibonacci_sphere_points(n: int, k: int) -> np.ndarray:
     """
     Generate N points uniformly distributed on the k-dimensional unit sphere using a Fibonacci spiral,
@@ -156,19 +182,43 @@ def fibonacci_sphere_points(n: int, k: int) -> np.ndarray:
     if n < 1:
         raise ValueError("Number of points n must be at least 1.")
     points = np.ones((n, k), dtype=np.float64)
-    phi = np.pi * (np.sqrt(5.0) + 1.0)  # golden angle
-    indices = np.arange(0, n) + 0.5
-    theta = np.arccos(1 - 2 * indices / n)
-    points[:, 0] *= np.cos(theta)
-    points[:, 1] *= np.sin(theta)
-    for i in range(n):
-        for j in range(k):
-            if j == 0:
-                points[i, j] = np.cos(theta[j] * i)
-                points[i, 1:] = np.sin(theta[1:] * i)
-            elif j > 0:
-                points[i, j] = points[i, j - 1] * np.sin(phi * i)
+    phi = (np.sqrt(5.0) + 1.0)  # golden angle
+    N = 20 # TODO - Parameterize this for total revolutions?
+    alpha_max = np.pi / 2.0 * N
+    s = np.linspace(0.0, 1.0, n)
+    alpha = 0 * s
+    # Solve each of these
+    for ij, s_ij in enumerate(s):
+        alpha[ij] = alpha_max / np.pi * inv_elliptic2(s_ij, -alpha_max**2.0 / np.pi ** 2.0)
+    theta = np.zeros((n,k-1), dtype=np.float64)
+    theta[:,:-1] = -np.pi/2.0 +alpha[:, np.newaxis]/alpha_max * np.pi
+    theta[:, -1] = N*phi*alpha  # Broadcasting (N,) to (N,k-1)
+    for j in range(k-1):
+        points[:,j] *= np.cos(theta[:,j])
+        points[:, (j+1):] *= np.sin(theta[:,j])[:,np.newaxis]
 
-    # Normalize to unit sphere
-    points = points / 2.0 + 0.5  # Scale to [0,1]
+    r = np.logspace(-1.0, 0.0, n)
+    # points = points * r[:, np.newaxis]
+
+    # Inscribe the unit-ball in the unit hyper-cube
+    points /= np.max(np.linalg.norm(points, axis=1))
+    points += 1.0
+    points /= 2.0
     return points
+
+def inv_elliptic2(s: f64, m: f64) -> f64:
+    # Solve the inverse second incomplete elliptic integral of the second kind
+    # https://en.wikipedia.org/wiki/Incomplete_elliptic_integral
+    # s = integral from 0 to alpha of sqrt(1-m*sin^2 t) dt
+    # Solving for alpha using bisection
+    alpha_min = 0.0
+    alpha_max = 1.0
+    alpha_mid = 0.5 * (alpha_min + alpha_max)
+    while alpha_max - alpha_min > 1e-5:
+        alpha_mid = 0.5 * (alpha_min + alpha_max)
+        s_mid = scipy.special.ellipeinc(alpha_mid, m)
+        if s_mid < s:
+            alpha_min = alpha_mid
+        else:
+            alpha_max = alpha_mid
+    return alpha_mid
