@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
+from fcmeans import FCM
 from sklearn.cluster import KMeans, SpectralClustering
 
 from .base import CombinatoricsResult
@@ -40,9 +41,7 @@ class AntColonyMTSP:
             InputDiscreteVariable(f"cluster_{i}", cluster_ids)
             for i in range(self.city_locations.shape[0])
         ]
-        solver_config = create_from_dict(
-            self.config.__dict__, AntColonyOptimizerConfig
-        )
+        solver_config = create_from_dict(self.config.__dict__, AntColonyOptimizerConfig)
         tsp_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
         # Because this is a multi-level optimization, don't parallelize here.
         solver_config.joblib_num_procs = 1
@@ -113,9 +112,17 @@ class AntColonyMTSP:
             return clusters
         elif self.config.clustering_method == "FCM":
             # Perform the fuzzy c-means clustering
-            raise ValueError("FCM clustering is not yet supported")
+            fcm = FCM(n_clusters=self.config.n_clusters)
+            fcm.fit(self.city_locations)
+            cluster_labels = fcm.predict(self.city_locations)
+            clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
+            for i, label in enumerate(cluster_labels):
+                clusters[label].append(i)
+            return clusters
         elif self.config.clustering_method == "spectral":
-            sc = SpectralClustering(n_clusters=self.config.n_clusters, assign_labels="discretize")
+            sc = SpectralClustering(
+                n_clusters=self.config.n_clusters, assign_labels="discretize"
+            )
             cluster_labels = sc.fit_predict(self.city_locations)
             clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
             for i, label in enumerate(cluster_labels):
