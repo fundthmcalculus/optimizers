@@ -277,5 +277,7 @@ def spiral_points(n: int, k: int) -> np.ndarray:
         points[i, :] *= reverse_r_scale * np.dot(
             r_theta_n(theta_step * i / n), points[i - 1, :]
         )
-
+    # Scale to [0,1]
+    points -= np.min(points)
+    points /= np.max(np.abs(points))
     return points
