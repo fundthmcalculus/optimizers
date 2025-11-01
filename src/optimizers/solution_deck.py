@@ -25,6 +25,7 @@ class SolutionDeck:
         # self.solution_constraints = np.empty((archive_size,), dtype=dtype)  # Vector for constraints
         self.archive_size = archive_size
         self.num_vars = num_vars
+        self._dtype = dtype
 
     def append(
         self, solutions: af64, values: af64, local_optima: bool | b8 | ab8 = False
@@ -144,6 +145,34 @@ class SolutionDeck:
         k_modes_model = KModes(n_clusters=n_clusters, random_state=42)
         cluster_labels = k_modes_model.fit_predict(self.solution_archive)
         return cluster_labels, k_modes_model.mode_indicies_
+
+    # ----- Serialization helpers for checkpointing -----
+    def to_dict(self) -> dict:
+        return {
+            "archive_size": int(self.archive_size),
+            "num_vars": int(self.num_vars),
+            "dtype": str(np.dtype(self.solution_archive.dtype)),
+            "solution_archive": self.solution_archive.tolist(),
+            "solution_value": self.solution_value.tolist(),
+            "is_local_optima": self.is_local_optima.astype(bool).tolist(),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SolutionDeck":
+        archive_size = int(data.get("archive_size", 0))
+        num_vars = int(data.get("num_vars", 0))
+        dtype = np.dtype(data.get("dtype", str(np.float64)))
+        deck = cls(archive_size=archive_size, num_vars=num_vars, dtype=dtype)
+        # Overwrite with stored arrays (may be larger due to appends)
+        deck.solution_archive = np.array(data["solution_archive"], dtype=dtype)
+        deck.solution_value = np.array(data["solution_value"], dtype=dtype)
+        deck.is_local_optima = np.array(data["is_local_optima"], dtype=bool)
+        # If archive_size smaller than loaded, update to loaded size baseline for operations
+        deck.archive_size = archive_size if archive_size > 0 else min(
+            len(deck.solution_archive), len(deck.solution_value)
+        )
+        deck.num_vars = num_vars if num_vars > 0 else deck.solution_archive.shape[1]
+        return deck
 
 
 @lru_cache(maxsize=16)

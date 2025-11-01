@@ -15,6 +15,13 @@ from optimizers.continuous.pso import (
     ParticleSwarmOptimizer,
     ParticleSwarmOptimizerConfig,
 )
+from optimizers.checkpoint import (
+    CheckpointConfig,
+    save_checkpoint,
+    load_checkpoint,
+    run_multiple,
+)
+from optimizers.plot import plot_convergence, plot_run_statistics
 
 __all__ = [
     "AntColonyOptimizer",
@@ -27,4 +34,10 @@ __all__ = [
     "ParticleSwarmOptimizer",
     "ParticleSwarmOptimizerConfig",
     "IOptimizerConfig",
+    "CheckpointConfig",
+    "save_checkpoint",
+    "load_checkpoint",
+    "run_multiple",
+    "plot_convergence",
+    "plot_run_statistics",
 ]
