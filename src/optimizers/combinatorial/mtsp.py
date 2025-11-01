@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-from sklearn.cluster import KMeans
+from fcmeans import FCM
+from sklearn.cluster import KMeans, SpectralClustering
 
 from .base import CombinatoricsResult
 from .tsp import AntColonyTSPConfig, AntColonyTSP
@@ -11,9 +12,7 @@ from ..continuous.variables import InputDiscreteVariable
 from ..core.base import create_from_dict
 from ..core.types import AF
 
-# TODO - Handle other clustering methods.
-# TODO - Handle GA method of clustering.
-ClusterMethod = Literal["kmeans", "TSP"]
+ClusterMethod = Literal["kmeans", "spectral", "FCM", "TSP"]
 
 
 @dataclass
@@ -30,61 +29,52 @@ class AntColonyMTSP:
 
     def solve(self) -> CombinatoricsResult:
         # TODO - Handle the number of processors based upon parallel clusters?
-        if self.config.clustering_method == "kmeans":
-            return self.solve_kmeans()
-        elif self.config.clustering_method == "TSP":
-            # Create n_cities DiscreteVariable with the options being each cluster
-            cluster_ids = np.arange(self.config.n_clusters)
-            variables = [
-                InputDiscreteVariable(f"cluster_{i}", cluster_ids)
-                for i in range(self.city_locations.shape[0])
-            ]
-            solver_config = create_from_dict(
-                self.config.__dict__, AntColonyOptimizerConfig
-            )
-            tsp_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
-            # Because this is a multi-level optimization, don't parallelize here.
-            solver_config.joblib_num_procs = 1
-
-            def goal_fcn(x: AF) -> float:
-                x = np.int32(x)
-                # Iterate over the number of clusters, and do each cluster's TSP optimization separately.
-                total_value = 0.0
-                for cluster_id in range(self.config.n_clusters):
-                    cluster_cities = self.city_locations[x == cluster_id, :]
-                    if len(cluster_cities) == 0:
-                        continue
-                    tsp_config.name = f"{tsp_config.name}-{cluster_id + 1}"
-                    tsp_solve = AntColonyTSP(
-                        tsp_config,
-                        city_locations=cluster_cities,
-                    )
-                    tsp_result = tsp_solve.solve()
-                    total_value += tsp_result.optimal_value
-                return total_value
-
-            solver = AntColonyOptimizer(
-                config=solver_config,
-                variables=variables,
-                fcn=goal_fcn,
-            )
-            result = solver.solve()
-
-            raise ValueError("TSP clustering is not yet supported")
+        if self.config.clustering_method == "TSP":
+            return self.solve_tsp()
         else:
-            raise ValueError(
-                f"Unknown clustering method: {self.config.clustering_method}"
-            )
+            return self.solve_clustering()
 
-    def solve_kmeans(self) -> CombinatoricsResult:
+    def solve_tsp(self):
+        # Create n_cities DiscreteVariable with the options being each cluster
+        cluster_ids = np.arange(self.config.n_clusters)
+        variables = [
+            InputDiscreteVariable(f"cluster_{i}", cluster_ids)
+            for i in range(self.city_locations.shape[0])
+        ]
+        solver_config = create_from_dict(self.config.__dict__, AntColonyOptimizerConfig)
+        tsp_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
+        # Because this is a multi-level optimization, don't parallelize here.
+        solver_config.joblib_num_procs = 1
+
+        def goal_fcn(x: AF) -> float:
+            x = np.int32(x)
+            # Iterate over the number of clusters, and do each cluster's TSP optimization separately.
+            total_value = 0.0
+            for cluster_id in range(self.config.n_clusters):
+                cluster_cities = self.city_locations[x == cluster_id, :]
+                if len(cluster_cities) == 0:
+                    continue
+                tsp_config.name = f"{tsp_config.name}-{cluster_id + 1}"
+                tsp_solve = AntColonyTSP(
+                    tsp_config,
+                    city_locations=cluster_cities,
+                )
+                tsp_result = tsp_solve.solve()
+                total_value += tsp_result.optimal_value
+            return total_value
+
+        solver = AntColonyOptimizer(
+            config=solver_config,
+            variables=variables,
+            fcn=goal_fcn,
+        )
+        result = solver.solve()
+
+        raise ValueError("TSP clustering is not yet supported")
+
+    def solve_clustering(self) -> CombinatoricsResult:
         # Perform k-means clustering
-        # TODO - Allow a different random state
-        kmeans = KMeans(n_clusters=self.config.n_clusters, random_state=42)
-        cluster_labels = kmeans.fit_predict(self.city_locations)
-        # Group cities by cluster
-        clusters = [[] for _ in range(self.config.n_clusters)]
-        for i, label in enumerate(cluster_labels):
-            clusters[label].append(i)
+        clusters = self.do_clustering()
 
         results = []
         for cluster_id, cluster in enumerate(clusters):
@@ -110,3 +100,35 @@ class AntColonyMTSP:
             stop_reason="max_iterations",
             optimal_path=optimal_paths,
         )
+
+    def do_clustering(self) -> list[list[int]]:
+        if self.config.clustering_method == "kmeans":
+            kmeans = KMeans(n_clusters=self.config.n_clusters)
+            cluster_labels = kmeans.fit_predict(self.city_locations)
+            # Group cities by cluster
+            clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
+            for i, label in enumerate(cluster_labels):
+                clusters[label].append(i)
+            return clusters
+        elif self.config.clustering_method == "FCM":
+            # Perform the fuzzy c-means clustering
+            fcm = FCM(n_clusters=self.config.n_clusters)
+            fcm.fit(self.city_locations)
+            cluster_labels = fcm.predict(self.city_locations)
+            clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
+            for i, label in enumerate(cluster_labels):
+                clusters[label].append(i)
+            return clusters
+        elif self.config.clustering_method == "spectral":
+            sc = SpectralClustering(
+                n_clusters=self.config.n_clusters, assign_labels="discretize"
+            )
+            cluster_labels = sc.fit_predict(self.city_locations)
+            clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
+            for i, label in enumerate(cluster_labels):
+                clusters[label].append(i)
+            return clusters
+        else:
+            raise ValueError(
+                f"Unknown clustering method: {self.config.clustering_method}"
+            )
