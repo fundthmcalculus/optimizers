@@ -26,7 +26,7 @@ from optimizers.solution_deck import (
     SolutionDeck,
     fibonacci_sphere_points,
     spiral_points,
-    lloyds_algorithm_points
+    lloyds_algorithm_points,
 )
 from optimizers.continuous.variables import (
     InputContinuousVariable,
@@ -219,11 +219,13 @@ def test_fibonacci():
     # Plot the solution deck points
     plot_solution_spiral(n_dim, points)
 
+
 def test_peano():
     n_dim = 3
     n_deck = 100
     solutions = lloyds_algorithm_points(n_deck, n_dim)
     plot_solution_spiral(n_dim, solutions)
+
 
 def test_spiral():
     n_dim = 2

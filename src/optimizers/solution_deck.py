@@ -147,7 +147,7 @@ class SolutionDeck:
 
 
 @lru_cache(maxsize=16)
-def lloyds_algorithm_points(n: int, k: int, n_steps:int = 10) -> np.ndarray:
+def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> np.ndarray:
     """
     Generate N points uniformly distributed on the unit hyper-cube [0,1]^k using Lloyd's algorithm.
 
@@ -157,6 +157,7 @@ def lloyds_algorithm_points(n: int, k: int, n_steps:int = 10) -> np.ndarray:
         n_steps (int): Number of iterations for Lloyd's algorithm.
     """
     from sklearn.cluster import KMeans
+
     kmeans = KMeans(n_clusters=n, random_state=42)
     points = np.sort(np.random.random(size=(n, k)), axis=0)
 
@@ -189,20 +190,22 @@ def fibonacci_sphere_points(n: int, k: int) -> np.ndarray:
     if n < 1:
         raise ValueError("Number of points n must be at least 1.")
     points = np.ones((n, k), dtype=np.float64)
-    phi = (np.sqrt(5.0) + 1.0)  # golden angle
-    N = 20 # TODO - Parameterize this for total revolutions?
+    phi = np.sqrt(5.0) + 1.0  # golden angle
+    N = 20  # TODO - Parameterize this for total revolutions?
     alpha_max = np.pi / 2.0 * N
     s = np.linspace(0.0, 1.0, n)
     alpha = 0 * s
     # Solve each of these
     for ij, s_ij in enumerate(s):
-        alpha[ij] = alpha_max / np.pi * inv_elliptic2(s_ij, -alpha_max**2.0 / np.pi ** 2.0)
-    theta = np.zeros((n,k-1), dtype=np.float64)
-    theta[:,:-1] = -np.pi/2.0 +alpha[:, np.newaxis]/alpha_max * np.pi
-    theta[:, -1] = N*phi*alpha  # Broadcasting (N,) to (N,k-1)
-    for j in range(k-1):
-        points[:,j] *= np.cos(theta[:,j])
-        points[:, (j+1):] *= np.sin(theta[:,j])[:,np.newaxis]
+        alpha[ij] = (
+            alpha_max / np.pi * inv_elliptic2(s_ij, -(alpha_max**2.0) / np.pi**2.0)
+        )
+    theta = np.zeros((n, k - 1), dtype=np.float64)
+    theta[:, :-1] = -np.pi / 2.0 + alpha[:, np.newaxis] / alpha_max * np.pi
+    theta[:, -1] = N * phi * alpha  # Broadcasting (N,) to (N,k-1)
+    for j in range(k - 1):
+        points[:, j] *= np.cos(theta[:, j])
+        points[:, (j + 1) :] *= np.sin(theta[:, j])[:, np.newaxis]
 
     r = np.logspace(-1.0, 0.0, n)
     # points = points * r[:, np.newaxis]
@@ -212,6 +215,7 @@ def fibonacci_sphere_points(n: int, k: int) -> np.ndarray:
     points += 1.0
     points /= 2.0
     return points
+
 
 def inv_elliptic2(s: f64, m: f64) -> f64:
     # Solve the inverse second incomplete elliptic integral of the second kind
@@ -229,6 +233,7 @@ def inv_elliptic2(s: f64, m: f64) -> f64:
         else:
             alpha_max = alpha_mid
     return alpha_mid
+
 
 @lru_cache(maxsize=16)
 def spiral_points(n: int, k: int) -> np.ndarray:
@@ -268,7 +273,9 @@ def spiral_points(n: int, k: int) -> np.ndarray:
     theta_step = np.pi * (np.sqrt(5.0) + 1.0)  # golden angle
     # Start in the corner
     for i in range(1, n):
-        reverse_r_scale = (r_scale+(1.0-r_scale)*i/(2*n))
-        points[i, :] *= reverse_r_scale * np.dot(r_theta_n(theta_step*i/n), points[i - 1, :])
+        reverse_r_scale = r_scale + (1.0 - r_scale) * i / (2 * n)
+        points[i, :] *= reverse_r_scale * np.dot(
+            r_theta_n(theta_step * i / n), points[i - 1, :]
+        )
 
     return points
