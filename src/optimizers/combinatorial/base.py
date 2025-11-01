@@ -11,7 +11,7 @@ from dataclasses import dataclass
 class CombinatoricsResult:
     optimal_path: AI | list[AI]
     optimal_value: F
-    value_history: AF
+    value_history: AF | list[AF]
     stop_reason: StopReason
 
 

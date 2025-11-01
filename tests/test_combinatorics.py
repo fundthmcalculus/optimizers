@@ -178,7 +178,7 @@ def test_mtsp():
         num_generations=N_GENERATIONS,
         population_size=N_ANTS,
         n_clusters=N_CLUSTERS,
-        clustering_method="kmeans",
+        clustering_method="spectral",
         stop_after_iterations=5,
         local_optimize=True,
     )
