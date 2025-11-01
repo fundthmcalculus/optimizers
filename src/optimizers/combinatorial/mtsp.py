@@ -78,6 +78,7 @@ class AntColonyMTSP:
 
     def solve_kmeans(self) -> CombinatoricsResult:
         # Perform k-means clustering
+        # TODO - Allow a different random state
         kmeans = KMeans(n_clusters=self.config.n_clusters, random_state=42)
         cluster_labels = kmeans.fit_predict(self.city_locations)
         # Group cities by cluster
@@ -100,9 +101,12 @@ class AntColonyMTSP:
             )
 
             results.append(cluster_result)
+
+        optimal_paths = [result.optimal_path for result in results]
+
         return CombinatoricsResult(
-            value_history=np.vstack([result.value_history for result in results]),
+            value_history=[result.value_history for result in results],
             optimal_value=np.sum([result.optimal_value for result in results]),
             stop_reason="max_iterations",
-            optimal_path=np.vstack([result.optimal_path for result in results]),
+            optimal_path=optimal_paths,
         )

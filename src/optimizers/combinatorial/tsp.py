@@ -2,14 +2,228 @@ import joblib
 import numpy as np
 from typing import Optional
 from dataclasses import dataclass
-from sklearn.metrics import pairwise_distances
 
 import tqdm
 from joblib import Parallel, delayed
 
-from .base import check_path_distance, CombinatoricsResult
-from ..core.base import IOptimizerConfig
+from .base import check_path_distance, CombinatoricsResult, TSPBase
+from ..core.base import IOptimizerConfig, StopReason
 from ..core.types import AI, AF, F, i32, i16
+
+
+@dataclass
+class TwoOptTSPConfig(IOptimizerConfig):
+    back_to_start: bool = True
+    """Whether to return to the start node"""
+    num_iterations: int = 10
+    """Number of iterations to run"""
+    nearest_neighbors: int = -1
+    """Only check the next nodes, which makes this O(n), but lower chance of finding crossovers"""
+
+
+class TwoOptTSP(TSPBase):
+    def __init__(
+        self,
+        config: TwoOptTSPConfig,
+        initial_route: Optional[AI] = None,
+        initial_value: Optional[F] = None,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
+        super().__init__(network_routes, city_locations)
+        self.config = config
+        self.initial_value = initial_value
+        self.initial_route = initial_route
+
+    def solve(self) -> CombinatoricsResult:
+        if self.initial_route is None or self.initial_value == None:
+            # Use the nearest neighbor
+            nn_config = NearestNeighborTSPConfig(
+                back_to_start=self.config.back_to_start, name=self.config.name
+            )
+            nn_solver = NearestNeighborTSP(nn_config)
+            solution = nn_solver.solve()
+            self.initial_route = solution.optimal_path
+            self.initial_value = solution.optimal_value
+        new_route = self.initial_route.copy()
+        N = self.network_routes.shape[0]
+        for cur_iter in range(self.config.num_iterations):
+            for ij in range(0, N - 2):
+                k_nn = N
+                if self.config.nearest_neighbors > 0:
+                    k_nn = min(k_nn, ij + self.config.nearest_neighbors)
+                for jk in range(ij + 2, k_nn):
+                    d1 = (
+                        self.network_routes[new_route[ij], new_route[ij + 1]]
+                        + self.network_routes[new_route[jk], new_route[jk + 1]]
+                    )
+                    d2 = (
+                        self.network_routes[new_route[ij], new_route[jk]]
+                        + self.network_routes[new_route[ij + 1], new_route[jk + 1]]
+                    )
+                    if d1 > d2:
+                        new_route[jk], new_route[ij + 1] = (
+                            new_route[ij + 1],
+                            new_route[jk],
+                        )
+
+        history = [
+            check_path_distance(
+                self.network_routes, new_route, self.config.back_to_start
+            )
+        ]
+
+        return CombinatoricsResult(
+            optimal_path=np.array(new_route),
+            optimal_value=history[-1],
+            value_history=np.array(history),
+            stop_reason="none",
+        )
+
+
+@dataclass
+class NearestNeighborTSPConfig(IOptimizerConfig):
+    back_to_start: bool = True
+    """Whether to return to the start node"""
+
+
+class NearestNeighborTSP(TSPBase):
+    def __init__(
+        self,
+        config: NearestNeighborTSPConfig,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
+        super().__init__(network_routes, city_locations)
+        self.config = config
+
+    def solve(self) -> CombinatoricsResult:
+        # Start at the first node, pick the nearest neighbor
+        route = [0]
+
+        # Initialize variables for tracking visited nodes and total distance
+        visited = set()
+        total_distance = 0
+
+        current_node = 0  # Start at first node (index 0)
+        visited.add(current_node)
+
+        while len(visited) < self.network_routes.shape[0]:
+            # Find the nearest unvisited neighbor
+            min_distance = float("inf")
+            nearest_neighbor = -1
+
+            for i in range(self.network_routes.shape[0]):
+                if (
+                    i not in visited
+                    and self.network_routes[current_node][i] < min_distance
+                ):
+                    min_distance = self.network_routes[current_node][i]
+                    nearest_neighbor = i
+
+            # Check if we found a valid neighbor
+            if nearest_neighbor == -1:
+                break
+
+            # Add to route and update distance
+            route.append(nearest_neighbor)
+            visited.add(nearest_neighbor)
+            total_distance += min_distance
+            current_node = nearest_neighbor
+
+        # If back_to_start is True, add the final connection
+        if self.config.back_to_start:
+            total_distance += self.network_routes[current_node][0]
+            route.append(0)
+
+        return CombinatoricsResult(
+            optimal_path=np.array(route),
+            optimal_value=total_distance,
+            value_history=np.array([total_distance]),
+            stop_reason="none",
+        )
+
+
+@dataclass
+class ConvexHullTSPConfig(IOptimizerConfig):
+    back_to_start: bool = True
+    """Whether to return to the start node"""
+
+
+class ConvexHullTSP(TSPBase):
+    def __init__(
+        self,
+        config: ConvexHullTSPConfig,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
+        super().__init__(network_routes, city_locations)
+        self.config = config
+
+    def solve(self) -> CombinatoricsResult:
+        # Use the windmill method starting at point-0.
+        # NOTE - This will give us the convex hull PLUS the sequence required to get there.
+        current_node = 0
+        total_distance = 0
+        tour = [current_node]
+        visited = set()
+        visited.add(current_node)
+        start_theta = 0.0
+
+        def atan2pos(v):
+            t = np.atan2(v[1], v[0])
+            if t < 0:
+                t += 2 * np.pi
+            return t
+
+        restarted = False
+        while True:
+            # Find the point which is CCW from this point by the least amount.
+            min_idx = -1
+            min_theta = float("inf")
+            p0 = self.city_locations[current_node]
+            for i in range(self.city_locations.shape[0]):
+                if i != current_node:
+                    p_i = self.city_locations[i]
+                    dp = p_i - p0
+                    theta = atan2pos(dp)
+                    if min_theta > theta >= start_theta:
+                        min_theta = theta
+                        min_idx = i
+            if min_idx == -1:
+                if not restarted:
+                    # Retry this once for the mod 2pi issue
+                    start_theta -= 2.0 * np.pi
+                    continue
+                else:
+                    break
+            start_theta = min_theta
+            total_distance += self.network_routes[current_node][min_idx]
+            current_node = min_idx
+            tour.append(current_node)
+            if current_node in visited:
+                break
+            visited.add(current_node)
+
+        return CombinatoricsResult(
+            optimal_path=np.array(tour),
+            optimal_value=total_distance,
+            value_history=np.array([total_distance]),
+            stop_reason="none",
+        )
+
+
+def _check_stop_early(config: IOptimizerConfig, soln_history) -> StopReason:
+    if len(soln_history) < config.stop_after_iterations:
+        return "none"
+    if np.allclose(
+        soln_history[-config.stop_after_iterations],
+        soln_history[-1],
+        rtol=1e-2,
+        atol=1e-2,
+    ):
+        return "no_improvement"
+    return "none"
 
 
 @dataclass
@@ -23,30 +237,24 @@ class AntColonyTSPConfig(IOptimizerConfig):
     q: float = 1.0
     """Weighting parameter for selecting better ranked solutions"""
     back_to_start: bool = True
+    local_optimize: bool = False
+    """Local optimization using 2OPT method"""
     """Whether to return to the start node"""
     hot_start: Optional[list[int]] = None
     """Hot start solution"""
     hot_start_length: Optional[float] = None
+    """Hot start length"""
 
 
-class AntColonyTSP:
+class AntColonyTSP(TSPBase):
     def __init__(
         self,
         config: AntColonyTSPConfig,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
     ):
+        super().__init__(network_routes, city_locations)
         self.config = config
-        # If we have network routes, use that, otherwise, use the city locations
-        if network_routes is None:
-            assert city_locations is not None
-
-            # Compute pairwise distances between all cities
-            assert len(city_locations.shape) == 2, "City locations must be a 2D array"
-            self.city_locations = city_locations.copy()
-            self.network_routes = pairwise_distances(city_locations)
-        else:
-            self.network_routes = network_routes.copy()
 
     def solve(self) -> CombinatoricsResult:
         self.network_routes[self.network_routes == 0] = -1
@@ -108,11 +316,28 @@ class AntColonyTSP:
                 tour_lengths.append(optimal_tour_length)
                 # Once all ants are done, update the pheromone
                 tau = pheromone_update(tau, delta_tau, self.config.rho)
+                # Check for stopping early
+                stop_reason = _check_stop_early(self.config, tour_lengths)
+                if stop_reason != "none":
+                    break
+
+        # TODO - Better parameters?
+        two_opt_config = TwoOptTSPConfig()
+        two_opt_optimize = TwoOptTSP(
+            two_opt_config,
+            initial_route=optimal_city_order,
+            initial_value=optimal_tour_length,
+            network_routes=self.network_routes,
+            city_locations=self.city_locations,
+        )
+        result = two_opt_optimize.solve()
+        tour_lengths.append(result.optimal_value)
+
         return CombinatoricsResult(
-            optimal_path=np.array(optimal_city_order),
-            optimal_value=optimal_tour_length,
+            optimal_path=result.optimal_path,
+            optimal_value=result.optimal_value,
             value_history=np.array(tour_lengths),
-            stop_reason="max_iterations",
+            stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
         )
 
 

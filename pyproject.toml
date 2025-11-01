@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "optimizers"
-version = "0.1.0"
+version = "0.2.0"
 description = "A collection of optimization algorithms (GA, PSO, ACO, GD, etc.)"
 authors = [ { name = "fundthmcalculus" } ]
 license = { file = "LICENSE" }

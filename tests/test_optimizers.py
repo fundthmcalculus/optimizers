@@ -12,12 +12,22 @@ from optimizers.continuous.gd import (
     GradientDescentOptimizerConfig,
 )
 from optimizers.core.base import IOptimizerConfig
-from optimizers.continuous.optimizer_strategy import MultiTypeOptimizer
+from optimizers.continuous.optimizer_strategy import (
+    MultiTypeOptimizer,
+    GroupedVariableOptimizerConfig,
+    InputVariableGroup,
+    GroupedVariableOptimizer,
+)
 from optimizers.continuous.pso import (
     ParticleSwarmOptimizerConfig,
     ParticleSwarmOptimizer,
 )
-from optimizers.solution_deck import SolutionDeck, fibonacci_sphere_points, lloyds_algorithm_points
+from optimizers.solution_deck import (
+    SolutionDeck,
+    fibonacci_sphere_points,
+    spiral_points,
+    lloyds_algorithm_points
+)
 from optimizers.continuous.variables import (
     InputContinuousVariable,
     InputDiscreteVariable,
@@ -102,6 +112,33 @@ def test_ga():
     )
 
 
+def test_group_optimize():
+    input_variables = [
+        InputContinuousVariable("x", -15, 30),
+        InputContinuousVariable("y", -15, 30),
+    ]
+
+    config = GroupedVariableOptimizerConfig(
+        name="Grouped Var Optimizer",
+        groups=[
+            InputVariableGroup(name="x", variables=["x"], optimizer_type="aco"),
+            InputVariableGroup(name="y", variables=["y"], optimizer_type="ga"),
+        ],
+    )
+    optimizer = GroupedVariableOptimizer(
+        config=config,
+        variables=input_variables,
+        fcn=optim_ackley,
+    )
+    best_solution = optimizer.solve()
+    print(
+        f"Best solution: {best_solution.solution_vector} with value: {best_solution.solution_score}"
+    )
+    assert pytest.approx(best_solution.solution_score) == optim_ackley(
+        best_solution.solution_vector
+    )
+
+
 def test_multi_optimizer():
     input_variables = [
         InputContinuousVariable("x", -15, 30),
@@ -145,7 +182,7 @@ def test_gd():
             name="GD-optim",
             parallel_discrete_search=True,
             discrete_search_size=40,
-            joblib_num_procs=4,
+            n_jobs=4,
             joblib_prefer="processes",
         ),
         variables=input_variables,
@@ -177,32 +214,35 @@ def test_rosenbrock():
 def test_fibonacci():
     n_dim = 3
     n_deck = 100
-    solutions = fibonacci_sphere_points(n_deck, n_dim)
-    print(
-        f"Fibonacci points: {solutions.shape} with min: {solutions.min()} and max: {solutions.max()}"
-    )
-    plot_distributed_points(n_dim, solutions)
+    points = fibonacci_sphere_points(n_deck, n_dim)
 
+    # Plot the solution deck points
+    plot_solution_spiral(n_dim, points)
 
 def test_peano():
     n_dim = 3
     n_deck = 100
     solutions = lloyds_algorithm_points(n_deck, n_dim)
-    print(
-        f"Peano Curve points: {solutions.shape} with min: {solutions.min()} and max: {solutions.max()}"
-    )
-    plot_distributed_points(n_dim, solutions)
+    plot_solution_spiral(n_dim, solutions)
+
+def test_spiral():
+    n_dim = 2
+    n_deck = 100
+    points = spiral_points(n_deck, n_dim)
+
+    # Plot the solution deck points
+    plot_solution_spiral(n_dim, points)
 
 
-def plot_distributed_points(n_dim: int, solutions: np.ndarray) -> None:
-    if n_dim >= 3:
+def plot_solution_spiral(n_dim: int, points: AF):
+    if n_dim == 3:
         ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
-        ax.scatter(solutions[:, 0], solutions[:, 1], solutions[:, 2], c="blue", alpha=0.6)
+        ax.scatter(points[:, 0], points[:, 1], points[:, 2], c="blue", alpha=0.6)
         ax.set_zlabel("z")
         ax.set_zlim(bottom=-0.1, top=1.1)
     elif n_dim == 2:
         ax = plt.figure(figsize=(8, 8)).add_subplot()
-        ax.scatter(solutions[:, 0], solutions[:, 1], c="blue", alpha=0.6)
+        ax.scatter(points[:, 0], points[:, 1], c="blue", alpha=0.6)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_xlim(left=-0.1, right=1.1)

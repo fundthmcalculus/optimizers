@@ -1,4 +1,4 @@
-from functools import lru_cache
+from functools import lru_cache, cache
 from typing import Any, Callable, Literal, Optional
 
 import numpy as np
@@ -13,7 +13,7 @@ InputArguments = dict[str, Any]
 GoalFcn = Callable[[af64, Optional[InputArguments]], float]
 WrappedGoalFcn = Callable[[af64], float]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
-InitializationType = Literal["random", "fibonacci"]
+InitializationType = Literal["random", "fibonacci", "spiral"]
 
 
 class SolutionDeck:
@@ -74,6 +74,10 @@ class SolutionDeck:
                         self.solution_archive[k, i] = variable.range_value(
                             fibb_spiral_points[k - num_preserve, i]
                         )
+                    elif init_type == "spiral":
+                        self.solution_archive[k, i] = variable.range_value(
+                            fibb_spiral_points[k - num_preserve, i]
+                        )
                     else:
                         raise ValueError(f"Unknown initialization type: {init_type}")
             if k >= num_preserve:
@@ -89,27 +93,30 @@ class SolutionDeck:
         # TODO - Handle the case of discrete variables with manhattan distance?
         # Sort first
         self.sort()
-        # Deduplicate solutions (worst to best)
+        # Deduplicate solutions (worst to best) - cache the list of rows to delete.
+        rows_to_delete: list[int] = list()
         for i_row in range(len(self.solution_archive) - 1, 0, -1):
             for j_row in range(i_row - 1, 0, -1):
-                if len(self.solution_value) == self.archive_size:
-                    return
                 if np.allclose(
                     self.solution_archive[i_row],
                     self.solution_archive[j_row],
                     rtol=rel_err,
                     atol=abs_err,
                 ):
-                    self.solution_archive = np.delete(
-                        self.solution_archive, i_row, axis=0
-                    )
-                    self.solution_value = np.delete(self.solution_value, i_row, axis=0)
-                    self.is_local_optima = np.delete(
-                        self.is_local_optima, i_row, axis=0
-                    )
+                    if (
+                        len(self.solution_value) - len(rows_to_delete)
+                        <= self.archive_size
+                    ):
+                        # Keep skipping
+                        break
+                    rows_to_delete.append(j_row)
                 else:
                     # Because sorted, we can break early
                     break
+
+        self.solution_archive = np.delete(self.solution_archive, rows_to_delete, axis=0)
+        self.solution_value = np.delete(self.solution_value, rows_to_delete, axis=0)
+        self.is_local_optima = np.delete(self.is_local_optima, rows_to_delete, axis=0)
 
     def sort(self) -> None:
         idx = np.argsort(self.solution_value)
@@ -152,7 +159,7 @@ def lloyds_algorithm_points(n: int, k: int, n_steps:int = 10) -> np.ndarray:
     from sklearn.cluster import KMeans
     kmeans = KMeans(n_clusters=n, random_state=42)
     points = np.sort(np.random.random(size=(n, k)), axis=0)
-    
+
     for step in range(n_steps):
         labels = kmeans.fit_predict(points)
         centers = kmeans.cluster_centers_
@@ -222,3 +229,46 @@ def inv_elliptic2(s: f64, m: f64) -> f64:
         else:
             alpha_max = alpha_mid
     return alpha_mid
+
+@lru_cache(maxsize=16)
+def spiral_points(n: int, k: int) -> np.ndarray:
+    """
+    Generates N points in a k-dimensional space using rotation matrices. Source: https://www.fujipress.jp/jaciii/jc/jacii001500081116/
+
+    Args:
+        n (int): Number of points.
+        k (int): Dimension of the sphere.
+
+    Returns:
+        np.ndarray: Array of shape (n, k) with coordinates in [0,1].
+    """
+    if k < 2:
+        raise ValueError("Dimension k must be at least 2.")
+    if n < 1:
+        raise ValueError("Number of points n must be at least 1.")
+    points = np.ones((n, k), dtype=np.float64)
+
+    def r_theta_ij(ij: int, jk: int, theta: float) -> np.ndarray:
+        # Create the rotation matrix in k-dimensional space
+        r = np.eye(k)
+        r[jk, jk] = r[ij, ij] = np.cos(theta)
+        r[jk, ij] = np.sin(theta)
+        r[ij, jk] = -r[jk, ij]
+        return r
+
+    @cache
+    def r_theta_n(theta: float) -> np.ndarray:
+        r1 = np.eye(k)
+        for ii in range(k):
+            for jj in range(ii):
+                r1 = np.dot(r_theta_ij(ii, jj, theta), r1)
+        return r1
+
+    r_scale = 0.97
+    theta_step = np.pi * (np.sqrt(5.0) + 1.0)  # golden angle
+    # Start in the corner
+    for i in range(1, n):
+        reverse_r_scale = (r_scale+(1.0-r_scale)*i/(2*n))
+        points[i, :] *= reverse_r_scale * np.dot(r_theta_n(theta_step*i/n), points[i - 1, :])
+
+    return points

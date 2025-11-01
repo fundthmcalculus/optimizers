@@ -26,10 +26,18 @@ StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
 
 
 @dataclass
+class OptimizerRun:
+    """Structured return values from a given optimizer run: PSO, ACO, etc"""
+
+    population_values: AF  # (N_generations x N_vars)
+    population_solutions: AF  # (1 x N_vars)
+
+
+@dataclass
 class IOptimizerConfig:
     """Base class for optimizer configurations."""
 
-    name: str
+    name: str = ""
     """The name of the optimizer. This is used for logging purposes."""
     num_generations: int = 50
     """The number of generations to run the optimizer"""
@@ -37,12 +45,12 @@ class IOptimizerConfig:
     """The population size for each generation of the optimizer."""
     solution_archive_size: int = 100
     """Size of solution archive used as memory of good solutions"""
-    stop_after_iterations: int = 50
+    stop_after_iterations: int = 15
     """Stop after a certain number of iterations. This is used for early stopping if nothing improves"""
     target_score: F = 0.0
     """The target score for the optimizer to achieve. This is used for early stopping."""
-    joblib_num_procs: int = 4
-    """The number of processes to use for parallel execution. -1 means use all available cores."""
+    n_jobs: int = 4
+    """The number of jobs to use for parallel execution. -1 means use all available cores."""
     joblib_prefer: Literal["threads", "processes"] = "threads"
     """The preferred execution mode for joblib."""
 

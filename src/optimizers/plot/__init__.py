@@ -2,21 +2,21 @@ import numpy as np
 import plotly.graph_objects as go
 
 
-def plot_convergence(tour_lengths: np.ndarray):
+def plot_convergence(tour_lengths: np.ndarray | list[np.ndarray]):
     # Create the figure
     fig = go.Figure()
 
-    if len(tour_lengths.shape) == 1:
+    if not isinstance(tour_lengths, list):
         tour_lengths = tour_lengths.reshape(1, -1)
 
     # Add the line trace
-    for trace in range(tour_lengths.shape[0]):
+    for i_t, trace in enumerate(tour_lengths):
         fig.add_trace(
             go.Scatter(
-                x=np.r_[0 : tour_lengths.shape[-1]],
-                y=tour_lengths[trace, :],
+                x=np.r_[0 : len(trace)],
+                y=trace,
                 mode="lines+markers",
-                name=f"Tour Length-{trace+1}",
+                name=f"Tour Length-{i_t+1}",
                 line=dict(width=2),
                 marker=dict(size=6),
             )

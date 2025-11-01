@@ -16,8 +16,8 @@ from optimizers.solution_deck import (
     InputVariables,
 )
 from optimizers.core.tqdm_joblib import tqdm_joblib
+from .base import IOptimizer
 from .variables import InputContinuousVariable, InputDiscreteVariable
-from .base import OptimizerBase
 
 
 @dataclass
@@ -95,7 +95,7 @@ def _count_discrete_vars(variables: InputVariables) -> tuple[int, list[int]]:
     return len(disc_vars), [p[1] for p in disc_vars]
 
 
-class GradientDescentOptimizer(OptimizerBase):
+class GradientDescentOptimizer(IOptimizer):
     def __init__(
         self,
         config: IOptimizerConfig,
@@ -131,7 +131,7 @@ class GradientDescentOptimizer(OptimizerBase):
                 tqdm(desc="Gradient Descent Optimization", total=len(rand_vars))
             ):
                 parallel = joblib.Parallel(
-                    n_jobs=self.config.joblib_num_procs,
+                    n_jobs=self.config.n_jobs,
                     prefer=self.config.joblib_prefer,
                 )
                 job_output: list[OptimizerResult] = parallel(

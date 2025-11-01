@@ -1,4 +1,6 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
 import numpy as np
 from typing import Optional, List
 from .types import af64
@@ -39,6 +41,14 @@ class InputVariable(ABC):
     @abstractmethod
     def upper_bound(self) -> float:
         pass
+
+    @property
+    def domain(self) -> float:
+        return abs(self.upper_bound - self.lower_bound)
+
+    def initial_random_velocity(self) -> float:
+        # NOTE - This doesn't mean as much for discrete variables, so we should probably ignore them?
+        return np.random.uniform(-self.domain, self.domain)
 
 
 # Type hinting
