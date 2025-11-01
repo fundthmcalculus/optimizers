@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-from fcmeans import FCM
 from sklearn.cluster import KMeans, SpectralClustering
 
 from .base import CombinatoricsResult
@@ -112,13 +111,14 @@ class AntColonyMTSP:
             return clusters
         elif self.config.clustering_method == "FCM":
             # Perform the fuzzy c-means clustering
-            fcm = FCM(n_clusters=self.config.n_clusters)
-            fcm.fit(self.city_locations)
-            cluster_labels = fcm.predict(self.city_locations)
-            clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
-            for i, label in enumerate(cluster_labels):
-                clusters[label].append(i)
-            return clusters
+            # fcm = FCM(n_clusters=self.config.n_clusters)
+            # fcm.fit(self.city_locations)
+            # cluster_labels = fcm.predict(self.city_locations)
+            # clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
+            # for i, label in enumerate(cluster_labels):
+            #     clusters[label].append(i)
+            # return clusters
+            raise NotImplementedError("FCM package is unreliable")
         elif self.config.clustering_method == "spectral":
             sc = SpectralClustering(
                 n_clusters=self.config.n_clusters, assign_labels="discretize"

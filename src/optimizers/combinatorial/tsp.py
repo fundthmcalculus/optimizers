@@ -36,18 +36,10 @@ class TwoOptTSP(TSPBase):
         self.initial_route = initial_route
 
     def solve(self) -> CombinatoricsResult:
-        if self.initial_route is None or self.initial_value == None:
-            # Use the nearest neighbor
-            nn_config = NearestNeighborTSPConfig(
-                back_to_start=self.config.back_to_start, name=self.config.name
-            )
-            nn_solver = NearestNeighborTSP(nn_config)
-            solution = nn_solver.solve()
-            self.initial_route = solution.optimal_path
-            self.initial_value = solution.optimal_value
-        new_route = self.initial_route.copy()
-        N = self.network_routes.shape[0]
+        N, new_route = self.setup_local_search()
+        no_moves = True
         for cur_iter in range(self.config.num_iterations):
+            no_moves = True
             for ij in range(0, N - 2):
                 k_nn = N
                 if self.config.nearest_neighbors > 0:
@@ -66,6 +58,10 @@ class TwoOptTSP(TSPBase):
                             new_route[ij + 1],
                             new_route[jk],
                         )
+                        no_moves = False
+
+            if no_moves:
+                break
 
         history = [
             check_path_distance(
@@ -77,7 +73,237 @@ class TwoOptTSP(TSPBase):
             optimal_path=np.array(new_route),
             optimal_value=history[-1],
             value_history=np.array(history),
-            stop_reason="none",
+            stop_reason="no_improvement" if no_moves else "max_iterations",
+        )
+
+    def setup_local_search(self) -> tuple[int, AF]:
+        if self.initial_route is None or self.initial_value == None:
+            # Use the nearest neighbor
+            nn_config = NearestNeighborTSPConfig(
+                back_to_start=self.config.back_to_start, name=self.config.name
+            )
+            nn_solver = NearestNeighborTSP(nn_config)
+            solution = nn_solver.solve()
+            self.initial_route = solution.optimal_path
+            self.initial_value = solution.optimal_value
+        new_route = self.initial_route.copy()
+        N = self.network_routes.shape[0]
+        return N, new_route
+
+
+class ThreeOptTSP(TwoOptTSP):
+    def __init__(
+        self,
+        config: TwoOptTSPConfig,
+        initial_route: Optional[AI] = None,
+        initial_value: Optional[F] = None,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+    ):
+        super().__init__(
+            config,
+            initial_route=initial_route,
+            initial_value=initial_value,
+            network_routes=network_routes,
+            city_locations=city_locations,
+        )
+
+    def solve(self) -> CombinatoricsResult:
+        N, new_route = self.setup_local_search()
+        no_moves = True
+        for cur_iter in range(self.config.num_iterations):
+            no_moves = True
+            for ij in range(0, N - 2):
+                k_nn = N
+                if self.config.nearest_neighbors > 0:
+                    k_nn = min(k_nn, ij + self.config.nearest_neighbors)
+                for jk in range(ij + 2, k_nn):
+                    l_nn = N
+                    if self.config.nearest_neighbors > 0:
+                        l_nn = min(l_nn, jk + self.config.nearest_neighbors)
+                    for kl in range(jk + 2, l_nn):
+                        # Create each of the 8 cases
+                        # TODO - generalize to higher dimensions?
+                        A = ij
+                        B = ij + 1
+                        C = jk
+                        D = jk + 1
+                        E = kl
+                        F = kl + 1
+                        d = np.zeros(8)
+                        d[0] = (
+                            self.network_routes[new_route[A], new_route[B]]
+                            + self.network_routes[new_route[C], new_route[D]]
+                            + self.network_routes[new_route[E], new_route[F]]
+                        )
+                        d[1] = (
+                            self.network_routes[new_route[A], new_route[E]]
+                            + self.network_routes[new_route[D], new_route[C]]
+                            + self.network_routes[new_route[B], new_route[F]]
+                        )
+                        d[2] = (
+                            self.network_routes[new_route[A], new_route[B]]
+                            + self.network_routes[new_route[C], new_route[E]]
+                            + self.network_routes[new_route[D], new_route[F]]
+                        )
+                        d[3] = (
+                            self.network_routes[new_route[A], new_route[C]]
+                            + self.network_routes[new_route[B], new_route[D]]
+                            + self.network_routes[new_route[E], new_route[F]]
+                        )
+                        d[4] = (
+                            self.network_routes[new_route[A], new_route[C]]
+                            + self.network_routes[new_route[B], new_route[E]]
+                            + self.network_routes[new_route[D], new_route[F]]
+                        )
+                        d[5] = (
+                            self.network_routes[new_route[A], new_route[E]]
+                            + self.network_routes[new_route[D], new_route[B]]
+                            + self.network_routes[new_route[C], new_route[F]]
+                        )
+                        d[6] = (
+                            self.network_routes[new_route[A], new_route[D]]
+                            + self.network_routes[new_route[E], new_route[C]]
+                            + self.network_routes[new_route[B], new_route[F]]
+                        )
+                        d[7] = (
+                            self.network_routes[new_route[A], new_route[D]]
+                            + self.network_routes[new_route[E], new_route[B]]
+                            + self.network_routes[new_route[C], new_route[F]]
+                        )
+                        # Find the shortest length
+                        min_length = np.argmin(d)
+                        if min_length == 0:
+                            continue
+                        elif min_length == 1:
+                            (
+                                new_route[A],
+                                new_route[E],
+                                new_route[D],
+                                new_route[C],
+                                new_route[B],
+                                new_route[F],
+                            ) = (
+                                new_route[A],
+                                new_route[B],
+                                new_route[C],
+                                new_route[D],
+                                new_route[E],
+                                new_route[F],
+                            )
+                        elif min_length == 2:
+                            (
+                                new_route[A],
+                                new_route[B],
+                                new_route[C],
+                                new_route[E],
+                                new_route[D],
+                                new_route[F],
+                            ) = (
+                                new_route[A],
+                                new_route[B],
+                                new_route[C],
+                                new_route[D],
+                                new_route[E],
+                                new_route[F],
+                            )
+                        elif min_length == 3:
+                            (
+                                new_route[A],
+                                new_route[C],
+                                new_route[B],
+                                new_route[D],
+                                new_route[E],
+                                new_route[F],
+                            ) = (
+                                new_route[A],
+                                new_route[B],
+                                new_route[C],
+                                new_route[D],
+                                new_route[E],
+                                new_route[F],
+                            )
+                        elif min_length == 4:
+                            (
+                                new_route[A],
+                                new_route[C],
+                                new_route[B],
+                                new_route[E],
+                                new_route[D],
+                                new_route[F],
+                            ) = (
+                                new_route[A],
+                                new_route[B],
+                                new_route[C],
+                                new_route[D],
+                                new_route[E],
+                                new_route[F],
+                            )
+                        elif min_length == 5:
+                            (
+                                new_route[A],
+                                new_route[E],
+                                new_route[D],
+                                new_route[B],
+                                new_route[C],
+                                new_route[F],
+                            ) = (
+                                new_route[A],
+                                new_route[B],
+                                new_route[C],
+                                new_route[D],
+                                new_route[E],
+                                new_route[F],
+                            )
+                        elif min_length == 6:
+                            (
+                                new_route[A],
+                                new_route[D],
+                                new_route[E],
+                                new_route[C],
+                                new_route[B],
+                                new_route[F],
+                            ) = (
+                                new_route[A],
+                                new_route[B],
+                                new_route[C],
+                                new_route[D],
+                                new_route[E],
+                                new_route[F],
+                            )
+                        elif min_length == 7:
+                            (
+                                new_route[A],
+                                new_route[D],
+                                new_route[E],
+                                new_route[B],
+                                new_route[C],
+                                new_route[F],
+                            ) = (
+                                new_route[A],
+                                new_route[B],
+                                new_route[C],
+                                new_route[D],
+                                new_route[E],
+                                new_route[F],
+                            )
+
+                        no_moves = False
+
+            if no_moves:
+                break
+
+        history = [
+            check_path_distance(
+                self.network_routes, new_route, self.config.back_to_start
+            )
+        ]
+
+        return CombinatoricsResult(
+            optimal_path=np.array(new_route),
+            optimal_value=history[-1],
+            value_history=np.array(history),
+            stop_reason="no_improvement" if no_moves else "max_iterations",
         )
 
 

@@ -19,7 +19,6 @@ dependencies = [
     "kmodes>=0.12.2",
     "scikit-learn>=1.7.2",
     "scipy>=1.16",
-    "fuzzy-c-means==1.7.2"
 ]
 
 [project.optional-dependencies]
