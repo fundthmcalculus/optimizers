@@ -26,6 +26,7 @@ from optimizers.solution_deck import (
     SolutionDeck,
     fibonacci_sphere_points,
     spiral_points,
+    lloyds_algorithm_points,
 )
 from optimizers.continuous.variables import (
     InputContinuousVariable,
@@ -219,6 +220,13 @@ def test_fibonacci():
     plot_solution_spiral(n_dim, points)
 
 
+def test_peano():
+    n_dim = 3
+    n_deck = 100
+    solutions = lloyds_algorithm_points(n_deck, n_dim)
+    plot_solution_spiral(n_dim, solutions)
+
+
 def test_spiral():
     n_dim = 2
     n_deck = 100
@@ -233,11 +241,14 @@ def plot_solution_spiral(n_dim: int, points: AF):
         ax = plt.figure(figsize=(8, 8)).add_subplot(projection="3d")
         ax.scatter(points[:, 0], points[:, 1], points[:, 2], c="blue", alpha=0.6)
         ax.set_zlabel("z")
+        ax.set_zlim(bottom=-0.1, top=1.1)
     elif n_dim == 2:
         ax = plt.figure(figsize=(8, 8)).add_subplot()
         ax.scatter(points[:, 0], points[:, 1], c="blue", alpha=0.6)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
+    ax.set_xlim(left=-0.1, right=1.1)
+    ax.set_ylim(bottom=-0.1, top=1.1)
     plt.title("Solution Distribution")
     plt.grid(True)
     plt.show()

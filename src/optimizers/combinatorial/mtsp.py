@@ -54,8 +54,8 @@ class AntColonyMTSP:
                     cluster_cities = self.city_locations[x == cluster_id, :]
                     if len(cluster_cities) == 0:
                         continue
+                    tsp_config.name = f"{tsp_config.name}-{cluster_id + 1}"
                     tsp_solve = AntColonyTSP(
-                        f"tsp-cluster-{cluster_id+1}",
                         tsp_config,
                         city_locations=cluster_cities,
                     )
@@ -81,7 +81,6 @@ class AntColonyMTSP:
         # TODO - Allow a different random state
         kmeans = KMeans(n_clusters=self.config.n_clusters, random_state=42)
         cluster_labels = kmeans.fit_predict(self.city_locations)
-        cluster_centers = kmeans.cluster_centers_
         # Group cities by cluster
         clusters = [[] for _ in range(self.config.n_clusters)]
         for i, label in enumerate(cluster_labels):
