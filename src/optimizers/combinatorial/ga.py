@@ -13,9 +13,9 @@ from ..core.types import AF, AI, F
 
 @dataclass
 class GeneticAlgorithmTSPConfig(IOptimizerConfig):
-    mutation_rate: float = 0.105 # 0.1
+    mutation_rate: float = 0.105  # 0.1
     """Probability of mutation"""
-    crossover_rate: float = 0.190 # 0.8
+    crossover_rate: float = 0.190  # 0.8
     """Probability of crossover"""
     back_to_start: bool = True
     """Whether to return to the start node"""
@@ -72,10 +72,15 @@ class GeneticAlgorithmTSP(TSPBase):
 
         with parallel:
             for generations_completed in generation_pbar:
+
                 def parallel_ga(local_ant):
                     results = []
                     for _ in range(individuals_per_job):
-                        results.append(run_ga(genome, genome_value, self.network_routes, self.config))
+                        results.append(
+                            run_ga(
+                                genome, genome_value, self.network_routes, self.config
+                            )
+                        )
                     return results
 
                 all_results = parallel(

@@ -11,19 +11,30 @@ from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.aco import AntColonyTSPConfig, AntColonyTSP
 from optimizers.combinatorial.ga import GeneticAlgorithmTSP, GeneticAlgorithmTSPConfig
-from optimizers.combinatorial.strategy import ConvexHullTSPConfig, ConvexHullTSP, TwoOptTSP, TwoOptTSPConfig, \
-    NearestNeighborTSP, NearestNeighborTSPConfig
+from optimizers.combinatorial.strategy import (
+    ConvexHullTSPConfig,
+    ConvexHullTSP,
+    TwoOptTSP,
+    TwoOptTSPConfig,
+    NearestNeighborTSP,
+    NearestNeighborTSPConfig,
+)
 from optimizers.core.types import AF
 from optimizers.plot import plot_cities_and_route, plot_convergence
+
 
 def main():
     city_locations = demo_data()
     # Now let's do parameter tuning on the GA and ACO.
-    n_trials=50
-    study: optuna.study.Study = aco_parameter_tuning(city_locations=city_locations,n_trials=n_trials)
+    n_trials = 50
+    study: optuna.study.Study = aco_parameter_tuning(
+        city_locations=city_locations, n_trials=n_trials
+    )
     print("Best ACO parameters:", study.best_params)
 
-    study: optuna.study.Study = ga_parameter_tuning(city_locations=city_locations,n_trials=n_trials)
+    study: optuna.study.Study = ga_parameter_tuning(
+        city_locations=city_locations, n_trials=n_trials
+    )
     print("Best GA parameters:", study.best_params)
 
     # Baseline case
@@ -42,6 +53,7 @@ def main():
         trace_names,
     )
 
+
 def aco_parameter_tuning(city_locations, n_trials):
     def aco_objective(trial):
         params = {
@@ -51,18 +63,17 @@ def aco_parameter_tuning(city_locations, n_trials):
             # "q": trial.suggest_float("q", 1.0, 10.0),
             "population_size": trial.suggest_int("population_size", 10, 100),
             "num_generations": trial.suggest_int("num_generations", 50, 500),
-            "solution_archive_size": trial.suggest_int("solution_archive_size", 50, 500)
+            "solution_archive_size": trial.suggest_int(
+                "solution_archive_size", 50, 500
+            ),
         }
         aco_config = AntColonyTSPConfig(
-            name="ACO TSP",
-            back_to_start=True,
-            joblib_prefer="processes",
-            **params
+            name="ACO TSP", back_to_start=True, joblib_prefer="processes", **params
         )
         aco = AntColonyTSP(config=aco_config, city_locations=city_locations)
         result = aco.solve()
 
-        gc.collect() # avoids some RAM problems
+        gc.collect()  # avoids some RAM problems
 
         return result.optimal_value
 
@@ -73,6 +84,7 @@ def aco_parameter_tuning(city_locations, n_trials):
 
     return study
 
+
 def ga_parameter_tuning(city_locations, n_trials):
     def ga_objective(trial):
         params = {
@@ -80,18 +92,17 @@ def ga_parameter_tuning(city_locations, n_trials):
             # "crossover_rate": trial.suggest_float("crossover_rate", 0.1, 1.0, log=True),
             "population_size": trial.suggest_int("population_size", 10, 100),
             "num_generations": trial.suggest_int("num_generations", 50, 500),
-            "solution_archive_size": trial.suggest_int("solution_archive_size", 50, 500)
+            "solution_archive_size": trial.suggest_int(
+                "solution_archive_size", 50, 500
+            ),
         }
         aco_config = GeneticAlgorithmTSPConfig(
-            name="GA TSP",
-            back_to_start=True,
-            joblib_prefer="processes",
-            **params
+            name="GA TSP", back_to_start=True, joblib_prefer="processes", **params
         )
         aco = GeneticAlgorithmTSP(config=aco_config, city_locations=city_locations)
         result = aco.solve()
 
-        gc.collect() # avoids some RAM problems
+        gc.collect()  # avoids some RAM problems
 
         return result.optimal_value
 
@@ -107,11 +118,11 @@ def plot_study_factors(study: optuna.study.Study):
     # Our own importance plot
     importances = get_param_importances(study)
     fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=list(importances.values()),
-        y=list(importances.keys()),
-        orientation='h'
-    ))
+    fig.add_trace(
+        go.Bar(
+            x=list(importances.values()), y=list(importances.keys()), orientation="h"
+        )
+    )
 
     # Create annotation text
     annotation_text = f"Best Score: {study.best_value:.4f}<br>"
@@ -127,7 +138,7 @@ def plot_study_factors(study: optuna.study.Study):
         showarrow=False,
         bgcolor="white",
         bordercolor="black",
-        borderwidth=1
+        borderwidth=1,
     )
 
     fig.update_layout(
@@ -135,13 +146,15 @@ def plot_study_factors(study: optuna.study.Study):
         xaxis_title="Importance",
         yaxis_title="Hyperparameter",
         height=400,
-        width=800
+        width=800,
     )
-    
+
     fig.show()
 
 
-def compute_tsp_bounds(cities: AF, aco_params: dict | None = None, ga_params: dict | None = None):
+def compute_tsp_bounds(
+    cities: AF, aco_params: dict | None = None, ga_params: dict | None = None
+):
     aco_params = aco_params or dict()
     ga_params = ga_params or dict()
     # Compute upper bound using Nearest Neighbor
@@ -183,12 +196,13 @@ def compute_tsp_bounds(cities: AF, aco_params: dict | None = None, ga_params: di
     start_time = time.time()
     ga_config = GeneticAlgorithmTSPConfig(
         name="GA TSP",
-        num_generations=n_generations * 3,  # NOTE - Anecdotally, GA runs about 3x faster than ACO, but worse.
+        num_generations=n_generations
+        * 3,  # NOTE - Anecdotally, GA runs about 3x faster than ACO, but worse.
         population_size=n_ants,
         solution_archive_size=solution_archive_size,
         joblib_prefer="processes",
         stop_after_iterations=n_generations * 3,  # No early stopping!
-        **ga_params
+        **ga_params,
     )
     ga_optimizer = GeneticAlgorithmTSP(
         ga_config, network_routes=distances, city_locations=cities
@@ -205,7 +219,7 @@ def compute_tsp_bounds(cities: AF, aco_params: dict | None = None, ga_params: di
         population_size=n_ants,
         joblib_prefer="processes",
         stop_after_iterations=n_generations,  # No early stopping!
-        **aco_params
+        **aco_params,
     )
     aco_optimizer = AntColonyTSP(
         aco_config, network_routes=distances, city_locations=cities
@@ -242,11 +256,19 @@ def demo_data(name: str = "berlin52") -> AF:
     city_data = pd.read_csv(
         os.path.join(os.path.dirname(__file__), "tsp_instances_dataset.csv"),
     )
-    city_row = city_data[city_data['TSP_Instance'] == name]
+    city_row = city_data[city_data["TSP_Instance"] == name]
 
     # Find X/Y coordinate columns
-    x_cols = [col for col in city_row.columns if col.startswith('City_') and col.endswith('_X')]
-    y_cols = [col for col in city_row.columns if col.startswith('City_') and col.endswith('_Y')]
+    x_cols = [
+        col
+        for col in city_row.columns
+        if col.startswith("City_") and col.endswith("_X")
+    ]
+    y_cols = [
+        col
+        for col in city_row.columns
+        if col.startswith("City_") and col.endswith("_Y")
+    ]
 
     # Extract coordinates, dropping any NaN values
     coords = []
@@ -258,6 +280,7 @@ def demo_data(name: str = "berlin52") -> AF:
 
     coords = np.array(coords)
     return coords
+
 
 if __name__ == "__main__":
     main()

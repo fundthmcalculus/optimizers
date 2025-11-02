@@ -12,13 +12,13 @@ from ..core.types import AI, AF, F, i32, i16
 
 @dataclass
 class AntColonyTSPConfig(IOptimizerConfig):
-    rho: float = 0.451 # 0.5
+    rho: float = 0.451  # 0.5
     """Pheromone decay parameter"""
-    alpha: float = 1.88 # 1.0
+    alpha: float = 1.88  # 1.0
     """Pheromone deposit parameter"""
-    beta: float = 1.88 # 1.0
+    beta: float = 1.88  # 1.0
     """Pheromone evaporation parameter"""
-    q: float = 2.17 # 1.0
+    q: float = 2.17  # 1.0
     """Weighting parameter for selecting better ranked solutions"""
     back_to_start: bool = True
     """Whether to return to the start node"""
@@ -71,7 +71,9 @@ class AntColonyTSP(TSPBase):
                 def parallel_ant(local_ant):
                     results = []
                     for _ in range(individuals_per_job):
-                        results.append(run_ant(self.network_routes, eta, tau, self.config))
+                        results.append(
+                            run_ant(self.network_routes, eta, tau, self.config)
+                        )
                     return results
 
                 all_results = parallel(
@@ -138,7 +140,7 @@ def pheromone_update(tau_xy, delta_tau_xy, rho):
 
 
 def p_xy(eta_xy, tau_xy, allowed_y, alpha, beta, x):
-    p = np.power(tau_xy[x, :],alpha) * np.power(eta_xy[x, :],beta)
+    p = np.power(tau_xy[x, :], alpha) * np.power(eta_xy[x, :], beta)
     # Remove negative probabilities, those are not allowed
     p[~allowed_y] = 0
     p[p < 0] = 0

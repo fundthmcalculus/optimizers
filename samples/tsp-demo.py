@@ -6,8 +6,14 @@ from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.aco import AntColonyTSPConfig, AntColonyTSP
 from optimizers.combinatorial.ga import GeneticAlgorithmTSP, GeneticAlgorithmTSPConfig
-from optimizers.combinatorial.strategy import ConvexHullTSPConfig, ConvexHullTSP, TwoOptTSP, TwoOptTSPConfig, \
-    NearestNeighborTSP, NearestNeighborTSPConfig
+from optimizers.combinatorial.strategy import (
+    ConvexHullTSPConfig,
+    ConvexHullTSP,
+    TwoOptTSP,
+    TwoOptTSPConfig,
+    NearestNeighborTSP,
+    NearestNeighborTSPConfig,
+)
 from optimizers.core.types import AF
 from optimizers.plot import plot_cities_and_route, plot_convergence
 
@@ -70,11 +76,12 @@ def compute_tsp_bounds(cities: AF):
     start_time = time.time()
     ga_config = GeneticAlgorithmTSPConfig(
         name="GA TSP",
-        num_generations=n_generations*3,  # NOTE - Anecdotally, GA runs about 3x faster than ACO, but worse.
+        num_generations=n_generations
+        * 3,  # NOTE - Anecdotally, GA runs about 3x faster than ACO, but worse.
         population_size=n_ants,
         solution_archive_size=solution_archive_size,
         joblib_prefer="threads",
-        stop_after_iterations=n_generations*3,  # No early stopping!
+        stop_after_iterations=n_generations * 3,  # No early stopping!
     )
     ga_optimizer = GeneticAlgorithmTSP(
         ga_config, network_routes=distances, city_locations=cities
