@@ -7,7 +7,7 @@ from tests.test_optimizers import optim_ackley
 
 
 def main():
-    print(f"GIL Enabled={sys._is_gil_enabled()}")
+    print(f"GIL Enabled={sys._is_gil_enabled() if hasattr(sys, '_is_gil_enabled') else 'Unknown'}")
     num_runs = 1
 
     input_variables = [
@@ -21,7 +21,7 @@ def main():
         solution_archive_size=200,
         learning_rate=0.5,
         q=1.0,
-        local_grad_optim=True,
+        local_grad_optim="single-var-grad",
         joblib_prefer="processes",
         n_jobs=4,
     )
