@@ -45,25 +45,19 @@ def main():
 def aco_parameter_tuning(city_locations, n_trials):
     def aco_objective(trial):
         params = {
-            "alpha": trial.suggest_float("alpha", 0.5, 10.0, log=True),
-            "beta": trial.suggest_float("beta", 0.5, 10.0, log=True),
-            "rho": trial.suggest_float("rho", 0.1, 0.9),
-            "q": trial.suggest_float("q", 0.1, 10.0, log=True),
-            "population_size": 100, #trial.suggest_int("population_size", 10, 100, log=True),
-            "num_generations": 100, #trial.suggest_int("num_generations", 100, 1000, log=True),
-            "solution_archive_size": 100, #trial.suggest_int("solution_archive_size", 50, 500, log=True)
+            # "alpha": trial.suggest_float("alpha", 0.2, 2),
+            # "beta": trial.suggest_float("beta", 0.2, 2),
+            # "rho": trial.suggest_float("rho", 0.1, 0.9),
+            # "q": trial.suggest_float("q", 1.0, 10.0),
+            "population_size": trial.suggest_int("population_size", 10, 100),
+            "num_generations": trial.suggest_int("num_generations", 50, 500),
+            "solution_archive_size": trial.suggest_int("solution_archive_size", 50, 500)
         }
         aco_config = AntColonyTSPConfig(
             name="ACO TSP",
             back_to_start=True,
-            num_generations=params["num_generations"],
-            population_size=params["population_size"],
-            solution_archive_size=params["solution_archive_size"],
-            rho=params["rho"],
-            alpha=params["alpha"],
-            beta=params["beta"],
-            q=params["q"],
             joblib_prefer="processes",
+            **params
         )
         aco = AntColonyTSP(config=aco_config, city_locations=city_locations)
         result = aco.solve()
@@ -82,21 +76,17 @@ def aco_parameter_tuning(city_locations, n_trials):
 def ga_parameter_tuning(city_locations, n_trials):
     def ga_objective(trial):
         params = {
-            "mutation_rate": trial.suggest_float("mutation_rate", 0.1, 1.0, log=True),
-            "crossover_rate": trial.suggest_float("crossover_rate", 0.1, 1.0, log=True),
-            "population_size": 100, #trial.suggest_int("population_size", 10, 100, log=True),
-            "num_generations": 100, #trial.suggest_int("num_generations", 100, 1000, log=True),
-            "solution_archive_size": 100, #trial.suggest_int("solution_archive_size", 50, 500, log=True)
+            # "mutation_rate": trial.suggest_float("mutation_rate", 0.1, 1.0, log=True),
+            # "crossover_rate": trial.suggest_float("crossover_rate", 0.1, 1.0, log=True),
+            "population_size": trial.suggest_int("population_size", 10, 100),
+            "num_generations": trial.suggest_int("num_generations", 50, 500),
+            "solution_archive_size": trial.suggest_int("solution_archive_size", 50, 500)
         }
         aco_config = GeneticAlgorithmTSPConfig(
             name="GA TSP",
             back_to_start=True,
-            num_generations=params["num_generations"],
-            population_size=params["population_size"],
-            solution_archive_size=params["solution_archive_size"],
-            mutation_rate=params["mutation_rate"],
-            crossover_rate=params["crossover_rate"],
             joblib_prefer="processes",
+            **params
         )
         aco = GeneticAlgorithmTSP(config=aco_config, city_locations=city_locations)
         result = aco.solve()
@@ -114,6 +104,7 @@ def ga_parameter_tuning(city_locations, n_trials):
 
 
 def plot_study_factors(study: optuna.study.Study):
+    # Our own importance plot
     importances = get_param_importances(study)
     fig = go.Figure()
     fig.add_trace(go.Bar(
