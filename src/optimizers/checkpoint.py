@@ -196,7 +196,11 @@ def run_multiple(
                 config=cfg,
                 solution_deck=deck,
                 result=res,
-                metadata={"run_index": i, "runtime_seconds": runtime_s, "seed": used_seed},
+                metadata={
+                    "run_index": i,
+                    "runtime_seconds": runtime_s,
+                    "seed": used_seed,
+                },
             )
             entry["checkpoint_path"] = str(cp_path)
 
