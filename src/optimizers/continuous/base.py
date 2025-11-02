@@ -2,7 +2,10 @@ import abc
 import tqdm
 import joblib
 import numpy as np
-from typing import Optional
+import time
+import uuid
+import inspect
+from typing import Optional, Callable, Any, Literal
 
 from ..core import InputVariables
 from ..core.base import (
@@ -13,6 +16,7 @@ from ..core.base import (
     ensure_literal_choice,
     JoblibPrefer,
     setup_for_generations,
+    Phase,
 )
 from ..core.types import AF, F
 from ..solution_deck import (
@@ -22,6 +26,37 @@ from ..solution_deck import (
     WrappedGoalFcn,
     WrappedConstraintFcn,
 )
+
+
+class _ArgProvider:
+    """Holds and provides merged input arguments (user args + runtime metadata).
+
+    This object is intentionally lightweight and picklable so wrapped callables
+    can be serialized for parallel workers while still carrying the current metadata.
+    """
+
+    def __init__(self, base_args: Optional[InputArguments] = None):
+        self.base_args: InputArguments = dict(base_args or {})
+        self.meta: InputArguments = {}
+        self._eval_count: int = 0
+
+    def current(self) -> InputArguments:
+        # merge without mutating user-provided dicts
+        merged = {**self.base_args, **self.meta}
+        return merged
+
+    def bump_eval(self) -> None:
+        # local to the process where the function executes
+        self._eval_count += 1
+        now = time.time()
+        self.meta["eval_count"] = self._eval_count
+        self.meta["now"] = now
+        # Elapsed seconds since run start
+        start = self.meta.get("start_time", now)
+        try:
+            self.meta["elapsed_time"] = float(now - start)
+        except Exception:
+            self.meta["elapsed_time"] = 0.0
 
 
 class IOptimizer(abc.ABC):
@@ -40,33 +75,65 @@ class IOptimizer(abc.ABC):
         self.config: IOptimizerConfig = config
         self.variables: InputVariables = variables
         self.args: Optional[InputArguments] = args
-        # Wrap the goal function if needed
-        if args:
 
-            def __wrapped_fcn(x: AF) -> AF:
-                return fcn(x, args)
+        # Runtime metadata provider shared by wrapped callables
+        self._arg_provider = _ArgProvider(args)
+        self._run_id = str(uuid.uuid4())
+        self._start_time = time.time()
+        # Initialize baseline metadata
+        self._arg_provider.meta.update(
+            {
+                "run_id": self._run_id,
+                "start_time": self._start_time,
+                "generation": 0,
+                "max_generation": config.num_generations,
+                "phase": "init",
+                "n_jobs": config.n_jobs,
+                "population_size": config.population_size,
+                "optimizer_name": getattr(config, "name", type(config).__name__),
+            }
+        )
 
-            wrapped_fcn = __wrapped_fcn
-        else:
-            wrapped_fcn = fcn
-        self.wrapped_fcn: WrappedGoalFcn = wrapped_fcn
-        # Wrap constraint functions similarly
+        # Detect whether functions accept (x, args) or just (x)
+        def _accepts_args(func: Any) -> bool:
+            try:
+                sig = inspect.signature(func)
+                return len(sig.parameters) >= 2
+            except (ValueError, TypeError):
+                return True  # assume safe to pass args
+
+        def _wrap_goal(func: GoalFcn) -> WrappedGoalFcn:
+            takes_args = _accepts_args(func)
+
+            def __wrapped(x: AF, _f=func, _ap=self._arg_provider):
+                _ap.bump_eval()
+                if takes_args:
+                    return _f(x, _ap.current())
+                return _f(x)
+
+            return __wrapped  # type: ignore[return-value]
+
+        def _wrap_constraint(func: GoalFcn) -> WrappedConstraintFcn:
+            takes_args = _accepts_args(func)
+
+            def __wrapped(x: AF, _f=func, _ap=self._arg_provider):
+                _ap.bump_eval()
+                if takes_args:
+                    return _f(x, _ap.current())
+                return _f(x)
+
+            return __wrapped  # type: ignore[return-value]
+
+        # Wrap the goal function and constraint functions
+        self.wrapped_fcn: WrappedGoalFcn = _wrap_goal(fcn)
+
         wrapped_ineq: list[WrappedConstraintFcn] | None = None
         wrapped_eq: list[WrappedConstraintFcn] | None = None
         if inequality_constraints:
-            wrapped_ineq = []
-            for g in inequality_constraints:
-                if args:
-                    wrapped_ineq.append(lambda x, g=g: g(x, args))
-                else:
-                    wrapped_ineq.append(g)  # type: ignore[arg-type]
+            wrapped_ineq = [_wrap_constraint(g) for g in inequality_constraints]
         if equality_constraints:
-            wrapped_eq = []
-            for h in equality_constraints:
-                if args:
-                    wrapped_eq.append(lambda x, h=h: h(x, args))
-                else:
-                    wrapped_eq.append(h)  # type: ignore[arg-type]
+            wrapped_eq = [_wrap_constraint(h) for h in equality_constraints]
+
         # Save wrapped constraints for use by optimizers that don't use SolutionDeck internally
         self.wrapped_ineq_constraints = wrapped_ineq or []
         self.wrapped_eq_constraints = wrapped_eq or []
@@ -76,6 +143,18 @@ class IOptimizer(abc.ABC):
             inequality_constraints=self.wrapped_ineq_constraints,
             equality_constraints=self.wrapped_eq_constraints,
         )
+
+    def _set_phase(self, phase: Phase) -> None:
+        # Validate at runtime for extra safety in non-type-checked contexts
+        try:
+            ensure_literal_choice("phase", phase, Phase)
+        except Exception:
+            # Keep fail-soft: still set, but this should not happen given our callers
+            pass
+        self._arg_provider.meta["phase"] = phase
+
+    def _set_generation(self, generation: int) -> None:
+        self._arg_provider.meta["generation"] = generation
 
     @abc.abstractmethod
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
