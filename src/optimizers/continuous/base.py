@@ -5,7 +5,7 @@ import numpy as np
 from typing import Optional
 
 from ..core import InputVariables
-from ..core.base import IOptimizerConfig, OptimizerResult, OptimizerRun, StopReason
+from ..core.base import IOptimizerConfig, OptimizerResult, OptimizerRun, StopReason, ensure_literal_choice, JoblibPrefer
 from ..core.types import AF, F
 from ..solution_deck import GoalFcn, InputArguments, SolutionDeck, WrappedGoalFcn
 
@@ -87,6 +87,8 @@ class IOptimizer(abc.ABC):
         """
         Validate the configuration parameters.
         """
+        # Validate joblib prefer value against allowed Literal options
+        ensure_literal_choice("joblib_prefer", self.config.joblib_prefer, JoblibPrefer)
         # Set the default values for the config
         if self.config.solution_archive_size < 0:
             self.config.solution_archive_size = len(self.variables) * 2

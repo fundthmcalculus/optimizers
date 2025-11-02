@@ -9,7 +9,7 @@ from .base import CombinatoricsResult
 from .tsp import AntColonyTSPConfig, AntColonyTSP
 from ..continuous.aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from ..continuous.variables import InputDiscreteVariable
-from ..core.base import create_from_dict
+from ..core.base import create_from_dict, literal_options
 from ..core.types import AF
 
 ClusterMethod = Literal["kmeans", "spectral", "FCM", "TSP"]
@@ -129,6 +129,7 @@ class AntColonyMTSP:
                 clusters[label].append(i)
             return clusters
         else:
+            allowed = ", ".join(repr(x) for x in literal_options(ClusterMethod))
             raise ValueError(
-                f"Unknown clustering method: {self.config.clustering_method}"
+                f"Invalid clustering_method={self.config.clustering_method!r}. Allowed options: {allowed}"
             )

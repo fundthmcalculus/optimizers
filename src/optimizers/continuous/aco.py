@@ -4,16 +4,16 @@ import joblib
 import numpy as np
 
 from .local import apply_local_optimization
-from optimizers.core.base import (
+from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
     OptimizerRun,
-)
-from optimizers.continuous.base import check_stop_early, cdf
-from optimizers.core.types import af64
-from optimizers.solution_deck import (
-    GoalFcn,
     LocalOptimType,
+)
+from ..continuous.base import check_stop_early, cdf
+from ..core.types import af64
+from ..solution_deck import (
+    GoalFcn,
     SolutionDeck,
     WrappedGoalFcn,
     InputArguments,
@@ -29,7 +29,6 @@ class AntColonyOptimizerConfig(IOptimizerConfig):
     """Learning rate for updating pheromone trails"""
     q: float = 1.0
     """Weighting parameter for better ranked solutions"""
-    local_grad_optim: LocalOptimType = "none"
 
 
 def run_ants(
