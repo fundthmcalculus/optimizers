@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
-from optimizers.combinatorial.tsp import (
+from optimizers.combinatorial.aco import (
     AntColonyTSPConfig,
     AntColonyTSP,
     NearestNeighborTSPConfig,

@@ -7,6 +7,7 @@ import tqdm
 from joblib import Parallel, delayed
 
 from .base import check_path_distance, CombinatoricsResult, TSPBase
+from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, StopReason
 from ..core.types import AI, AF, F, i32, i16
 
