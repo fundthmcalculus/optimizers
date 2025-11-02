@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.cluster import KMeans, SpectralClustering
 
 from .base import CombinatoricsResult
-from .tsp import AntColonyTSPConfig, AntColonyTSP
+from .aco import AntColonyTSPConfig, AntColonyTSP
 from ..continuous.aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from ..continuous.variables import InputDiscreteVariable
 from ..core.base import create_from_dict, literal_options

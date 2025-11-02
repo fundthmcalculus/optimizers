@@ -1,6 +1,8 @@
 from typing import Literal, Optional, TypeVar, Type, get_args
 from dataclasses import dataclass, fields
 import numpy as np
+from joblib import cpu_count, Parallel
+from tqdm import trange, tqdm
 
 from .types import AF, F
 
@@ -49,6 +51,16 @@ def create_from_dict(data: dict, cls: Type[T]) -> T:
     field_names = {f.name for f in fields(cls)}
     filtered_data = {k: v for k, v in data.items() if k in field_names}
     return cls(**filtered_data)
+
+
+def setup_for_generations(config: IOptimizerConfig) -> tuple[tqdm, int, int, Parallel]:
+    generation_pbar = trange(config.num_generations, desc="Optimizer generation")
+    n_jobs = config.n_jobs
+    if n_jobs < 1:
+        n_jobs = cpu_count() - 1
+    individuals_per_job = max(1, config.population_size // n_jobs)
+    parallel = Parallel(n_jobs=n_jobs, prefer=config.joblib_prefer)
+    return generation_pbar, individuals_per_job, n_jobs, parallel
 
 
 @dataclass
