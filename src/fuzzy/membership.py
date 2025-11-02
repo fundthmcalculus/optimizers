@@ -3,7 +3,7 @@ from typing import Union
 
 import numpy as np
 
-from ..core.types import AF
+from optimizers.core.types import AF
 
 
 class FuzzyVariable:

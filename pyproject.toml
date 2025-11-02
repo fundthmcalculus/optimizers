@@ -42,6 +42,7 @@ where = ["src"]
 
 [project.scripts]
 optimizers = "optimizers.__init__:main"
+fuzzy = "fuzzy.__init__:main"
 
 [tool.flake8]
 max-line-length = 120

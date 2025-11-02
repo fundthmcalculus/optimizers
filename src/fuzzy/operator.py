@@ -3,7 +3,7 @@ from typing import Union, List
 
 from .base import default_norm
 from .membership import FuzzyVariable
-from ..core.types import AF
+from optimizers.core.types import AF
 
 
 FuzzyArgument = Union[AF, List[FuzzyVariable]]
