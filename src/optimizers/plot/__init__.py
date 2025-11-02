@@ -1,5 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
 def plot_convergence(tour_lengths: np.ndarray | list[np.ndarray]):
@@ -33,4 +34,66 @@ def plot_convergence(tour_lengths: np.ndarray | list[np.ndarray]):
     )
 
     # Show the figure
+    fig.show()
+
+
+def plot_run_statistics(
+    summary_or_scores,
+    runtimes: np.ndarray | list[float] | None = None,
+    title_prefix: str = "Run Statistics",
+):
+    """Render box-and-whisker plots for final scores and total runtimes across runs.
+
+    Parameters
+    ----------
+    summary_or_scores: dict | array-like
+        - If dict (from optimizers.checkpoint.run_multiple), expects keys 'scores' and 'runtimes'.
+        - If array-like, treated as the list of final scores; then provide `runtimes` separately.
+    runtimes: array-like | None
+        List of runtimes in seconds (only required when `summary_or_scores` is not a dict).
+    title_prefix: str
+        Custom prefix for figure titles.
+    """
+    if isinstance(summary_or_scores, dict):
+        scores = np.asarray(summary_or_scores.get("scores", []), dtype=float)
+        rtimes = np.asarray(summary_or_scores.get("runtimes", []), dtype=float)
+    else:
+        scores = np.asarray(summary_or_scores, dtype=float)
+        rtimes = np.asarray(runtimes if runtimes is not None else [], dtype=float)
+
+    # Create two subplots vertically using specifications
+    fig = make_subplots(rows=1, cols=2, specs=[[{"type": "box"}, {"type": "box"}]])
+
+    # Box for Scores
+    fig.add_trace(
+        go.Box(
+            y=scores,
+            name="Final Score",
+            boxmean=True,
+            marker_color="#1f77b4",
+        ),
+        row=1,
+        col=1,
+    )
+
+    # Create a second independent y-axis for runtimes by adding as another trace with different x name
+    fig.add_trace(
+        go.Box(
+            y=rtimes,
+            name="Runtime (s)",
+            boxmean=True,
+            marker_color="#ff7f0e",
+        ),
+        row=1,
+        col=2,
+    )
+
+    fig.update_layout(
+        title=f"{title_prefix}: Final Score and Runtime",
+        template="plotly_white",
+        showlegend=False,
+        yaxis_title="Final Score",
+        yaxis2_title="Runtime (seconds)",
+    )
+
     fig.show()

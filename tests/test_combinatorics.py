@@ -14,6 +14,7 @@ from optimizers.combinatorial.tsp import (
     ConvexHullTSPConfig,
     TwoOptTSPConfig,
     TwoOptTSP,
+    ThreeOptTSP,
 )
 from optimizers.core.types import AF, AI
 from optimizers.plot import plot_convergence
@@ -145,7 +146,7 @@ def test_nn_tsp():
     topt_config2 = TwoOptTSPConfig(
         name="2opt TSP", back_to_start=True, nearest_neighbors=5
     )
-    topt_optimizer2 = TwoOptTSP(
+    topt_optimizer2 = ThreeOptTSP(
         topt_config2,
         initial_route=result.optimal_path,
         initial_value=result.optimal_value,
