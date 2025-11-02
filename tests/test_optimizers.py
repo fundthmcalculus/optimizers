@@ -1,6 +1,6 @@
-import pytest
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 
 from optimizers.continuous.aco import AntColonyOptimizerConfig, AntColonyOptimizer
 from optimizers.continuous.ga import (
@@ -11,7 +11,6 @@ from optimizers.continuous.gd import (
     GradientDescentOptimizer,
     GradientDescentOptimizerConfig,
 )
-from optimizers.core.base import IOptimizerConfig
 from optimizers.continuous.optimizer_strategy import (
     MultiTypeOptimizer,
     GroupedVariableOptimizerConfig,
@@ -22,18 +21,18 @@ from optimizers.continuous.pso import (
     ParticleSwarmOptimizerConfig,
     ParticleSwarmOptimizer,
 )
-from optimizers.solution_deck import (
-    SolutionDeck,
-    fibonacci_sphere_points,
-    spiral_points,
-    lloyds_algorithm_points,
-)
 from optimizers.continuous.variables import (
     InputContinuousVariable,
     InputDiscreteVariable,
     InputVariable,
 )
+from optimizers.core.base import IOptimizerConfig
 from optimizers.core.types import AF, F
+from optimizers.solution_deck import (
+    fibonacci_sphere_points,
+    spiral_points,
+    lloyds_algorithm_points,
+)
 
 
 def optim_ackley(x: AF) -> F:
