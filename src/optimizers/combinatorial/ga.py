@@ -185,17 +185,18 @@ def _mutate(child: AI, mutation_rate: F, network_routes: AF) -> AI:
         candidate_swaps = np.r_[1 : len(child) - 1]
         for _ in range(n_swaps):
             ij, jk = np.random.choice(candidate_swaps, 2, replace=False)
-            # Ensure that this swap is actually better.
-            d1 = (
-                network_routes[child[ij], child[ij + 1]]
-                + network_routes[child[jk], child[jk + 1]]
-            )
-            d2 = (
-                network_routes[child[ij], child[jk]]
-                + network_routes[child[jk + 1], child[ij + 1]]
-            )
-            if d1 > d2:
+            # Support a handful of specific operations (as per Anoop): swap, slide, and flip
+            action_choice = np.random.randint(3)
+            if action_choice == 0:
+                # Swap
                 child[ij], child[jk] = child[jk], child[ij]
+            elif action_choice == 1:
+                # This has to be sorted
+                swaps = list(sorted([ij,jk]))
+                ij, jk = swaps[0], swaps[1]
+                child = np.concatenate((child[:ij], child[jk:], child[ij:jk]), axis=0)
+            else:
+                child[ij:jk] = child[ij:jk][::-1]
         return child
     else:
         return child
