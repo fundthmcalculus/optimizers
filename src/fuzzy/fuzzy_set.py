@@ -5,7 +5,7 @@ import numpy as np
 
 from .membership import MembershipFunction, FuzzyVariable
 from .operator import FuzzyNot, FuzzyOperator, FuzzyArgument
-from ..core.types import AF, F
+from optimizers.core.types import AF, F
 
 # Some more type hints
 FuzzyInput = Union[AF, FuzzyVariable, List[FuzzyVariable]]

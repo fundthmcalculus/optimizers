@@ -7,8 +7,8 @@ from plotly.subplots import make_subplots
 
 from optimizers import AntColonyOptimizerConfig, AntColonyOptimizer
 from optimizers.continuous.variables import InputContinuousVariable
-from optimizers.fuzzy.fuzzy_set import FuzzySet, MamdaniRule, FuzzyRule, FuzzyInference
-from optimizers.fuzzy.membership import create_sinusoid_memberships, FuzzyVariable
+from fuzzy.fuzzy_set import FuzzySet, MamdaniRule, FuzzyRule, FuzzyInference
+from fuzzy.membership import create_sinusoid_memberships, FuzzyVariable
 
 
 def plot_membership_functions(*varargs: FuzzySet) -> None:

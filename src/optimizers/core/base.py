@@ -1,8 +1,37 @@
-from typing import Literal, Optional, TypeVar, Type
+from typing import Literal, Optional, TypeVar, Type, get_args
 from dataclasses import dataclass, fields
 import numpy as np
 
 from .types import AF, F
+
+JoblibPrefer = Literal["threads", "processes"]
+StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
+LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
+
+
+def literal_options(literal_type) -> list:
+    """Return the list of allowed values for a typing.Literal type."""
+    try:
+        return list(get_args(literal_type))
+    except Exception:
+        return []
+
+
+def ensure_literal_choice(name: str, value, literal_type) -> None:
+    """Validate a value against a typing.Literal and raise a helpful error.
+
+    Args:
+        name: The name of the option (for error message context)
+        value: The provided value
+        literal_type: The Literal type alias to validate against
+    Raises:
+        ValueError: if value not in allowed options
+    """
+    allowed = literal_options(literal_type)
+    if allowed and value not in allowed:
+        allowed_str = ", ".join(repr(x) for x in allowed)
+        raise ValueError(f"Invalid {name}={value!r}. Allowed options: {allowed_str}")
+
 
 T = TypeVar("T")
 
@@ -20,9 +49,6 @@ def create_from_dict(data: dict, cls: Type[T]) -> T:
     field_names = {f.name for f in fields(cls)}
     filtered_data = {k: v for k, v in data.items() if k in field_names}
     return cls(**filtered_data)
-
-
-StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
 
 
 @dataclass
@@ -53,6 +79,8 @@ class IOptimizerConfig:
     """The number of jobs to use for parallel execution. -1 means use all available cores."""
     joblib_prefer: Literal["threads", "processes"] = "threads"
     """The preferred execution mode for joblib."""
+    local_grad_optim: LocalOptimType = "none"
+    """Preferred local gradient optimization, ignored by the gradient descent method for obvious reasons"""
 
 
 @dataclass

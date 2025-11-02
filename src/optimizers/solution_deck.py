@@ -1,6 +1,8 @@
 from functools import lru_cache, cache
 from typing import Any, Callable, Literal, Optional
 
+from .core.base import ensure_literal_choice, literal_options
+
 import numpy as np
 import scipy
 from kmodes.kmodes import KModes
@@ -13,7 +15,6 @@ from .core.random import get_seed
 InputArguments = dict[str, Any]
 GoalFcn = Callable[[af64, Optional[InputArguments]], float]
 WrappedGoalFcn = Callable[[af64], float]
-LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
 InitializationType = Literal["random", "fibonacci", "spiral"]
 
 
@@ -61,6 +62,8 @@ class SolutionDeck:
             raise ValueError(
                 "Number of variables does not match the initialized deck size."
             )
+        # Validate initialization type early
+        ensure_literal_choice("init_type", init_type, InitializationType)
         num_preserve = int(self.archive_size * preserve_percent)
         if init_type == "fibonacci" and num_preserve < self.archive_size:
             fibb_spiral_points = fibonacci_sphere_points(
@@ -80,8 +83,6 @@ class SolutionDeck:
                         self.solution_archive[k, i] = variable.range_value(
                             fibb_spiral_points[k - num_preserve, i]
                         )
-                    else:
-                        raise ValueError(f"Unknown initialization type: {init_type}")
             if k >= num_preserve:
                 self.solution_value[k] = eval_fcn(self.solution_archive[k])
                 self.is_local_optima[k] = False  # Initially, none are local optima

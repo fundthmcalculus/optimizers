@@ -9,9 +9,9 @@ from ..core.base import (
     OptimizerResult,
     IOptimizerConfig,
     OptimizerRun,
+    LocalOptimType,
 )
 from .base import (
-    setup_for_generations,
     check_stop_early,
 )
 from ..core.variables import InputVariables
@@ -19,7 +19,6 @@ from .base import IOptimizer
 
 from optimizers.solution_deck import (
     GoalFcn,
-    LocalOptimType,
     SolutionDeck,
     WrappedGoalFcn,
     InputArguments,
@@ -31,8 +30,6 @@ class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
     mutation_rate: float = 0.1
     """Probability of mutation"""
     crossover_rate: float = 0.8
-    """Probability of crossover"""
-    local_grad_optim: LocalOptimType = "none"
 
 
 def tournament_selection(
