@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
+
+import numpy as np
 from sklearn.metrics import pairwise_distances
 from typing import Optional
 
 from ..core.types import AF, AI, F
-from ..core.base import StopReason
+from ..core.base import StopReason, IOptimizerConfig
 from dataclasses import dataclass
 
 
@@ -25,6 +27,19 @@ def check_path_distance(distances: AF, order_path: AI, return_to_start=False) ->
             p1 = order_path[ij + 1]
             total_dist += distances[p0, p1]
     return total_dist
+
+
+def _check_stop_early(config: IOptimizerConfig, soln_history) -> StopReason:
+    if len(soln_history) < config.stop_after_iterations:
+        return "none"
+    if np.allclose(
+        soln_history[-config.stop_after_iterations],
+        soln_history[-1],
+        rtol=1e-2,
+        atol=1e-2,
+    ):
+        return "no_improvement"
+    return "none"
 
 
 class TSPBase(ABC):

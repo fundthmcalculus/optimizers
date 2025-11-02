@@ -6,23 +6,10 @@ from dataclasses import dataclass
 import tqdm
 from joblib import Parallel, delayed
 
-from .base import check_path_distance, CombinatoricsResult, TSPBase
+from .base import check_path_distance, CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, StopReason
 from ..core.types import AI, AF, F, i32, i16
-
-
-def _check_stop_early(config: IOptimizerConfig, soln_history) -> StopReason:
-    if len(soln_history) < config.stop_after_iterations:
-        return "none"
-    if np.allclose(
-        soln_history[-config.stop_after_iterations],
-        soln_history[-1],
-        rtol=1e-2,
-        atol=1e-2,
-    ):
-        return "no_improvement"
-    return "none"
 
 
 @dataclass
