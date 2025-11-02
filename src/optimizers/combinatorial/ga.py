@@ -234,8 +234,10 @@ def _crossover(
             [parent2[:crossover_idx], parent1[crossover_idx:], all_entries], axis=0
         )
         # Deduplicate entries
-        child1 = np.unique(child1, sorted=False)
-        child2 = np.unique(child2, sorted=False)
+        _, child1_indices = np.unique(child1, return_index=True)
+        _, child2_indices = np.unique(child2, return_index=True)
+        child1 = child1[child1_indices]
+        child2 = child2[child2_indices]
         # Make sure 0 is always first
         child1 = np.concatenate([np.array([0]), child1[child1 > 0]], axis=0)
         child2 = np.concatenate([np.array([0]), child2[child2 > 0]], axis=0)

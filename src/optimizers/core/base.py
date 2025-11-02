@@ -53,7 +53,9 @@ def create_from_dict(data: dict, cls: Type[T]) -> T:
     return cls(**filtered_data)
 
 
-def setup_for_generations(config: IOptimizerConfig) -> tuple[tqdm, int, int, Parallel]:
+def setup_for_generations(
+    config: "IOptimizerConfig",
+) -> tuple[tqdm, int, int, Parallel]:
     generation_pbar = trange(config.num_generations, desc="Optimizer generation")
     n_jobs = config.n_jobs
     if n_jobs < 1:

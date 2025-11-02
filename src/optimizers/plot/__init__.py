@@ -31,7 +31,7 @@ def plot_convergence(
 
     # Update layout
     fig.update_layout(
-        title="ACO Convergence",
+        title="Convergence",
         xaxis_title="Generation",
         yaxis_title="Tour Length",
         template="plotly_white",
