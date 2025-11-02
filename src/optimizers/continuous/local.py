@@ -1,7 +1,9 @@
 from .gd import solve_gd_for_1var, solve_gd_from_x0
-from optimizers.solution_deck import WrappedGoalFcn, LocalOptimType
+from ..core.base import LocalOptimType
+from ..solution_deck import WrappedGoalFcn
 from .variables import InputVariable, InputDiscreteVariable
-from optimizers.core.types import af64
+from ..core.types import af64
+from typing import get_args
 
 
 def apply_local_optimization(
@@ -16,9 +18,14 @@ def apply_local_optimization(
         new_solution, new_value = local_perturb_optim(fcn, new_solution, variables)
     elif local_optim == "single-var-grad":
         new_solution, new_value = single_var_grad_optim(fcn, new_solution, variables)
-    else:
+    elif local_optim == "none":
         # Evaluate the new solution
         new_value = fcn(new_solution)
+    else:
+        allowed = ", ".join(repr(x) for x in get_args(LocalOptimType))
+        raise ValueError(
+            f"Invalid local_optim={local_optim!r}. Allowed options: {allowed}"
+        )
     return new_solution, new_value
 
 

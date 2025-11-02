@@ -3,28 +3,24 @@ from dataclasses import dataclass
 import joblib
 import numpy as np
 
-from .local import apply_local_optimization
-from optimizers.core.base import (
+from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
     OptimizerRun,
+    LocalOptimType,
 )
-from .base import (
-    IOptimizer,
-    setup_for_generations,
-    check_stop_early,
-    cdf,
-)
-from .variables import InputDiscreteVariable
-from ..core.types import af64
-from optimizers.solution_deck import (
+from ..solution_deck import (
     WrappedGoalFcn,
     GoalFcn,
-    LocalOptimType,
     InputArguments,
     InputVariables,
     SolutionDeck,
 )
+from .base import (
+    IOptimizer,
+    check_stop_early,
+)
+from ..core.types import af64
 
 
 @dataclass
@@ -39,7 +35,6 @@ class ParticleSwarmOptimizerConfig(IOptimizerConfig):
     """Max velocity as a fraction of variable range"""
     q: float = 1.0
     """Weighting parameter for selecting better ranked solutions as p-best"""
-    local_grad_optim: LocalOptimType = "none"
 
 
 def run_particles(

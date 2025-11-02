@@ -6,7 +6,13 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from optimizers.core.base import IOptimizerConfig, OptimizerResult, create_from_dict
+from ..core.base import (
+    IOptimizerConfig,
+    OptimizerResult,
+    create_from_dict,
+    ensure_literal_choice,
+    literal_options,
+)
 from .base import IOptimizer
 from optimizers.solution_deck import GoalFcn, InputArguments, InputVariables
 from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
@@ -26,6 +32,7 @@ def config_to_type(
     | GeneticAlgorithmOptimizerConfig
     | GradientDescentOptimizerConfig
 ):
+    ensure_literal_choice("to_type", to_type, OptimizationType)
     if to_type == "aco":
         # If you want to use default meta-parameters, you can just instantiate without extra fields
         return create_from_dict(config.__dict__, AntColonyOptimizerConfig)
@@ -36,7 +43,9 @@ def config_to_type(
     elif to_type == "gd":
         return create_from_dict(config.__dict__, GradientDescentOptimizerConfig)
     else:
-        raise ValueError(f"Unknown optimizer type: {to_type}")
+        # Should be unreachable due to ensure_literal_choice above, but keep as safety
+        allowed = ", ".join(repr(x) for x in literal_options(OptimizationType))
+        raise ValueError(f"Invalid to_type={to_type!r}. Allowed options: {allowed}")
 
 
 class IOptimizerSelection(ABC):
@@ -86,6 +95,8 @@ class MultiTypeOptimizer(IOptimizer):
             if restart_count > 0
             else self.initial_optimizer
         )
+        # Validate selection
+        ensure_literal_choice("selected_type", selected_type, OptimizationType)
         self.optimizer_choice_history.append(selected_type)
         logging.info(f"Selected optimizer: {selected_type}")
         converted_config = config_to_type(self.config, selected_type)
@@ -113,7 +124,11 @@ class MultiTypeOptimizer(IOptimizer):
                 converted_config, self.fcn, self.variables, self.args
             )
         else:
-            raise ValueError(f"Unknown optimizer type: {selected_type}")
+            # Should be unreachable due to ensure_literal_choice
+            allowed = ", ".join(repr(x) for x in literal_options(OptimizationType))
+            raise ValueError(
+                f"Invalid selected_type={selected_type!r}. Allowed options: {allowed}"
+            )
 
         result = optimizer.solve(preserve_percent=0.0 if restart_count == 0 else 0.1)
         if result.stop_reason == "no_improvement" and restart_count < max_restart:
