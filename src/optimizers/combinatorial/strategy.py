@@ -434,4 +434,3 @@ class ConvexHullTSP(TSPBase):
             value_history=np.array([total_distance]),
             stop_reason="none",
         )
-

@@ -8,7 +8,7 @@ from joblib import Parallel, delayed
 
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
-from ..core.base import IOptimizerConfig
+from ..core.base import IOptimizerConfig, setup_for_generations
 from ..core.types import AI, AF, F, i32, i16
 
 
@@ -60,39 +60,40 @@ class AntColonyTSP(TSPBase):
                     10 * self.config.q / self.config.hot_start_length
                 )
 
-        with Parallel(n_jobs=joblib.cpu_count() // 2) as parallel:
-            for generation in tqdm.trange(
-                self.config.num_generations, desc="ACO-TSP Generation"
-            ):
+        generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
+            self.config
+        )
+
+        with parallel:
+            for generations_completed in generation_pbar:
                 # Compute the change in pheromone!
                 delta_tau = np.zeros(tau.shape)
 
                 def parallel_ant(local_ant):
-                    return run_ant(self.network_routes, eta, tau, self.config)
+                    for _ in range(individuals_per_job):
+                        yield run_ant(self.network_routes, eta, tau, self.config)
 
                 all_results = parallel(
-                    delayed(parallel_ant)(i_ant)
-                    for i_ant in range(self.config.population_size)
+                    delayed(parallel_ant)(i_ant) for i_ant in range(n_jobs)
                 )
 
-                for ant in range(self.config.population_size):
-                    tour_length = all_results[ant][1]
-                    city_order = all_results[ant][0]
-                    # If a dead-end, skip!
-                    if tour_length == np.inf:
-                        continue
-                    # Update the relative ant pheromone
-                    if tour_length <= optimal_tour_length:
-                        optimal_tour_length = tour_length
-                        optimal_city_order = city_order
-                    for i in range(len(city_order) - 1):
-                        delta_tau[city_order[i], city_order[i + 1]] += (
-                            self.config.q / tour_length
-                        )
-                    if self.config.back_to_start:
-                        delta_tau[city_order[-1], city_order[0]] += (
-                            self.config.q / tour_length
-                        )
+                for ant, result_gen in enumerate(all_results):
+                    for city_order, tour_length in result_gen:
+                        # If a dead-end, skip!
+                        if tour_length == np.inf:
+                            continue
+                        # Update the relative ant pheromone
+                        if tour_length <= optimal_tour_length:
+                            optimal_tour_length = tour_length
+                            optimal_city_order = city_order
+                        for i in range(len(city_order) - 1):
+                            delta_tau[city_order[i], city_order[i + 1]] += (
+                                self.config.q / tour_length
+                            )
+                        if self.config.back_to_start:
+                            delta_tau[city_order[-1], city_order[0]] += (
+                                self.config.q / tour_length
+                            )
                 tour_lengths.append(optimal_tour_length)
                 # Once all ants are done, update the pheromone
                 tau = pheromone_update(tau, delta_tau, self.config.rho)

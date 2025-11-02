@@ -8,6 +8,7 @@ from joblib import Parallel, delayed, cpu_count
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core import IOptimizerConfig
 from .base import TSPBase, CombinatoricsResult, _check_stop_early, check_path_distance
+from ..core.base import setup_for_generations
 from ..core.types import AF, AI, F
 
 
@@ -67,28 +68,31 @@ class GeneticAlgorithmTSP(TSPBase):
 
         tour_lengths = []
 
-        with Parallel(n_jobs=cpu_count() // 2, prefer="threads") as parallel:
-            for generation in tqdm.trange(
-                self.config.num_generations, desc="GA-TSP Generation"
-            ):
+        generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
+            self.config
+        )
+
+        with parallel:
+            for generations_completed in generation_pbar:
 
                 def parallel_ga(local_ant):
-                    return run_ga(
-                        genome, genome_value, self.network_routes, self.config
-                    )
+                    for _ in range(individuals_per_job):
+                        yield run_ga(
+                            genome, genome_value, self.network_routes, self.config
+                        )
 
                 all_results = parallel(
-                    delayed(parallel_ga)(i_ant)
-                    for i_ant in range(self.config.population_size)
+                    delayed(parallel_ga)(i_ant) for i_ant in range(n_jobs)
                 )
 
-                for ant, (city_order, tour_length) in enumerate(all_results):
-                    # If a dead-end, skip!
-                    if tour_length == np.inf:
-                        continue
-                    # Append to the genome
-                    genome = np.vstack((genome, city_order))
-                    genome_value = np.hstack((genome_value, tour_length))
+                for ant, result_gen in enumerate(all_results):
+                    for city_order, tour_length in result_gen:
+                        # If a dead-end, skip!
+                        if tour_length == np.inf:
+                            continue
+                        # Append to the genome
+                        genome = np.vstack((genome, city_order))
+                        genome_value = np.hstack((genome_value, tour_length))
 
                 # Sort by genome and keep only the required rows
                 genome = genome[np.argsort(genome_value)]
@@ -140,6 +144,9 @@ def run_ga(
     child_1, child_2 = _crossover(parent_1, parent_2, config.crossover_rate)
     child_1 = _mutate(child_1, config.mutation_rate, network_routes)
     child_2 = _mutate(child_2, config.mutation_rate, network_routes)
+    # Do a bit of 2-OPT fine-tuning so everything gets a tiny bit better
+    child_1 = _2opt_refine(child_1, network_routes)
+    child_2 = _2opt_refine(child_2, network_routes)
     child_1_fitness = check_path_distance(network_routes, child_1, config.back_to_start)
     child_2_fitness = check_path_distance(network_routes, child_2, config.back_to_start)
     if child_1_fitness < child_2_fitness:
@@ -148,14 +155,36 @@ def run_ga(
         return child_2, child_2_fitness
 
 
-def _mutate(child: AI, mutation_rate: F, network_routes) -> AI:
+def _2opt_refine(new_route: AI, network_routes: AF, nearest_neighbors=10) -> AI:
+    N = len(new_route)
+    ij = np.random.randint(low=1, high=max(1, N - nearest_neighbors))
+    k_nn = N
+    if nearest_neighbors > 0:
+        k_nn = min(k_nn, ij + nearest_neighbors)
+    for jk in range(ij + 2, k_nn):
+        d1 = (
+            network_routes[new_route[ij], new_route[ij + 1]]
+            + network_routes[new_route[jk], new_route[jk + 1]]
+        )
+        d2 = (
+            network_routes[new_route[ij], new_route[jk]]
+            + network_routes[new_route[ij + 1], new_route[jk + 1]]
+        )
+        if d1 > d2:
+            new_route[jk], new_route[ij + 1] = (
+                new_route[ij + 1],
+                new_route[jk],
+            )
+    return new_route
+
+
+def _mutate(child: AI, mutation_rate: F, network_routes: AF) -> AI:
     if np.random.rand() < mutation_rate:
         # Swap a percentage of the variables
         n_swaps = max(1, int(np.round(mutation_rate * len(child) / 2.0)))
+        candidate_swaps = np.r_[1 : len(child) - 1]
         for _ in range(n_swaps):
-            ij, jk = np.random.choice(len(child) - 1, 2, replace=False)
-            if ij == 0 or jk == 0:
-                continue
+            ij, jk = np.random.choice(candidate_swaps, 2, replace=False)
             # Ensure that this swap is actually better.
             d1 = (
                 network_routes[child[ij], child[ij + 1]]

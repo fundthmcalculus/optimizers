@@ -12,6 +12,7 @@ from ..core.base import (
     StopReason,
     ensure_literal_choice,
     JoblibPrefer,
+    setup_for_generations,
 )
 from ..core.types import AF, F
 from ..solution_deck import GoalFcn, InputArguments, SolutionDeck, WrappedGoalFcn
@@ -106,16 +107,6 @@ class IOptimizer(abc.ABC):
 
     def __str__(self):
         return f"Solver(name={self.config.name})"
-
-
-def setup_for_generations(config: IOptimizerConfig):
-    generation_pbar = tqdm.trange(config.num_generations, desc="Optimizer generation")
-    n_jobs = config.n_jobs
-    if n_jobs < 1:
-        n_jobs = joblib.cpu_count() - 1
-    individuals_per_job = max(1, config.population_size // n_jobs)
-    parallel = joblib.Parallel(n_jobs=n_jobs, prefer=config.joblib_prefer)
-    return generation_pbar, individuals_per_job, n_jobs, parallel
 
 
 def check_stop_early(
