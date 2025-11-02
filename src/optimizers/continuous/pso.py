@@ -85,7 +85,9 @@ def run_particles(
                 + social * r_g * (swarm_best_pos[d] - p_pos[:, d])
             )
             # Clamp the velocity
-            p_vel[:, d] *= np.minimum(np.maximum(p_vel[:, d] / v.domain, -velocity_clamp), velocity_clamp)
+            p_vel[:, d] *= np.minimum(
+                np.maximum(p_vel[:, d] / v.domain, -velocity_clamp), velocity_clamp
+            )
         # Update the particle position for this time step.
         p_pos += p_vel
         # Do the best position for each particle
