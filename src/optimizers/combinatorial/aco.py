@@ -1,10 +1,8 @@
-import joblib
-import numpy as np
-from typing import Optional
 from dataclasses import dataclass
+from typing import Optional
 
-import tqdm
-from joblib import Parallel, delayed
+import numpy as np
+from joblib import delayed
 
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
@@ -46,6 +44,7 @@ class AntColonyTSP(TSPBase):
         self.network_routes[self.network_routes == 0] = -1
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes
+        eta[eta == -1] = 0
         # Pheromone matrix
         tau = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
@@ -70,8 +69,10 @@ class AntColonyTSP(TSPBase):
                 delta_tau = np.zeros(tau.shape)
 
                 def parallel_ant(local_ant):
+                    results = []
                     for _ in range(individuals_per_job):
-                        yield run_ant(self.network_routes, eta, tau, self.config)
+                        results.append(run_ant(self.network_routes, eta, tau, self.config))
+                    return results
 
                 all_results = parallel(
                     delayed(parallel_ant)(i_ant) for i_ant in range(n_jobs)
@@ -95,6 +96,7 @@ class AntColonyTSP(TSPBase):
                                 self.config.q / tour_length
                             )
                 tour_lengths.append(optimal_tour_length)
+                generation_pbar.set_postfix(best_value=optimal_tour_length)
                 # Once all ants are done, update the pheromone
                 tau = pheromone_update(tau, delta_tau, self.config.rho)
                 # Check for stopping early
@@ -136,7 +138,7 @@ def pheromone_update(tau_xy, delta_tau_xy, rho):
 
 
 def p_xy(eta_xy, tau_xy, allowed_y, alpha, beta, x):
-    p = (tau_xy[x, :] ** alpha) * eta_xy[x, :] ** beta
+    p = np.power(tau_xy[x, :],alpha) * np.power(eta_xy[x, :],beta)
     # Remove negative probabilities, those are not allowed
     p[~allowed_y] = 0
     p[p < 0] = 0
