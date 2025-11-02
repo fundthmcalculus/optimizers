@@ -9,6 +9,7 @@ from kmodes.kmodes import KModes
 
 from .core.types import f64, af64, ab8, b8, i64
 from .core.variables import InputVariables
+from .core.random import get_seed
 
 # Some type hinting
 InputArguments = dict[str, Any]
@@ -143,7 +144,8 @@ class SolutionDeck:
     def get_clusters(self, n_clusters: int = -1) -> tuple[af64, af64]:
         if n_clusters == -1:
             n_clusters = self.solution_archive.shape[0]
-        k_modes_model = KModes(n_clusters=n_clusters, random_state=42)
+        seed = get_seed()
+        k_modes_model = KModes(n_clusters=n_clusters, random_state=seed)
         cluster_labels = k_modes_model.fit_predict(self.solution_archive)
         return cluster_labels, k_modes_model.mode_indicies_
 
@@ -189,8 +191,9 @@ def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> np.ndarray:
         n_steps (int): Number of iterations for Lloyd's algorithm.
     """
     from sklearn.cluster import KMeans
+    from optimizers.core.random import get_seed
 
-    kmeans = KMeans(n_clusters=n, random_state=42)
+    kmeans = KMeans(n_clusters=n, random_state=get_seed())
     points = np.sort(np.random.random(size=(n, k)), axis=0)
 
     for step in range(n_steps):
