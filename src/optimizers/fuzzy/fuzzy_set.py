@@ -41,7 +41,7 @@ class FuzzySet:
         else:
             raise TypeError("item must be float or AF")
 
-    def __eq__(self, other: str | list[str]) -> FuzzyEquals:
+    def __eq__(self, other: str | list[str]) -> "FuzzyEquals":
         if isinstance(other, str):
             return FuzzyEquals(self, other)
         elif isinstance(other, list):
@@ -55,16 +55,16 @@ class FuzzySet:
     def __ne__(self, other: str | list[str]) -> FuzzyNot:
         return FuzzyNot(self == other)
 
-    def __lt__(self, other: str | list[str]) -> FuzzyLessThan:
+    def __lt__(self, other: str | list[str]) -> "FuzzyLessThan":
         return FuzzyLessThan(self, other[0])
 
-    def __gt__(self, other: str | list[str]) -> FuzzyGreaterThan:
+    def __gt__(self, other: str | list[str]) -> "FuzzyGreaterThan":
         return FuzzyGreaterThan(self, other[0])
 
-    def __le__(self, other: str | list[str]) -> FuzzyLessThanEqual:
+    def __le__(self, other: str | list[str]) -> "FuzzyLessThanEqual":
         return FuzzyLessThanEqual(self, other[0])
 
-    def __ge__(self, other: str | list[str]) -> FuzzyGreaterThanEqual:
+    def __ge__(self, other: str | list[str]) -> "FuzzyGreaterThanEqual":
         return FuzzyGreaterThanEqual(self, other[0])
 
     @property

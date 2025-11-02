@@ -397,7 +397,7 @@ class ConvexHullTSP(TSPBase):
         start_theta = 0.0
 
         def atan2pos(v):
-            t = np.atan2(v[1], v[0])
+            t = np.arctan2(v[1], v[0])
             if t < 0:
                 t += 2 * np.pi
             return t
