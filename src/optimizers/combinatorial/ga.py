@@ -192,7 +192,7 @@ def _mutate(child: AI, mutation_rate: F, network_routes: AF) -> AI:
                 child[ij], child[jk] = child[jk], child[ij]
             elif action_choice == 1:
                 # This has to be sorted
-                swaps = list(sorted([ij,jk]))
+                swaps = list(sorted([ij, jk]))
                 ij, jk = swaps[0], swaps[1]
                 child = np.concatenate((child[:ij], child[jk:], child[ij:jk]), axis=0)
             else:
