@@ -1,9 +1,15 @@
+from typing import List
+
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from ..core.types import AF, AI
 
-def plot_convergence(tour_lengths: np.ndarray | list[np.ndarray]):
+
+def plot_convergence(
+    tour_lengths: np.ndarray | list[np.ndarray], trace_names: list[str] | None = None
+):
     # Create the figure
     fig = go.Figure()
 
@@ -17,7 +23,7 @@ def plot_convergence(tour_lengths: np.ndarray | list[np.ndarray]):
                 x=np.r_[0 : len(trace)],
                 y=trace,
                 mode="lines+markers",
-                name=f"Tour Length-{i_t+1}",
+                name=trace_names[i_t] if trace_names else f"Tour Length-{i_t+1}",
                 line=dict(width=2),
                 marker=dict(size=6),
             )
@@ -34,6 +40,51 @@ def plot_convergence(tour_lengths: np.ndarray | list[np.ndarray]):
     )
 
     # Show the figure
+    fig.show()
+
+
+def plot_cities_and_route(
+    cities: AF, route: AI | List[AI], trace_names: list[str] | None = None
+):
+    fig = go.Figure()
+
+    # Plot cities
+    fig.add_trace(
+        go.Scatter(
+            x=cities[:, 0],
+            y=cities[:, 1],
+            mode="markers",
+            name="Cities",
+            marker=dict(size=8, color="blue"),
+        )
+    )
+
+    if not isinstance(route, list):
+        route = [route]
+
+    # Plot route
+    for ir, route in enumerate(route):
+        route_cities = np.vstack(
+            (cities[route], cities[route[0]])
+        )  # Connect back to start
+        fig.add_trace(
+            go.Scatter(
+                x=route_cities[:, 0],
+                y=route_cities[:, 1],
+                mode="lines",
+                name=trace_names[ir] if trace_names else f"Route-{ir+1}",
+                line=dict(width=2),
+            )
+        )
+
+    fig.update_layout(
+        title="TSP Route",
+        xaxis_title="X",
+        yaxis_title="Y",
+        showlegend=True,
+        template="plotly_white",
+    )
+
     fig.show()
 
 

@@ -22,7 +22,7 @@ from optimizers.combinatorial.strategy import (
     ConvexHullTSP,
 )
 from optimizers.core.types import AF, AI
-from optimizers.plot import plot_convergence
+from optimizers.plot import plot_convergence, plot_cities_and_route
 
 N_CITIES_CLUSTER = 20
 N_CLUSTERS = N_CITIES_CLUSTER // 2
@@ -67,49 +67,6 @@ def circle_random_clusters(n_clusters=-1, n_cities=-1) -> np.ndarray:
 def poly_perimeter(n_sides, r):
     # Compute perimeter of inscribed polygon in circle of radius, r.
     return n_sides * 2 * r * np.sin(2 * np.pi / (2 * n_sides))
-
-
-def plot_cities_and_route(cities: AF, route: AI | List[AI]):
-    fig = go.Figure()
-
-    # Plot cities
-    fig.add_trace(
-        go.Scatter(
-            x=cities[:, 0],
-            y=cities[:, 1],
-            mode="markers",
-            name="Cities",
-            marker=dict(size=8, color="blue"),
-        )
-    )
-
-    if not isinstance(route, list):
-        route = [route]
-
-    # Plot route
-    for ir, route in enumerate(route):
-        route_cities = np.vstack(
-            (cities[route], cities[route[0]])
-        )  # Connect back to start
-        fig.add_trace(
-            go.Scatter(
-                x=route_cities[:, 0],
-                y=route_cities[:, 1],
-                mode="lines",
-                name=f"Route-{ir+1}",
-                line=dict(width=2),
-            )
-        )
-
-    fig.update_layout(
-        title="TSP Route",
-        xaxis_title="X",
-        yaxis_title="Y",
-        showlegend=True,
-        template="plotly_white",
-    )
-
-    fig.show()
 
 
 def test_aco_tsp():
@@ -210,6 +167,24 @@ def test_mtsp():
     plot_cities_and_route(all_cities, result.optimal_path)
 
 
+def test_p2():
+    city_locations = project_2_data()
+    results = compute_tsp_bounds(city_locations)
+    trace_names = [
+        "Nearest Neighbor",
+        "2-OPT",
+        "Convex Hull",
+        "Genetic Algorithm",
+        "Ant Colony",
+    ]
+    plot_convergence([x.value_history for x in results], trace_names)
+    plot_cities_and_route(
+        city_locations,
+        [x.optimal_path for x in results],
+        trace_names,
+    )
+
+
 def compute_tsp_bounds(cities: AF):
     # Compute upper bound using Nearest Neighbor
     distances: AF = pairwise_distances(cities)
@@ -251,11 +226,12 @@ def compute_tsp_bounds(cities: AF):
     start_time = time.time()
     ga_config = GeneticAlgorithmTSPConfig(
         name="GA TSP",
-        num_generations=n_generations,  # NOTE - Anecdotally, GA runs faster than ACO, but worse.
+        num_generations=3
+        * n_generations,  # NOTE - Anecdotally, GA runs about 3x faster than ACO, but worse.
         population_size=n_ants,
         solution_archive_size=solution_archive_size,
         joblib_prefer="threads",
-        stop_after_iterations=n_generations,  # No early stopping!
+        stop_after_iterations=3 * n_generations,  # No early stopping!
     )
     ga_optimizer = GeneticAlgorithmTSP(
         ga_config, network_routes=distances, city_locations=cities
@@ -292,21 +268,7 @@ def compute_tsp_bounds(cities: AF):
     print(f"TSP GA Solution: {ga_result.optimal_value:.2f} (Time: {ga_time:.2f}s)")
     print(f"TSP ACO Solution: {aco_result.optimal_value:.2f} (Time: {aco_time:.2f}s)")
 
-    return nn_result, ch_result, ga_result, aco_result
-
-
-def test_p2():
-    city_locations = project_2_data()
-    nn_result, ch_result, ga_result, aco_result = compute_tsp_bounds(city_locations)
-    plot_cities_and_route(
-        city_locations,
-        [
-            nn_result.optimal_path,
-            ch_result.optimal_path,
-            ga_result.optimal_path,
-            aco_result.optimal_path,
-        ],
-    )
+    return nn_result, topt_result, ch_result, ga_result, aco_result
 
 
 def project_2_data() -> AF:
