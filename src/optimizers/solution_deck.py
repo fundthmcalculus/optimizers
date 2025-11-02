@@ -168,8 +168,10 @@ class SolutionDeck:
         deck.solution_value = np.array(data["solution_value"], dtype=dtype)
         deck.is_local_optima = np.array(data["is_local_optima"], dtype=bool)
         # If archive_size smaller than loaded, update to loaded size baseline for operations
-        deck.archive_size = archive_size if archive_size > 0 else min(
-            len(deck.solution_archive), len(deck.solution_value)
+        deck.archive_size = (
+            archive_size
+            if archive_size > 0
+            else min(len(deck.solution_archive), len(deck.solution_value))
         )
         deck.num_vars = num_vars if num_vars > 0 else deck.solution_archive.shape[1]
         return deck

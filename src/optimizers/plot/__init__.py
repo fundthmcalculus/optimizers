@@ -37,7 +37,11 @@ def plot_convergence(tour_lengths: np.ndarray | list[np.ndarray]):
     fig.show()
 
 
-def plot_run_statistics(summary_or_scores, runtimes: np.ndarray | list[float] | None = None, title_prefix: str = "Run Statistics"):
+def plot_run_statistics(
+    summary_or_scores,
+    runtimes: np.ndarray | list[float] | None = None,
+    title_prefix: str = "Run Statistics",
+):
     """Render box-and-whisker plots for final scores and total runtimes across runs.
 
     Parameters
@@ -68,7 +72,8 @@ def plot_run_statistics(summary_or_scores, runtimes: np.ndarray | list[float] | 
             boxmean=True,
             marker_color="#1f77b4",
         ),
-        row=1, col=1
+        row=1,
+        col=1,
     )
 
     # Create a second independent y-axis for runtimes by adding as another trace with different x name
@@ -79,7 +84,8 @@ def plot_run_statistics(summary_or_scores, runtimes: np.ndarray | list[float] | 
             boxmean=True,
             marker_color="#ff7f0e",
         ),
-        row=1, col=2
+        row=1,
+        col=2,
     )
 
     fig.update_layout(
@@ -89,6 +95,5 @@ def plot_run_statistics(summary_or_scores, runtimes: np.ndarray | list[float] | 
         yaxis_title="Final Score",
         yaxis2_title="Runtime (seconds)",
     )
-    
 
     fig.show()

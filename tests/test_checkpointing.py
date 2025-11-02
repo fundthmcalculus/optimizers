@@ -21,7 +21,7 @@ from optimizers.solution_deck import SolutionDeck
 def simple_ga_setup():
     # Simple convex sphere function in 2D
     def sphere(x):
-        return float(np.sum(x ** 2))
+        return float(np.sum(x**2))
 
     variables = [
         InputContinuousVariable("x1", -5.0, 5.0),
@@ -71,7 +71,9 @@ def test_save_and_load_checkpoint_single_run(tmp_path: Path, simple_ga_setup):
     assert np.isfinite(deck.solution_value[0])
 
 
-def test_run_multiple_and_summary_and_plot(monkeypatch, tmp_path: Path, simple_ga_setup):
+def test_run_multiple_and_summary_and_plot(
+    monkeypatch, tmp_path: Path, simple_ga_setup
+):
     fcn, variables, base_cfg = simple_ga_setup
 
     def build_optimizer():
@@ -85,7 +87,9 @@ def test_run_multiple_and_summary_and_plot(monkeypatch, tmp_path: Path, simple_g
 
         return "GA", cfg, runner
 
-    cp_cfg = CheckpointConfig(enabled=True, folder=str(tmp_path / "multi"), filename_prefix="ga_fold")
+    cp_cfg = CheckpointConfig(
+        enabled=True, folder=str(tmp_path / "multi"), filename_prefix="ga_fold"
+    )
 
     summary = run_multiple(
         n_runs=3,

@@ -75,20 +75,26 @@ def save_checkpoint(
         "timestamp": timestamp,
         "optimizer": optimizer_name,
         "config": asdict(config) if checkpoint_cfg.save_config_blob else None,
-        "solution_deck": solution_deck.to_dict() if (solution_deck and checkpoint_cfg.save_solution_deck) else None,
-        "result": {
-            "solution_score": float(result.solution_score),
-            "solution_vector": np.asarray(result.solution_vector).tolist(),
-            "solution_history": (
-                None
-                if result.solution_history is None
-                else np.asarray(result.solution_history).tolist()
-            ),
-            "stop_reason": result.stop_reason,
-            "generations_completed": int(result.generations_completed),
-        }
-        if (result is not None and checkpoint_cfg.save_result_blob)
-        else None,
+        "solution_deck": (
+            solution_deck.to_dict()
+            if (solution_deck and checkpoint_cfg.save_solution_deck)
+            else None
+        ),
+        "result": (
+            {
+                "solution_score": float(result.solution_score),
+                "solution_vector": np.asarray(result.solution_vector).tolist(),
+                "solution_history": (
+                    None
+                    if result.solution_history is None
+                    else np.asarray(result.solution_history).tolist()
+                ),
+                "stop_reason": result.stop_reason,
+                "generations_completed": int(result.generations_completed),
+            }
+            if (result is not None and checkpoint_cfg.save_result_blob)
+            else None
+        ),
         "metadata": metadata or {},
     }
 
@@ -123,7 +129,14 @@ def load_checkpoint(file_path: str | os.PathLike[str]) -> dict[str, Any]:
 
 def run_multiple(
     n_runs: int,
-    build_optimizer: Callable[[], tuple[str, IOptimizerConfig, Callable[[], tuple[SolutionDeck | None, OptimizerResult]]]],
+    build_optimizer: Callable[
+        [],
+        tuple[
+            str,
+            IOptimizerConfig,
+            Callable[[], tuple[SolutionDeck | None, OptimizerResult]],
+        ],
+    ],
     checkpoint_cfg: Optional[CheckpointConfig] = None,
     summary_filename: str = "summary.json",
 ) -> dict[str, Any]:
