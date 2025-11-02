@@ -16,7 +16,7 @@ from .base import (
     cdf,
 )
 from .variables import InputDiscreteVariable
-from ..core.types import af64
+from ..core.types import af64, AF, F
 from optimizers.solution_deck import (
     WrappedGoalFcn,
     GoalFcn,
@@ -36,10 +36,6 @@ class ParticleSwarmOptimizerConfig(IOptimizerConfig):
     social: float = 1.5
     """Social coefficient (c2) towards global best"""
     velocity_clamp: float = 0.5
-    """Max velocity as a fraction of variable range"""
-    q: float = 1.0
-    """Weighting parameter for selecting better ranked solutions as p-best"""
-    local_grad_optim: LocalOptimType = "none"
 
 
 def run_particles(
@@ -48,9 +44,8 @@ def run_particles(
     cognitive: float,
     social: float,
     velocity_clamp: float,
-    q_weight: float,
-    local_optim: LocalOptimType,
-    solution_archive: af64,
+    global_best_position: AF,
+    global_best_value: F,
     variables: InputVariables,
     fcn: WrappedGoalFcn,
 ) -> OptimizerRun:
@@ -69,8 +64,6 @@ def run_particles(
     p_vel = np.zeros((n_particles, len(variables)))  # Current Velocity
     p_best_val = np.zeros(n_particles)  # Particle best value
     # Swarm best position
-    swarm_best_pos = np.zeros(len(variables))
-    swarm_best_val = 0.0
     for k in range(n_particles):
         for d, v in enumerate(variables):
             p_pos[k, d] = p_best_pos[k, d] = v.initial_random_value()
@@ -80,11 +73,10 @@ def run_particles(
     best_idx = np.argmin(p_best_val)
     swarm_best_pos = p_best_pos[best_idx, :]
     swarm_best_val = p_best_val[best_idx]
+    if global_best_value < swarm_best_val:
+        swarm_best_val = global_best_value
+        swarm_best_pos = global_best_position
 
-    # Run for a certain number of iterations, or maybe till the solution doesn't get much better?
-    w = 0.5  # Inertial weight
-    phi_p = 1.5  # Typically between [1,3]
-    phi_g = 1.5  # Typically between [1,3]
     n_iterations = 10
     for cur_iter in range(n_iterations):
         # TODO - Vectorize this!
@@ -93,9 +85,13 @@ def run_particles(
                 r_p, r_g = np.random.rand(), np.random.rand()
                 # Update velocity
                 p_vel[k, d] = (
-                    w * p_vel[k, d]
-                    + r_p * phi_p * (p_best_pos[k, d] - p_pos[k, d])
-                    + phi_g * r_g * (swarm_best_pos[d] - p_pos[k, d])
+                    inertia * p_vel[k, d]
+                    + r_p * cognitive * (p_best_pos[k, d] - p_pos[k, d])
+                    + social * r_g * (swarm_best_pos[d] - p_pos[k, d])
+                )
+                # Clamp the velocity
+                p_vel[k, d] = min(
+                    max(p_vel[k, d], -velocity_clamp), velocity_clamp
                 )
         # Update the particle position for this time step.
         p_pos += p_vel
@@ -140,7 +136,7 @@ class ParticleSwarmOptimizer(IOptimizer):
             stopped_early = check_stop_early(
                 self.config, best_soln_history, self.soln_deck.solution_value
             )
-            if stopped_early:
+            if stopped_early != 'none':
                 break
 
             job_output: list[OptimizerRun] = parallel(
@@ -150,9 +146,8 @@ class ParticleSwarmOptimizer(IOptimizer):
                     self.config.cognitive,
                     self.config.social,
                     self.config.velocity_clamp,
-                    self.config.q,
-                    self.config.local_grad_optim,
-                    self.soln_deck.solution_archive,
+                    self.soln_deck.solution_archive[0,:],
+                    self.soln_deck.solution_value[0],
                     self.variables,
                     self.wrapped_fcn,
                 )
