@@ -2,7 +2,10 @@ import time
 import numpy as np
 import pytest
 
-from optimizers.continuous.ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
+from optimizers.continuous.ga import (
+    GeneticAlgorithmOptimizer,
+    GeneticAlgorithmOptimizerConfig,
+)
 from optimizers.continuous.variables import InputContinuousVariable
 from optimizers.core.base import ensure_literal_choice, literal_options, Phase
 from optimizers.core.types import AF, F
@@ -57,11 +60,13 @@ def test_metadata_injection_into_goal_and_constraints(tiny_ga_cfg):
         seen_goal.append(snap)
         # simple convex objective
         x = np.asarray(x, dtype=float)
-        return float(np.sum(x ** 2))
+        return float(np.sum(x**2))
 
     def ineq_g(x: AF, args: dict) -> F:
         # Record only phase/generation for constraint path
-        seen_cons.append((args.get("phase"), args.get("generation"), args.get("eval_count")))
+        seen_cons.append(
+            (args.get("phase"), args.get("generation"), args.get("eval_count"))
+        )
         x = np.asarray(x, dtype=float)
         # encourage small x[0]
         return float(x[0] - 10.0)  # <= 0 when x0 <= 10
