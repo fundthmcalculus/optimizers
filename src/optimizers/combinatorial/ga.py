@@ -2,22 +2,20 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-import tqdm
-from joblib import Parallel, delayed, cpu_count
+from joblib import delayed
 
+from .base import TSPBase, CombinatoricsResult, _check_stop_early, check_path_distance
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core import IOptimizerConfig
-from .base import TSPBase, CombinatoricsResult, _check_stop_early, check_path_distance
 from ..core.base import setup_for_generations
 from ..core.types import AF, AI, F
 
 
 @dataclass
 class GeneticAlgorithmTSPConfig(IOptimizerConfig):
-
-    mutation_rate: float = 0.1
+    mutation_rate: float = 0.105  # 0.1
     """Probability of mutation"""
-    crossover_rate: float = 0.8
+    crossover_rate: float = 0.190  # 0.8
     """Probability of crossover"""
     back_to_start: bool = True
     """Whether to return to the start node"""
@@ -76,10 +74,14 @@ class GeneticAlgorithmTSP(TSPBase):
             for generations_completed in generation_pbar:
 
                 def parallel_ga(local_ant):
+                    results = []
                     for _ in range(individuals_per_job):
-                        yield run_ga(
-                            genome, genome_value, self.network_routes, self.config
+                        results.append(
+                            run_ga(
+                                genome, genome_value, self.network_routes, self.config
+                            )
                         )
+                    return results
 
                 all_results = parallel(
                     delayed(parallel_ga)(i_ant) for i_ant in range(n_jobs)
@@ -101,6 +103,7 @@ class GeneticAlgorithmTSP(TSPBase):
                 genome_value = genome_value[: self.config.solution_archive_size]
 
                 tour_lengths.append(genome_value[0])
+                generation_pbar.set_postfix(best_value=genome_value[0])
                 # Check for stopping early
                 stop_reason = _check_stop_early(self.config, tour_lengths)
                 if stop_reason != "none":
