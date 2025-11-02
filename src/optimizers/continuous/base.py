@@ -5,7 +5,14 @@ import numpy as np
 from typing import Optional
 
 from ..core import InputVariables
-from ..core.base import IOptimizerConfig, OptimizerResult, OptimizerRun, StopReason, ensure_literal_choice, JoblibPrefer
+from ..core.base import (
+    IOptimizerConfig,
+    OptimizerResult,
+    OptimizerRun,
+    StopReason,
+    ensure_literal_choice,
+    JoblibPrefer,
+)
 from ..core.types import AF, F
 from ..solution_deck import GoalFcn, InputArguments, SolutionDeck, WrappedGoalFcn
 

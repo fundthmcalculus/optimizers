@@ -32,6 +32,7 @@ def ensure_literal_choice(name: str, value, literal_type) -> None:
         allowed_str = ", ".join(repr(x) for x in allowed)
         raise ValueError(f"Invalid {name}={value!r}. Allowed options: {allowed_str}")
 
+
 T = TypeVar("T")
 
 

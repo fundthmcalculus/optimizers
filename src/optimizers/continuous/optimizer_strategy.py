@@ -6,7 +6,13 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from ..core.base import IOptimizerConfig, OptimizerResult, create_from_dict, ensure_literal_choice, literal_options
+from ..core.base import (
+    IOptimizerConfig,
+    OptimizerResult,
+    create_from_dict,
+    ensure_literal_choice,
+    literal_options,
+)
 from .base import IOptimizer
 from optimizers.solution_deck import GoalFcn, InputArguments, InputVariables
 from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
