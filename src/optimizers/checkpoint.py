@@ -85,53 +85,71 @@ def save_checkpoint(
             else None
         ),
         "result": (
-            (lambda r: {
-                "solution_score": float(r.solution_score),
-                "solution_vector": np.asarray(r.solution_vector).tolist(),
-                "solution_history": (
-                    None
-                    if r.solution_history is None
-                    else np.asarray(r.solution_history).tolist()
-                ),
-                "stop_reason": r.stop_reason,
-                "generations_completed": int(r.generations_completed),
-                # New optional fields for constraints and unconstrained best
-                **(
-                    {"total_constraint_violation": float(r.total_constraint_violation)}
-                    if r.total_constraint_violation is not None
-                    else {}
-                ),
-                **(
-                    {"ineq_relative_violations": np.asarray(r.ineq_relative_violations).tolist()}
-                    if r.ineq_relative_violations is not None
-                    else {}
-                ),
-                **(
-                    {"eq_relative_violations": np.asarray(r.eq_relative_violations).tolist()}
-                    if r.eq_relative_violations is not None
-                    else {}
-                ),
-                **(
-                    {"ineq_values": np.asarray(r.ineq_values).tolist()}
-                    if r.ineq_values is not None
-                    else {}
-                ),
-                **(
-                    {"eq_values": np.asarray(r.eq_values).tolist()}
-                    if r.eq_values is not None
-                    else {}
-                ),
-                **(
-                    {"unconstrained_best_score": float(r.unconstrained_best_score)}
-                    if r.unconstrained_best_score is not None
-                    else {}
-                ),
-                **(
-                    {"unconstrained_best_vector": np.asarray(r.unconstrained_best_vector).tolist()}
-                    if r.unconstrained_best_vector is not None
-                    else {}
-                ),
-            })(result)
+            (
+                lambda r: {
+                    "solution_score": float(r.solution_score),
+                    "solution_vector": np.asarray(r.solution_vector).tolist(),
+                    "solution_history": (
+                        None
+                        if r.solution_history is None
+                        else np.asarray(r.solution_history).tolist()
+                    ),
+                    "stop_reason": r.stop_reason,
+                    "generations_completed": int(r.generations_completed),
+                    # New optional fields for constraints and unconstrained best
+                    **(
+                        {
+                            "total_constraint_violation": float(
+                                r.total_constraint_violation
+                            )
+                        }
+                        if r.total_constraint_violation is not None
+                        else {}
+                    ),
+                    **(
+                        {
+                            "ineq_relative_violations": np.asarray(
+                                r.ineq_relative_violations
+                            ).tolist()
+                        }
+                        if r.ineq_relative_violations is not None
+                        else {}
+                    ),
+                    **(
+                        {
+                            "eq_relative_violations": np.asarray(
+                                r.eq_relative_violations
+                            ).tolist()
+                        }
+                        if r.eq_relative_violations is not None
+                        else {}
+                    ),
+                    **(
+                        {"ineq_values": np.asarray(r.ineq_values).tolist()}
+                        if r.ineq_values is not None
+                        else {}
+                    ),
+                    **(
+                        {"eq_values": np.asarray(r.eq_values).tolist()}
+                        if r.eq_values is not None
+                        else {}
+                    ),
+                    **(
+                        {"unconstrained_best_score": float(r.unconstrained_best_score)}
+                        if r.unconstrained_best_score is not None
+                        else {}
+                    ),
+                    **(
+                        {
+                            "unconstrained_best_vector": np.asarray(
+                                r.unconstrained_best_vector
+                            ).tolist()
+                        }
+                        if r.unconstrained_best_vector is not None
+                        else {}
+                    ),
+                }
+            )(result)
             if (result is not None and checkpoint_cfg.save_result_blob)
             else None
         ),

@@ -136,10 +136,14 @@ class GradientDescentOptimizer(IOptimizer):
             eq_rel = None
             total = None
             if getattr(self, "wrapped_ineq_constraints", None):
-                ineq_vals = np.array([g(x) for g in self.wrapped_ineq_constraints], dtype=float)
+                ineq_vals = np.array(
+                    [g(x) for g in self.wrapped_ineq_constraints], dtype=float
+                )
                 ineq_rel = np.maximum(ineq_vals, 0.0)
             if getattr(self, "wrapped_eq_constraints", None):
-                eq_vals = np.array([h(x) for h in self.wrapped_eq_constraints], dtype=float)
+                eq_vals = np.array(
+                    [h(x) for h in self.wrapped_eq_constraints], dtype=float
+                )
                 eq_rel = np.abs(eq_vals)
             if ineq_rel is not None or eq_rel is not None:
                 total = 0.0
@@ -179,7 +183,9 @@ class GradientDescentOptimizer(IOptimizer):
                 # Pick the best solution of the output options
                 job_output = sorted(job_output, key=lambda x: x.solution_score)
                 best = job_output[0]
-                ineq_vals, eq_vals, ineq_rel, eq_rel, total = compute_constraints_for_x(best.solution_vector)
+                ineq_vals, eq_vals, ineq_rel, eq_rel, total = compute_constraints_for_x(
+                    best.solution_vector
+                )
                 return OptimizerResult(
                     solution_vector=best.solution_vector,
                     solution_score=best.solution_score,
@@ -196,7 +202,9 @@ class GradientDescentOptimizer(IOptimizer):
                 )
         else:
             res = solve_gd(self.variables, self.wrapped_fcn)
-            ineq_vals, eq_vals, ineq_rel, eq_rel, total = compute_constraints_for_x(res.x)
+            ineq_vals, eq_vals, ineq_rel, eq_rel, total = compute_constraints_for_x(
+                res.x
+            )
             return OptimizerResult(
                 solution_vector=res.x,
                 solution_score=res.fun,

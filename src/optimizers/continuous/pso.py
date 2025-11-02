@@ -113,7 +113,7 @@ class ParticleSwarmOptimizer(IOptimizer):
         existing_soln_deck: SolutionDeck | None = None,
         inequality_constraints: list[GoalFcn] | None = None,
         equality_constraints: list[GoalFcn] | None = None,
-    ): 
+    ):
         super().__init__(
             config,
             fcn,
@@ -165,7 +165,9 @@ class ParticleSwarmOptimizer(IOptimizer):
         stopped_early = stopped_early if stopped_early != "none" else "max_iterations"
         # Return the best solution, including constraint metrics and unconstrained best
         best_x, best_val, _ = self.soln_deck.get_best()
-        ineq_vals, eq_vals, ineq_rel, eq_rel, total = self.soln_deck.get_constraint_results(0)
+        ineq_vals, eq_vals, ineq_rel, eq_rel, total = (
+            self.soln_deck.get_constraint_results(0)
+        )
         ub_x, ub_val, _ = self.soln_deck.get_best_unconstrained()
         return OptimizerResult(
             solution_vector=best_x,

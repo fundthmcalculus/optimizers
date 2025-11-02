@@ -14,7 +14,13 @@ from ..core.base import (
     JoblibPrefer,
 )
 from ..core.types import AF, F
-from ..solution_deck import GoalFcn, InputArguments, SolutionDeck, WrappedGoalFcn, WrappedConstraintFcn
+from ..solution_deck import (
+    GoalFcn,
+    InputArguments,
+    SolutionDeck,
+    WrappedGoalFcn,
+    WrappedConstraintFcn,
+)
 
 
 class IOptimizer(abc.ABC):

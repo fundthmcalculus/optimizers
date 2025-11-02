@@ -17,7 +17,7 @@ GoalFcn = Union[
     Callable[[AF], F],
     Callable[[AF, InputArguments], F],
     Callable[[AF], float],
-    Callable[[AF, InputArguments], float]
+    Callable[[AF, InputArguments], float],
 ]
 WrappedGoalFcn = Callable[[AF], F]
 InitializationType = Literal["random", "fibonacci", "spiral"]
@@ -64,13 +64,19 @@ class SolutionDeck:
         )
         # total relative violation for sorting
         self.total_rel_violation = (
-            np.empty((archive_size,), dtype=dtype) if (self._ineq_fcns or self._eq_fcns) else None
+            np.empty((archive_size,), dtype=dtype)
+            if (self._ineq_fcns or self._eq_fcns)
+            else None
         )
         self.archive_size = archive_size
         self.num_vars = num_vars
         self._dtype = dtype
 
-    def _compute_constraint_values_and_violations(self, xs: af64) -> tuple[Optional[af64], Optional[af64], Optional[af64], Optional[af64], Optional[af64]]:
+    def _compute_constraint_values_and_violations(
+        self, xs: af64
+    ) -> tuple[
+        Optional[af64], Optional[af64], Optional[af64], Optional[af64], Optional[af64]
+    ]:
         # Returns (ineq_vals, eq_vals, ineq_rel, eq_rel, total_rel)
         if not self._ineq_fcns and not self._eq_fcns:
             return None, None, None, None, None
@@ -85,7 +91,9 @@ class SolutionDeck:
             for j, f in enumerate(self._ineq_fcns):
                 gj = np.array([f(xs[i, :]) for i in range(n)], dtype=self._dtype)
                 ineq_vals[:, j] = gj
-                ineq_rel[:, j] = np.maximum(gj, 0.0)  # <=0 is satisfied; positive is violation
+                ineq_rel[:, j] = np.maximum(
+                    gj, 0.0
+                )  # <=0 is satisfied; positive is violation
         if self._eq_fcns:
             eq_vals = np.zeros((n, len(self._eq_fcns)), dtype=self._dtype)
             eq_rel = np.zeros_like(eq_vals)
@@ -135,7 +143,9 @@ class SolutionDeck:
         self.solution_value = np.hstack([self.solution_value, values])
         # Compute constraint metrics for new rows and append
         if self._ineq_fcns or self._eq_fcns:
-            ineq_vals, eq_vals, ineq_rel, eq_rel, total_rel = self._compute_constraint_values_and_violations(solutions)
+            ineq_vals, eq_vals, ineq_rel, eq_rel, total_rel = (
+                self._compute_constraint_values_and_violations(solutions)
+            )
             if self.ineq_values is not None and ineq_vals is not None:
                 self.ineq_values = np.vstack([self.ineq_values, ineq_vals])
                 self.ineq_rel_viol = np.vstack([self.ineq_rel_viol, ineq_rel])
@@ -143,7 +153,9 @@ class SolutionDeck:
                 self.eq_values = np.vstack([self.eq_values, eq_vals])
                 self.eq_rel_viol = np.vstack([self.eq_rel_viol, eq_rel])
             if self.total_rel_violation is not None and total_rel is not None:
-                self.total_rel_violation = np.hstack([self.total_rel_violation, total_rel])
+                self.total_rel_violation = np.hstack(
+                    [self.total_rel_violation, total_rel]
+                )
 
     def initialize_solution_deck(
         self,
@@ -195,8 +207,13 @@ class SolutionDeck:
                             self.eq_rel_viol[k, j] = abs(hj)
                     if self.total_rel_violation is not None:
                         n_cons = (
-                            (self.ineq_rel_viol.shape[1] if self.ineq_rel_viol is not None else 0)
-                            + (self.eq_rel_viol.shape[1] if self.eq_rel_viol is not None else 0)
+                            self.ineq_rel_viol.shape[1]
+                            if self.ineq_rel_viol is not None
+                            else 0
+                        ) + (
+                            self.eq_rel_viol.shape[1]
+                            if self.eq_rel_viol is not None
+                            else 0
                         )
                         n_cons = max(1, n_cons)
                         total = 0.0
@@ -241,17 +258,25 @@ class SolutionDeck:
         # Ensure unique and sorted indices for deletion
         if rows_to_delete:
             rows_to_delete = sorted(set(rows_to_delete))
-            self.solution_archive = np.delete(self.solution_archive, rows_to_delete, axis=0)
+            self.solution_archive = np.delete(
+                self.solution_archive, rows_to_delete, axis=0
+            )
             self.solution_value = np.delete(self.solution_value, rows_to_delete, axis=0)
-            self.is_local_optima = np.delete(self.is_local_optima, rows_to_delete, axis=0)
+            self.is_local_optima = np.delete(
+                self.is_local_optima, rows_to_delete, axis=0
+            )
             if self.ineq_values is not None:
                 self.ineq_values = np.delete(self.ineq_values, rows_to_delete, axis=0)
-                self.ineq_rel_viol = np.delete(self.ineq_rel_viol, rows_to_delete, axis=0)
+                self.ineq_rel_viol = np.delete(
+                    self.ineq_rel_viol, rows_to_delete, axis=0
+                )
             if self.eq_values is not None:
                 self.eq_values = np.delete(self.eq_values, rows_to_delete, axis=0)
                 self.eq_rel_viol = np.delete(self.eq_rel_viol, rows_to_delete, axis=0)
             if self.total_rel_violation is not None:
-                self.total_rel_violation = np.delete(self.total_rel_violation, rows_to_delete, axis=0)
+                self.total_rel_violation = np.delete(
+                    self.total_rel_violation, rows_to_delete, axis=0
+                )
 
     def sort(self) -> None:
         if self.total_rel_violation is not None:
@@ -282,12 +307,16 @@ class SolutionDeck:
 
     def get_constraint_results(
         self, idx: int
-    ) -> tuple[Optional[af64], Optional[af64], Optional[af64], Optional[af64], Optional[f64]]:
+    ) -> tuple[
+        Optional[af64], Optional[af64], Optional[af64], Optional[af64], Optional[f64]
+    ]:
         ineq_vals = None if self.ineq_values is None else self.ineq_values[idx]
         eq_vals = None if self.eq_values is None else self.eq_values[idx]
         ineq_rel = None if self.ineq_rel_viol is None else self.ineq_rel_viol[idx]
         eq_rel = None if self.eq_rel_viol is None else self.eq_rel_viol[idx]
-        total = None if self.total_rel_violation is None else self.total_rel_violation[idx]
+        total = (
+            None if self.total_rel_violation is None else self.total_rel_violation[idx]
+        )
         return ineq_vals, eq_vals, ineq_rel, eq_rel, total
 
     def get_best(self) -> tuple[af64, f64, b8]:
@@ -341,12 +370,18 @@ class SolutionDeck:
         # Load optional constraint arrays if present
         if "ineq_values" in data:
             deck.ineq_values = np.array(data["ineq_values"], dtype=dtype)
-            deck.ineq_rel_viol = np.array(data.get("ineq_rel_viol", np.zeros_like(deck.ineq_values)), dtype=dtype)
+            deck.ineq_rel_viol = np.array(
+                data.get("ineq_rel_viol", np.zeros_like(deck.ineq_values)), dtype=dtype
+            )
         if "eq_values" in data:
             deck.eq_values = np.array(data["eq_values"], dtype=dtype)
-            deck.eq_rel_viol = np.array(data.get("eq_rel_viol", np.zeros_like(deck.eq_values)), dtype=dtype)
+            deck.eq_rel_viol = np.array(
+                data.get("eq_rel_viol", np.zeros_like(deck.eq_values)), dtype=dtype
+            )
         if "total_rel_violation" in data:
-            deck.total_rel_violation = np.array(data["total_rel_violation"], dtype=dtype)
+            deck.total_rel_violation = np.array(
+                data["total_rel_violation"], dtype=dtype
+            )
         # If archive_size smaller than loaded, update to loaded size baseline for operations
         deck.archive_size = (
             archive_size
