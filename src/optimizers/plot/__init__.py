@@ -1,5 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 
 def plot_convergence(tour_lengths: np.ndarray | list[np.ndarray]):
@@ -57,7 +58,7 @@ def plot_run_statistics(summary_or_scores, runtimes: np.ndarray | list[float] | 
         rtimes = np.asarray(runtimes if runtimes is not None else [], dtype=float)
 
     # Create two subplots vertically using specifications
-    fig = go.Figure()
+    fig = make_subplots(rows=1, cols=2, specs=[[{"type": "box"}, {"type": "box"}]])
 
     # Box for Scores
     fig.add_trace(
@@ -66,7 +67,8 @@ def plot_run_statistics(summary_or_scores, runtimes: np.ndarray | list[float] | 
             name="Final Score",
             boxmean=True,
             marker_color="#1f77b4",
-        )
+        ),
+        row=1, col=1
     )
 
     # Create a second independent y-axis for runtimes by adding as another trace with different x name
@@ -76,14 +78,17 @@ def plot_run_statistics(summary_or_scores, runtimes: np.ndarray | list[float] | 
             name="Runtime (s)",
             boxmean=True,
             marker_color="#ff7f0e",
-        )
+        ),
+        row=1, col=2
     )
 
     fig.update_layout(
         title=f"{title_prefix}: Final Score and Runtime",
-        yaxis_title="Value",
         template="plotly_white",
         showlegend=False,
+        yaxis_title="Final Score",
+        yaxis2_title="Runtime (seconds)",
     )
+    
 
     fig.show()
