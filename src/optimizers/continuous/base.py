@@ -14,7 +14,7 @@ from ..core.base import (
     JoblibPrefer,
 )
 from ..core.types import AF, F
-from ..solution_deck import GoalFcn, InputArguments, SolutionDeck, WrappedGoalFcn
+from ..solution_deck import GoalFcn, InputArguments, SolutionDeck, WrappedGoalFcn, WrappedConstraintFcn
 
 
 class IOptimizer(abc.ABC):
@@ -27,6 +27,8 @@ class IOptimizer(abc.ABC):
         variables: InputVariables,
         args: Optional[InputArguments] = None,
         existing_soln_deck: Optional[SolutionDeck] = None,
+        inequality_constraints: Optional[list[GoalFcn]] = None,
+        equality_constraints: Optional[list[GoalFcn]] = None,
     ):
         self.config: IOptimizerConfig = config
         self.variables: InputVariables = variables
@@ -41,8 +43,31 @@ class IOptimizer(abc.ABC):
         else:
             wrapped_fcn = fcn
         self.wrapped_fcn: WrappedGoalFcn = wrapped_fcn
+        # Wrap constraint functions similarly
+        wrapped_ineq: list[WrappedConstraintFcn] | None = None
+        wrapped_eq: list[WrappedConstraintFcn] | None = None
+        if inequality_constraints:
+            wrapped_ineq = []
+            for g in inequality_constraints:
+                if args:
+                    wrapped_ineq.append(lambda x, g=g: g(x, args))
+                else:
+                    wrapped_ineq.append(g)  # type: ignore[arg-type]
+        if equality_constraints:
+            wrapped_eq = []
+            for h in equality_constraints:
+                if args:
+                    wrapped_eq.append(lambda x, h=h: h(x, args))
+                else:
+                    wrapped_eq.append(h)  # type: ignore[arg-type]
+        # Save wrapped constraints for use by optimizers that don't use SolutionDeck internally
+        self.wrapped_ineq_constraints = wrapped_ineq or []
+        self.wrapped_eq_constraints = wrapped_eq or []
         self.soln_deck = existing_soln_deck or SolutionDeck(
-            archive_size=config.solution_archive_size, num_vars=len(variables)
+            archive_size=config.solution_archive_size,
+            num_vars=len(variables),
+            inequality_constraints=self.wrapped_ineq_constraints,
+            equality_constraints=self.wrapped_eq_constraints,
         )
 
     @abc.abstractmethod

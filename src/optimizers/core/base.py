@@ -85,18 +85,31 @@ class IOptimizerConfig:
 
 @dataclass
 class OptimizerResult:
-    """Base class for optimizer results."""
+    """Base class for optimizer results.
+
+    Extended to include optional constraint violation information and an unconstrained-best result.
+    """
 
     solution_score: F
-    """The score of the best solution found by the optimizer."""
+    """The score of the best solution found by the optimizer (respecting deck ordering)."""
     solution_vector: AF
-    """The best solution found by the optimizer."""
+    """The best solution found by the optimizer (respecting deck ordering)."""
     solution_history: Optional[AF] = None
     """The history of the best solutions found by the optimizer."""
     stop_reason: StopReason = "none"
     """Whether the optimizer stopped early due to convergence criteria."""
     generations_completed: int = 0
     """Number of generations completed before stopping."""
+    # Constraint-related outputs (relative violations)
+    total_constraint_violation: Optional[F] = None
+    ineq_relative_violations: Optional[AF] = None
+    eq_relative_violations: Optional[AF] = None
+    # Raw constraint results for the reported best solution
+    ineq_values: Optional[AF] = None
+    eq_values: Optional[AF] = None
+    # Best overall result ignoring constraints for user awareness
+    unconstrained_best_score: Optional[F] = None
+    unconstrained_best_vector: Optional[AF] = None
 
     def __repr__(self):
         return (
