@@ -121,7 +121,6 @@ def setup_for_generations(config: IOptimizerConfig):
 def check_stop_early(
     config: IOptimizerConfig, best_soln_history: AF, solution_values: AF
 ) -> StopReason:
-    stop_early = False
     if solution_values[0] <= config.target_score:
         print("Target score reached, terminating early.")
         return "target_score"
