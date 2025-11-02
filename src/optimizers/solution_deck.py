@@ -1,5 +1,5 @@
 from functools import lru_cache, cache
-from typing import Any, Callable, Literal, Optional, Sequence
+from typing import Any, Callable, Literal, Optional, Sequence, Union
 
 from .core.base import ensure_literal_choice, literal_options
 
@@ -7,14 +7,19 @@ import numpy as np
 import scipy
 from kmodes.kmodes import KModes
 
-from .core.types import f64, af64, ab8, b8, i64
+from .core.types import f64, af64, ab8, b8, i64, AF, F
 from .core.variables import InputVariables
 from .core.random import get_seed
 
 # Some type hinting
 InputArguments = dict[str, Any]
-GoalFcn = Callable[[af64, Optional[InputArguments]], float]
-WrappedGoalFcn = Callable[[af64], float]
+GoalFcn = Union[
+    Callable[[AF], F],
+    Callable[[AF, InputArguments], F],
+    Callable[[AF], float],
+    Callable[[AF, InputArguments], float]
+]
+WrappedGoalFcn = Callable[[AF], F]
 InitializationType = Literal["random", "fibonacci", "spiral"]
 
 ConstraintFcn = GoalFcn
