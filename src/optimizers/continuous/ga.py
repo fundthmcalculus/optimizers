@@ -135,7 +135,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             stopped_early = check_stop_early(
                 self.config, best_soln_history, self.soln_deck.solution_value
             )
-            if stopped_early != 'none':
+            if stopped_early != "none":
                 break
 
             job_output: list[OptimizerRun] = parallel(

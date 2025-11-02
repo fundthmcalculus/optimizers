@@ -87,9 +87,7 @@ def run_particles(
                     + social * r_g * (swarm_best_pos[d] - p_pos[k, d])
                 )
                 # Clamp the velocity
-                p_vel[k, d] = min(
-                    max(p_vel[k, d], -velocity_clamp), velocity_clamp
-                )
+                p_vel[k, d] = min(max(p_vel[k, d], -velocity_clamp), velocity_clamp)
         # Update the particle position for this time step.
         p_pos += p_vel
         # Do the best position for each particle
@@ -133,7 +131,7 @@ class ParticleSwarmOptimizer(IOptimizer):
             stopped_early = check_stop_early(
                 self.config, best_soln_history, self.soln_deck.solution_value
             )
-            if stopped_early != 'none':
+            if stopped_early != "none":
                 break
 
             job_output: list[OptimizerRun] = parallel(
@@ -143,7 +141,7 @@ class ParticleSwarmOptimizer(IOptimizer):
                     self.config.cognitive,
                     self.config.social,
                     self.config.velocity_clamp,
-                    self.soln_deck.solution_archive[0,:],
+                    self.soln_deck.solution_archive[0, :],
                     self.soln_deck.solution_value[0],
                     self.variables,
                     self.wrapped_fcn,
