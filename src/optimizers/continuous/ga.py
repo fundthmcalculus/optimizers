@@ -4,7 +4,7 @@ import joblib
 import numpy as np
 
 from .local import apply_local_optimization
-from ..core.types import AF
+from ..core.types import AF, AI
 from ..core.base import (
     OptimizerResult,
     IOptimizerConfig,
@@ -30,13 +30,14 @@ class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
     mutation_rate: float = 0.1
     """Probability of mutation"""
     crossover_rate: float = 0.8
+    """Probability of crossover"""
 
 
-def tournament_selection(
-    population_deck: AF,
+def _tournament_selection(
+    population_deck: AF | AI,
     population_fitness: AF,
     tournament_size: int = 3,
-) -> AF:
+) -> AF | AI:
     # Randomly sample row
     row_idxs = np.random.choice(
         len(population_deck), size=tournament_size, replace=False
@@ -46,7 +47,9 @@ def tournament_selection(
     return population_deck[row_idxs[row_idx_sort[0]], :]
 
 
-def crossover(parent1: AF, parent2: AF, crossover_rate: float) -> tuple[AF, AF]:
+def _crossover(
+    parent1: AF | AI, parent2: AF | AI, crossover_rate: float
+) -> tuple[AF | AI, AF | AI]:
     # Randomly pick a point in the array that the swap starts
     if np.random.rand() < crossover_rate:
         crossover_idx = np.random.choice(len(parent1))
@@ -61,8 +64,8 @@ def crossover(parent1: AF, parent2: AF, crossover_rate: float) -> tuple[AF, AF]:
         return parent1, parent2
 
 
-def mutate(child: AF, mutation_rate: float, variables: InputVariables) -> AF:
-    mutant_child: AF = np.copy(child)
+def _mutate(child: AF | AI, mutation_rate: float, variables: InputVariables) -> AF | AI:
+    mutant_child: AF | AI = np.copy(child)
     for ij, variable in enumerate(variables):
         if np.random.random() < mutation_rate:
             mutant_child[ij] = variable.perturb_value(mutant_child[ij])
@@ -74,7 +77,7 @@ def run_ga(
     mutation_rate: float,
     crossover_rate: float,
     local_optim: LocalOptimType,
-    solution_values: AF,
+    solution_values: AF | AI,
     solution_archive: AF,
     variables: InputVariables,
     fcn: WrappedGoalFcn,
@@ -83,12 +86,12 @@ def run_ga(
     new_population_fitness = np.zeros(n_steps)
     for row in range(n_steps):
         # Take two parents
-        parent_1 = tournament_selection(solution_archive, solution_values)
-        parent_2 = tournament_selection(solution_archive, solution_values)
+        parent_1 = _tournament_selection(solution_archive, solution_values)
+        parent_2 = _tournament_selection(solution_archive, solution_values)
         # Perform genetic operations.
-        child_1, child_2 = crossover(parent_1, parent_2, crossover_rate)
-        child_1 = mutate(child_1, mutation_rate, variables)
-        child_2 = mutate(child_2, mutation_rate, variables)
+        child_1, child_2 = _crossover(parent_1, parent_2, crossover_rate)
+        child_1 = _mutate(child_1, mutation_rate, variables)
+        child_2 = _mutate(child_2, mutation_rate, variables)
         # Optimize child-1, because firstborn rights.
         child_1, child_1_fitness = apply_local_optimization(
             fcn, local_optim, child_1, variables

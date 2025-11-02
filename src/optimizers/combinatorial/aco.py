@@ -6,9 +6,9 @@ from dataclasses import dataclass
 import tqdm
 from joblib import Parallel, delayed
 
-from .base import check_path_distance, CombinatoricsResult, TSPBase, _check_stop_early
+from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
-from ..core.base import IOptimizerConfig, StopReason
+from ..core.base import IOptimizerConfig
 from ..core.types import AI, AF, F, i32, i16
 
 
@@ -23,9 +23,9 @@ class AntColonyTSPConfig(IOptimizerConfig):
     q: float = 1.0
     """Weighting parameter for selecting better ranked solutions"""
     back_to_start: bool = True
+    """Whether to return to the start node"""
     local_optimize: bool = False
     """Local optimization using 2OPT method"""
-    """Whether to return to the start node"""
     hot_start: Optional[list[int]] = None
     """Hot start solution"""
     hot_start_length: Optional[float] = None
@@ -66,8 +66,6 @@ class AntColonyTSP(TSPBase):
             ):
                 # Compute the change in pheromone!
                 delta_tau = np.zeros(tau.shape)
-                optimal_ant_len = np.inf
-                optimal_ant_city_order = None
 
                 def parallel_ant(local_ant):
                     return run_ant(self.network_routes, eta, tau, self.config)
@@ -84,9 +82,9 @@ class AntColonyTSP(TSPBase):
                     if tour_length == np.inf:
                         continue
                     # Update the relative ant pheromone
-                    if tour_length <= optimal_ant_len:
-                        optimal_ant_len = tour_length
-                        optimal_ant_city_order = city_order
+                    if tour_length <= optimal_tour_length:
+                        optimal_tour_length = tour_length
+                        optimal_city_order = city_order
                     for i in range(len(city_order) - 1):
                         delta_tau[city_order[i], city_order[i + 1]] += (
                             self.config.q / tour_length
@@ -95,10 +93,6 @@ class AntColonyTSP(TSPBase):
                         delta_tau[city_order[-1], city_order[0]] += (
                             self.config.q / tour_length
                         )
-                # Update the per-generation information
-                if optimal_ant_len < optimal_tour_length:
-                    optimal_tour_length = optimal_ant_len
-                    optimal_city_order = optimal_ant_city_order
                 tour_lengths.append(optimal_tour_length)
                 # Once all ants are done, update the pheromone
                 tau = pheromone_update(tau, delta_tau, self.config.rho)
@@ -107,24 +101,32 @@ class AntColonyTSP(TSPBase):
                 if stop_reason != "none":
                     break
 
-        # TODO - Better parameters?
-        two_opt_config = TwoOptTSPConfig()
-        two_opt_optimize = TwoOptTSP(
-            two_opt_config,
-            initial_route=optimal_city_order,
-            initial_value=optimal_tour_length,
-            network_routes=self.network_routes,
-            city_locations=self.city_locations,
-        )
-        result = two_opt_optimize.solve()
-        tour_lengths.append(result.optimal_value)
+        if self.config.local_optimize:
+            # TODO - Better parameters?
+            two_opt_config = TwoOptTSPConfig()
+            two_opt_optimize = TwoOptTSP(
+                two_opt_config,
+                initial_route=optimal_city_order,
+                initial_value=optimal_tour_length,
+                network_routes=self.network_routes,
+                city_locations=self.city_locations,
+            )
+            result = two_opt_optimize.solve()
+            tour_lengths.append(result.optimal_value)
 
-        return CombinatoricsResult(
-            optimal_path=result.optimal_path,
-            optimal_value=result.optimal_value,
-            value_history=np.array(tour_lengths),
-            stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
-        )
+            return CombinatoricsResult(
+                optimal_path=result.optimal_path,
+                optimal_value=result.optimal_value,
+                value_history=np.array(tour_lengths),
+                stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
+            )
+        else:
+            return CombinatoricsResult(
+                optimal_path=optimal_city_order,
+                optimal_value=optimal_tour_length,
+                value_history=np.array(tour_lengths),
+                stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
+            )
 
 
 def pheromone_update(tau_xy, delta_tau_xy, rho):
@@ -183,19 +185,5 @@ def run_ant(
         cur_city = np.random.choice(choice_indexes, p=p)
         total_length += network_routes[city_order[idx], cur_city]
         idx += 1
-
-    # Randomly permute 2 entries that aren't the first, and see if that's shorter
-    r0 = np.random.randint(low=1, high=eta_shape_)
-    r1 = np.random.randint(low=1, high=eta_shape_)
-    c0 = city_order[r0]
-    c1 = city_order[r1]
-    city_order[r0] = c1
-    city_order[r1] = c0
-    permute_distance = check_path_distance(network_routes, city_order)
-    if permute_distance < total_length:
-        total_length = permute_distance
-    else:
-        city_order[r0] = c0
-        city_order[r1] = c1
 
     return city_order, total_length

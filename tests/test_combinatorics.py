@@ -4,17 +4,20 @@ import numpy as np
 import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
 
+from optimizers.combinatorial.ga import GeneticAlgorithmTSPConfig, GeneticAlgorithmTSP
 from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.aco import (
     AntColonyTSPConfig,
     AntColonyTSP,
+)
+from optimizers.combinatorial.strategy import (
     NearestNeighborTSPConfig,
     NearestNeighborTSP,
-    ConvexHullTSP,
-    ConvexHullTSPConfig,
     TwoOptTSPConfig,
     TwoOptTSP,
     ThreeOptTSP,
+    ConvexHullTSPConfig,
+    ConvexHullTSP,
 )
 from optimizers.core.types import AF, AI
 from optimizers.plot import plot_convergence
@@ -127,6 +130,26 @@ def test_aco_tsp():
     plot_cities_and_route(all_cities, result.optimal_path)
 
 
+def test_ga_tsp():
+    all_cities = circle_random_clusters()
+    # Compute all distances
+    distances: AF = pairwise_distances(all_cities)
+    # Compute TSP optimized distance
+    config = GeneticAlgorithmTSPConfig(
+        name="Test TSP",
+        num_generations=N_GENERATIONS,
+        population_size=N_ANTS,
+        # stop_after_iterations=5,
+        joblib_prefer="threads",
+    )
+    optimizer = GeneticAlgorithmTSP(
+        config, network_routes=distances, city_locations=all_cities
+    )
+    result = optimizer.solve()
+    plot_convergence(result.value_history)
+    plot_cities_and_route(all_cities, result.optimal_path)
+
+
 def test_nn_tsp():
     all_cities = circle_random_clusters()
     # Compute all distances
@@ -161,8 +184,6 @@ def test_nn_tsp():
 
 def test_convex_hull_tsp():
     all_cities = circle_random_clusters()
-    # Compute all distances
-    distances: AF = pairwise_distances(all_cities)
     # Compute TSP optimized distance
     config = ConvexHullTSPConfig(name="Test Convex Hull", back_to_start=True)
     optimizer = ConvexHullTSP(config, city_locations=all_cities)
@@ -172,7 +193,6 @@ def test_convex_hull_tsp():
 
 def test_mtsp():
     all_cities = circle_random_clusters()
-    # Compute all distances
     # Compute TSP optimized distance
     config = AntColonyMTSPConfig(
         name="Test TSP",
