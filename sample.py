@@ -7,7 +7,9 @@ from tests.test_optimizers import optim_ackley
 
 
 def main():
-    print(f"GIL Enabled={sys._is_gil_enabled() if hasattr(sys, '_is_gil_enabled') else 'Unknown'}")
+    print(
+        f"GIL Enabled={sys._is_gil_enabled() if hasattr(sys, '_is_gil_enabled') else 'Unknown'}"
+    )
     num_runs = 1
 
     input_variables = [
