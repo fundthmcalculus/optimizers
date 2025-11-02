@@ -192,6 +192,29 @@ def test_gd():
     assert soln is not None
 
 
+def test_pso():
+    input_variables = [
+        InputContinuousVariable("x", -15, 30),
+        InputContinuousVariable("y", -15, 30),
+    ]
+
+    config = ParticleSwarmOptimizerConfig(
+        name="PSO Optimizer",
+    )
+    optimizer = ParticleSwarmOptimizer(
+        config=config,
+        variables=input_variables,
+        fcn=optim_ackley,
+    )
+    best_solution = optimizer.solve()
+    print(
+        f"Best solution: {best_solution.solution_vector} with value: {best_solution.solution_score}"
+    )
+    assert pytest.approx(best_solution.solution_score) == optim_ackley(
+        best_solution.solution_vector
+    )
+
+
 def test_rosenbrock():
     n_dim = 10
     input_variables = [

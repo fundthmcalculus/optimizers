@@ -76,18 +76,16 @@ def run_particles(
 
     n_iterations = 10
     for cur_iter in range(n_iterations):
-        # TODO - Vectorize this!
-        for k in range(n_particles):
-            for d, v in enumerate(variables):
-                r_p, r_g = np.random.rand(), np.random.rand()
-                # Update velocity
-                p_vel[k, d] = (
-                    inertia * p_vel[k, d]
-                    + r_p * cognitive * (p_best_pos[k, d] - p_pos[k, d])
-                    + social * r_g * (swarm_best_pos[d] - p_pos[k, d])
-                )
-                # Clamp the velocity
-                p_vel[k, d] = min(max(p_vel[k, d], -velocity_clamp), velocity_clamp)
+        for d, v in enumerate(variables):
+            r_p, r_g = np.random.rand(), np.random.rand()
+            # Update velocity
+            p_vel[:, d] = (
+                inertia * p_vel[:, d]
+                + r_p * cognitive * (p_best_pos[:, d] - p_pos[:, d])
+                + social * r_g * (swarm_best_pos[d] - p_pos[:, d])
+            )
+            # Clamp the velocity
+            p_vel[:, d] *= np.minimum(np.maximum(p_vel[:, d] / v.domain, -velocity_clamp), velocity_clamp)
         # Update the particle position for this time step.
         p_pos += p_vel
         # Do the best position for each particle
