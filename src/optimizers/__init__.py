@@ -22,6 +22,7 @@ from optimizers.checkpoint import (
     run_multiple,
 )
 from optimizers.plot import plot_convergence, plot_run_statistics
+from optimizers.core.random import set_seed, get_seed
 
 __all__ = [
     "AntColonyOptimizer",
@@ -40,4 +41,6 @@ __all__ = [
     "run_multiple",
     "plot_convergence",
     "plot_run_statistics",
+    "set_seed",
+    "get_seed",
 ]

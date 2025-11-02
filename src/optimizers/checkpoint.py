@@ -13,6 +13,7 @@ import numpy as np
 
 from .core.base import IOptimizerConfig, OptimizerResult
 from .solution_deck import SolutionDeck
+from .core.random import set_seed, get_seed
 
 
 @dataclass
@@ -26,6 +27,7 @@ class CheckpointConfig:
         save_solution_deck: Save the full solution archive for later warm-starting.
         save_config_blob: Save the optimizer configuration blob.
         save_result_blob: Save the final OptimizerResult blob.
+        base_seed: If provided, seeds will be derived per run as base_seed + run_index.
     """
 
     enabled: bool = True
@@ -34,6 +36,7 @@ class CheckpointConfig:
     save_solution_deck: bool = True
     save_config_blob: bool = True
     save_result_blob: bool = True
+    base_seed: int | None = None
 
 
 def _ensure_folder(folder: str | os.PathLike[str]) -> Path:
@@ -74,6 +77,7 @@ def save_checkpoint(
         "run_id": rid,
         "timestamp": timestamp,
         "optimizer": optimizer_name,
+        "seed": get_seed(),
         "config": asdict(config) if checkpoint_cfg.save_config_blob else None,
         "solution_deck": (
             solution_deck.to_dict()
@@ -157,8 +161,17 @@ def run_multiple(
     stats: list[dict[str, Any]] = []
     scores: list[float] = []
     runtimes: list[float] = []
+    seeds: list[int] = []
 
     for i in range(n_runs):
+        # Determine and set the seed for this run
+        if checkpoint_cfg and checkpoint_cfg.base_seed is not None:
+            run_seed = int(checkpoint_cfg.base_seed) + int(i)
+            used_seed = set_seed(run_seed)
+        else:
+            used_seed = set_seed(None)
+        seeds.append(int(used_seed))
+
         opt_name, cfg, runner = build_optimizer()
         start = time.perf_counter()
         deck, res = runner()
@@ -167,6 +180,7 @@ def run_multiple(
         entry = {
             "run_index": i,
             "optimizer": opt_name,
+            "seed": used_seed,
             "solution_score": float(res.solution_score),
             "generations_completed": int(res.generations_completed),
             "stop_reason": res.stop_reason,
@@ -182,7 +196,7 @@ def run_multiple(
                 config=cfg,
                 solution_deck=deck,
                 result=res,
-                metadata={"run_index": i, "runtime_seconds": runtime_s},
+                metadata={"run_index": i, "runtime_seconds": runtime_s, "seed": used_seed},
             )
             entry["checkpoint_path"] = str(cp_path)
 
@@ -192,8 +206,10 @@ def run_multiple(
         "n_runs": n_runs,
         "scores": scores,
         "runtimes": runtimes,
+        "seeds": seeds,
         "runs": stats,
         "timestamp": _now_iso(),
+        "base_seed": None if checkpoint_cfg is None else checkpoint_cfg.base_seed,
     }
 
     if checkpoint_cfg and checkpoint_cfg.enabled:

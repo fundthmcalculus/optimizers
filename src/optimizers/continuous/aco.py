@@ -9,15 +9,16 @@ from optimizers.core.base import (
     OptimizerResult,
     OptimizerRun,
 )
-from optimizers.continuous.base import check_stop_early, cdf
-from optimizers.core.types import af64
-from optimizers.solution_deck import (
+from ..continuous.base import check_stop_early, cdf
+from ..core.types import af64
+from ..solution_deck import (
     GoalFcn,
     LocalOptimType,
     SolutionDeck,
     WrappedGoalFcn,
     InputArguments,
 )
+from ..core.random import rng as global_rng
 
 from .base import IOptimizer
 from ..core.variables import InputVariables
@@ -47,7 +48,7 @@ def run_ants(
     for ant in range(n_ants):
         new_solution = np.zeros(len(variables))
         # Generate a new solution from an existing one as a base
-        p = np.random.default_rng().uniform()
+        p = global_rng().uniform()
         # Find the entry based upon cdf
         base_solution_idx = np.searchsorted(cp_j, p)
         base_solution = solution_archive[base_solution_idx, :]

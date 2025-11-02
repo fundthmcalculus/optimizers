@@ -6,6 +6,7 @@ from scipy.stats import truncnorm
 
 from ..core.types import AF, AI, F, I
 from ..core.variables import InputVariable
+from ..core.random import rng as global_rng
 
 
 class InputDiscreteVariable(InputVariable):
@@ -35,7 +36,7 @@ class InputDiscreteVariable(InputVariable):
         other_values: Optional[AF] = None,
         learning_rate: float = 0.7,
     ) -> F | I:
-        rng = np.random.default_rng()
+        rng = global_rng()
         if other_values is not None:
             # Convert into a weighted count, but ensure every option has a non-zero probability
             all_values = np.concatenate((self.values, other_values))
@@ -46,7 +47,7 @@ class InputDiscreteVariable(InputVariable):
         return rng.choice(self.values)
 
     def initial_random_value(self, perturbation: float = 0.1) -> F | I:
-        rng = np.random.default_rng()
+        rng = global_rng()
         return rng.choice(self.values)
 
     def range_value(self, p: float) -> F | I:
