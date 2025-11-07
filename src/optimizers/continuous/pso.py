@@ -138,6 +138,10 @@ class ParticleSwarmOptimizer(IOptimizer):
             stopped_early,
         ) = self.initialize(preserve_percent)
         for generations_completed in generation_pbar:
+            # Update runtime metadata for this generation
+            self._set_phase("evolve")
+            self._set_generation(generations_completed)
+
             stopped_early = check_stop_early(
                 self.config, best_soln_history, self.soln_deck.solution_value
             )
@@ -162,6 +166,9 @@ class ParticleSwarmOptimizer(IOptimizer):
             # Merge candidates into the archive
             self.update_solution_deck(generation_pbar, job_output)
             best_soln_history[generations_completed] = self.soln_deck.get_best()[1]
+
+        # Mark finalize phase
+        self._set_phase("finalize")
 
         stopped_early = stopped_early if stopped_early != "none" else "max_iterations"
         # Return the best solution, including constraint metrics and unconstrained best

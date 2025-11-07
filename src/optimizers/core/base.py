@@ -9,6 +9,7 @@ from .types import AF, F
 JoblibPrefer = Literal["threads", "processes"]
 StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
+Phase = Literal["init", "evolve", "finalize"]
 
 
 def literal_options(literal_type) -> list:
