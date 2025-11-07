@@ -23,7 +23,7 @@ def plot_convergence(
                 x=np.r_[0 : len(trace)],
                 y=trace,
                 mode="lines+markers",
-                name=trace_names[i_t] if trace_names else f"Tour Length-{i_t+1}",
+                name=trace_names[i_t] if trace_names else f"Run-{i_t+1}",
                 line=dict(width=2),
                 marker=dict(size=6),
             )
@@ -31,7 +31,7 @@ def plot_convergence(
 
     # Update layout
     fig.update_layout(
-        title="ACO Convergence",
+        title="Convergence",
         xaxis_title="Generation",
         yaxis_title="Tour Length",
         template="plotly_white",

@@ -126,6 +126,7 @@ class AntColonyOptimizer(IOptimizer):
 
             # Merge candidates into the archive
             self.update_solution_deck(generation_pbar, job_output)
+            best_soln_history.append(self.soln_deck.get_best()[1])
         stopped_early = stopped_early if stopped_early != "none" else "max_iterations"
 
         # Return the best solution, including constraint metrics and unconstrained best
@@ -137,7 +138,7 @@ class AntColonyOptimizer(IOptimizer):
         return OptimizerResult(
             solution_vector=best_x,
             solution_score=best_val,
-            solution_history=best_soln_history,
+            solution_history=np.array(best_soln_history),
             stop_reason=stopped_early,
             generations_completed=generations_completed + 1,
             total_constraint_violation=None if total is None else float(total),

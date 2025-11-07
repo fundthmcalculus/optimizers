@@ -86,13 +86,12 @@ class IOptimizer(abc.ABC):
 
     def initialize(
         self, preserve_percent: float
-    ) -> tuple[AF, tqdm.tqdm, int, int, int, joblib.Parallel, bool]:
+    ) -> tuple[list[F], tqdm.tqdm, int, int, int, joblib.Parallel, bool]:
         self.validate_config()
         self.soln_deck.initialize_solution_deck(
             self.variables, self.wrapped_fcn, preserve_percent
         )
         self.soln_deck.sort()
-        best_soln_history = np.zeros(self.config.num_generations)
 
         # Add the progress bar
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
@@ -101,7 +100,7 @@ class IOptimizer(abc.ABC):
         stopped_early = False
         generations_completed = 0
         return (
-            best_soln_history,
+            [],
             generation_pbar,
             generations_completed,
             individuals_per_job,
@@ -127,7 +126,7 @@ class IOptimizer(abc.ABC):
         Validate the configuration parameters.
         """
         # Validate joblib prefer value against allowed Literal options
-        ensure_literal_choice("joblib_prefer", self.config.joblib_prefer, JoblibPrefer)
+        ensure_literal_choice(self.config.joblib_prefer, JoblibPrefer)
         # Set the default values for the config
         if self.config.solution_archive_size < 0:
             self.config.solution_archive_size = len(self.variables) * 2
@@ -141,16 +140,16 @@ class IOptimizer(abc.ABC):
 
 
 def check_stop_early(
-    config: IOptimizerConfig, best_soln_history: AF, solution_values: AF
+    config: IOptimizerConfig, best_soln_history: list[F], solution_values: AF
 ) -> StopReason:
     if solution_values[0] <= config.target_score:
         print("Target score reached, terminating early.")
         return "target_score"
     # Check if the solution hasn't improved
+    if len(best_soln_history) < config.stop_after_iterations:
+        return "none"
     recent_history = best_soln_history[-config.stop_after_iterations :]
-    if np.allclose(recent_history, recent_history[0], rtol=1e-2, atol=1e-2) and np.all(
-        recent_history > 0
-    ):
+    if np.allclose(recent_history[-1], recent_history[0], rtol=1e-2, atol=1e-2):
         print(
             f"No improvement in last {config.stop_after_iterations} iterations. Stopping early."
         )

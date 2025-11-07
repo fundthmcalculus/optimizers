@@ -167,6 +167,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
 
             # Merge candidates into the archive
             self.update_solution_deck(generation_pbar, job_output)
+            best_soln_history.append(self.soln_deck.get_best()[1])
 
         stopped_early = stopped_early if stopped_early != "none" else "max_iterations"
         # Return the best solution, including constraint metrics and unconstrained best
