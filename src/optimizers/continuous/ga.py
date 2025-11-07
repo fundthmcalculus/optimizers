@@ -17,7 +17,7 @@ from .base import (
 from ..core.variables import InputVariables
 from .base import IOptimizer
 
-from optimizers.solution_deck import (
+from ..solution_deck import (
     GoalFcn,
     SolutionDeck,
     WrappedGoalFcn,

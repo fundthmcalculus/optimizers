@@ -1,4 +1,4 @@
-from typing import Literal, Optional, TypeVar, Type, get_args
+from typing import Literal, Optional, TypeVar, Type, get_args, Callable, Union, Any
 from dataclasses import dataclass, fields
 import numpy as np
 from joblib import cpu_count, Parallel
@@ -10,6 +10,16 @@ JoblibPrefer = Literal["threads", "processes"]
 StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
 Phase = Literal["init", "evolve", "finalize"]
+InputArguments = dict[str, Any]
+GoalFcn = Union[
+    Callable[[AF], F],
+    Callable[[AF, InputArguments], F],
+    Callable[[AF], float],
+    Callable[[AF, InputArguments], float],
+]
+WrappedGoalFcn = Callable[[AF], F]
+ConstraintFcn = GoalFcn
+WrappedConstraintFcn = WrappedGoalFcn
 
 
 def literal_options(literal_type) -> list:
