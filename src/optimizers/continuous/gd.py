@@ -5,18 +5,17 @@ import numpy as np
 from scipy.optimize import OptimizeResult, minimize
 from tqdm.std import tqdm
 
-from optimizers.core.base import (
+from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
-)
-from optimizers.solution_deck import (
-    WrappedGoalFcn,
     GoalFcn,
     InputArguments,
-    InputVariables,
-    WrappedConstraintFcn,
 )
-from optimizers.core.tqdm_joblib import tqdm_joblib
+from ..solution_deck import (
+    WrappedGoalFcn,
+    InputVariables,
+)
+from ..core.tqdm_joblib import tqdm_joblib
 from .base import IOptimizer
 from .variables import InputContinuousVariable, InputDiscreteVariable
 
