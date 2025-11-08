@@ -178,8 +178,10 @@ def simulate(x0: np.ndarray | None = None):
 
 def optimize_simulate(x0: np.ndarray) -> np.float64:
     try:
-        def controls2(t,y):
-            return controls(t,y,x0)
+
+        def controls2(t, y):
+            return controls(t, y, x0)
+
         sys1.set_controller(controls2)
         sys1.set_event(event)
         sol = sys1.run()
@@ -193,7 +195,7 @@ def fuzzy_optimize():
     param_optim = AntColonyOptimizerConfig(
         name="CLIK Controller",
         joblib_prefer="processes",
-        local_grad_optim="perturb", # this slows things down!
+        local_grad_optim="perturb",  # this slows things down!
         population_size=64,
         n_jobs=16,
     )
@@ -208,18 +210,36 @@ def fuzzy_optimize():
     p_u = 0.02
 
     variables = [
-        InputContinuousVariable(name="KD", lower_bound=k_l, upper_bound=k_u,initial_value=5.0),
-        InputContinuousVariable(name="KP", lower_bound=k_l, upper_bound=k_u,initial_value=5.0),
-
-        InputContinuousVariable(name="p2", lower_bound=p_l, upper_bound=p_u,initial_value=0.01),
-        InputContinuousVariable(name="p3", lower_bound=p_l, upper_bound=p_u,initial_value=0.01),
-
-        InputContinuousVariable(name="w1", lower_bound=w_l, upper_bound=w_u, initial_value=2.0),
-        InputContinuousVariable(name="w2", lower_bound=w_l, upper_bound=w_u, initial_value=2.0),
-        InputContinuousVariable(name="w3", lower_bound=w_l, upper_bound=w_u, initial_value=2.0),
-        InputContinuousVariable(name="w4", lower_bound=w_l, upper_bound=w_u, initial_value=2.0),
-        InputContinuousVariable(name="w5", lower_bound=w_l, upper_bound=w_u, initial_value=2.0),
-        InputContinuousVariable(name="w6", lower_bound=w_l, upper_bound=w_u, initial_value=2.0),
+        InputContinuousVariable(
+            name="KD", lower_bound=k_l, upper_bound=k_u, initial_value=5.0
+        ),
+        InputContinuousVariable(
+            name="KP", lower_bound=k_l, upper_bound=k_u, initial_value=5.0
+        ),
+        InputContinuousVariable(
+            name="p2", lower_bound=p_l, upper_bound=p_u, initial_value=0.01
+        ),
+        InputContinuousVariable(
+            name="p3", lower_bound=p_l, upper_bound=p_u, initial_value=0.01
+        ),
+        InputContinuousVariable(
+            name="w1", lower_bound=w_l, upper_bound=w_u, initial_value=2.0
+        ),
+        InputContinuousVariable(
+            name="w2", lower_bound=w_l, upper_bound=w_u, initial_value=2.0
+        ),
+        InputContinuousVariable(
+            name="w3", lower_bound=w_l, upper_bound=w_u, initial_value=2.0
+        ),
+        InputContinuousVariable(
+            name="w4", lower_bound=w_l, upper_bound=w_u, initial_value=2.0
+        ),
+        InputContinuousVariable(
+            name="w5", lower_bound=w_l, upper_bound=w_u, initial_value=2.0
+        ),
+        InputContinuousVariable(
+            name="w6", lower_bound=w_l, upper_bound=w_u, initial_value=2.0
+        ),
     ]
 
     optim = AntColonyOptimizer(
@@ -234,7 +254,7 @@ def fuzzy_optimize():
 def main():
     results = fuzzy_optimize()
     print("Optimized Fixed Control parameters:", results)
-    plot_convergence(results.solution_history,"ACO Optimization")
+    plot_convergence(results.solution_history, "ACO Optimization")
 
     sol = simulate()
     plot_states(sol.t, sol.y, save=False, show=True)

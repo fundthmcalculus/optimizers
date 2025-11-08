@@ -32,7 +32,9 @@ def ensure_literal_choice(value, literal_type) -> None:
     allowed = literal_options(literal_type)
     if allowed and value not in allowed:
         allowed_str = ", ".join(repr(x) for x in allowed)
-        raise ValueError(f"Invalid {type(literal_type)}={value!r}. Allowed options: {allowed_str}")
+        raise ValueError(
+            f"Invalid {type(literal_type)}={value!r}. Allowed options: {allowed_str}"
+        )
 
 
 T = TypeVar("T")
@@ -53,7 +55,9 @@ def create_from_dict(data: dict, cls: Type[T]) -> T:
     return cls(**filtered_data)
 
 
-def setup_for_generations(config: "IOptimizerConfig") -> tuple[tqdm, int, int, Parallel]:
+def setup_for_generations(
+    config: "IOptimizerConfig",
+) -> tuple[tqdm, int, int, Parallel]:
     generation_pbar = trange(config.num_generations, desc="Optimizer generation")
     n_jobs = config.n_jobs
     if n_jobs < 1:
