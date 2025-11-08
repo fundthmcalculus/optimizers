@@ -26,7 +26,7 @@ class GradientDescentOptimizerConfig(IOptimizerConfig):
     discrete_search_size: int = -1  # Defaults to number of discrete variables
 
 
-def solve_gd(variables: InputVariables, fcn: WrappedGoalFcn) -> OptimizeResult:
+def solve_gd(variables: InputVariables, fcn: WrappedGoalFcn) -> tuple[OptimizeResult, list[float]]:
     x0 = [x.initial_value for x in variables]
     # Effectively pin the discrete values.
     bounds = [
@@ -38,12 +38,14 @@ def solve_gd(variables: InputVariables, fcn: WrappedGoalFcn) -> OptimizeResult:
         for x in variables
     ]
     res: OptimizeResult = minimize(fcn, np.array(x0), bounds=bounds)
-    return res
+    x0_val = fcn(x0)
+    x1_val = fcn(res.x)
+    return res, [x0_val, x1_val]
 
 
 def solve_gd_from_x0(
     x0: np.ndarray, variables: InputVariables, fcn: WrappedGoalFcn
-) -> OptimizerResult:
+) -> tuple[OptimizeResult, list[float]]:
     # Effectively pin the discrete values.
     bounds = [
         (
@@ -54,7 +56,9 @@ def solve_gd_from_x0(
         for ij, x in enumerate(variables)
     ]
     res: OptimizeResult = minimize(fcn, np.array(x0), bounds=bounds)
-    return OptimizerResult(solution_vector=res.x, solution_score=res.fun)
+    x0_val = fcn(x0)
+    x1_val = fcn(res.x)
+    return OptimizerResult(solution_vector=res.x, solution_score=res.fun), [x0_val, x1_val]
 
 
 def solve_gd_with_mutate(
@@ -200,14 +204,14 @@ class GradientDescentOptimizer(IOptimizer):
                     unconstrained_best_vector=best.solution_vector,
                 )
         else:
-            res = solve_gd(self.variables, self.wrapped_fcn)
+            res, history = solve_gd(self.variables, self.wrapped_fcn)
             ineq_vals, eq_vals, ineq_rel, eq_rel, total = compute_constraints_for_x(
                 res.x
             )
             return OptimizerResult(
                 solution_vector=res.x,
                 solution_score=res.fun,
-                solution_history=None,
+                solution_history=np.array(history),
                 stop_reason="max_iterations",
                 generations_completed=1,
                 total_constraint_violation=total,

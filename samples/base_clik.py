@@ -2,8 +2,11 @@ import os
 
 import numpy as np
 
-from optimizers import AntColonyOptimizerConfig, AntColonyOptimizer, plot_convergence
+from optimizers import plot_convergence
+from optimizers.continuous.step import StepWiseOptimizer, StepWiseOptimizerConfig
+from optimizers.continuous.gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
 from optimizers.continuous.variables import InputContinuousVariable
+
 from remi.src.clik_functions import get_gam2_vals, calc_clik_params
 from remi.src.dynamics import inverse_dynamics
 from remi.src.kinematics import (
@@ -15,6 +18,10 @@ from remi.src.kinematics import (
     calc_J,
     calc_J_dot,
 )
+
+# TODO - This allows us to change the optimizer type at the drop of a hat
+Optimizer = GradientDescentOptimizer
+OptimizerConfig = GradientDescentOptimizerConfig
 
 # LOCAL PACKAGE IMPORT
 from remi.src.system import System
@@ -87,6 +94,16 @@ def controls(t, y, control_params: np.ndarray | None = None) -> np.ndarray:
         [2.0 * np.pi, np.pi / 2.0, np.pi]  # theta_s limit  # theta_1 limit
     )  # theta_2 limit
     q_min = -q_max
+
+    # FIS bounds
+    max_th1 = q_max[1]
+    max_th2 = q_max[2]
+    max_dth1 = 2.0
+    max_dth2 = 2.0
+    # max_eN = 2.
+    # Normalize w FIS by distance btwn satellites
+    max_djk = np.sqrt((r_s[0] - r_t[0]) ** 2 + (r_s[1] - r_t[1]) ** 2)
+    max_djk_dot = 1.0  # kind of a guesstimate
 
     # Specific states
     q = y[:3]
@@ -192,7 +209,7 @@ def optimize_simulate(x0: np.ndarray) -> np.float64:
 
 
 def fuzzy_optimize():
-    param_optim = AntColonyOptimizerConfig(
+    param_optim = OptimizerConfig(
         name="CLIK Controller",
         joblib_prefer="processes",
         local_grad_optim="perturb",  # this slows things down!
@@ -242,7 +259,7 @@ def fuzzy_optimize():
         ),
     ]
 
-    optim = AntColonyOptimizer(
+    optim = Optimizer(
         config=param_optim,
         fcn=optimize_simulate,
         variables=variables,
@@ -254,7 +271,7 @@ def fuzzy_optimize():
 def main():
     results = fuzzy_optimize()
     print("Optimized Fixed Control parameters:", results)
-    plot_convergence(results.solution_history, "ACO Optimization")
+    plot_convergence(results.solution_history, "Optimization")
 
     sol = simulate()
     plot_states(sol.t, sol.y, save=False, show=True)

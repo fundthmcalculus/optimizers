@@ -52,7 +52,10 @@ class StepWiseOptimizer(IOptimizer):
                 desc="Stepwise optimization generations",
             ):
                 x0, x0_val = local_perturb_optim(self.wrapped_fcn, x0, self.variables)
-                best_soln_value.append(min(min(best_soln_value), x0_val))
+                if len(best_soln_value) == 0:
+                    best_soln_value.append(x0_val)
+                else:
+                    best_soln_value.append(min(min(best_soln_value), x0_val))
                 if gen >= 2 and np.allclose(
                     best_soln_value[-1], best_soln_value[-2], atol=1e-2, rtol=1e-2
                 ):
@@ -90,7 +93,7 @@ class StepWiseOptimizer(IOptimizer):
                 self.soln_deck.set(
                     soln_idx, x0, x0_val, stop_reason == "no_improvement"
                 )
-                if cur_best_soln_value[-1] < best_soln_value[-1]:
+                if cur_best_soln_value[-1] < best_soln_value[-1] or len(best_soln_value) == 0:
                     best_soln_vector = x0
                     best_soln_value.append(cur_best_soln_value[-1])
 

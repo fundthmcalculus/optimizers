@@ -2,7 +2,9 @@
 
 import numpy as np
 
-from remi.kinematics import (
+from remi.src.clik_functions import get_gam2_vals, calc_clik_params
+from remi.src.dynamics import inverse_dynamics
+from remi.src.kinematics import (
     calc_capture_point_position,
     calc_end_effector_position,
     calc_end_effector_velocity,
@@ -11,8 +13,6 @@ from remi.kinematics import (
     calc_J,
     calc_J_dot,
 )
-from remi.clik_functions import get_gam2_vals, calc_clik_params
-from remi.dynamics import inverse_dynamics
 
 from eve import (
     FitnessCPU,
@@ -34,7 +34,7 @@ def calculate_cost(sol):
     else:
         penalty = 0.0
 
-    # Don't want oscilatory behavior upon reaching target
+    # Don't want oscillatory behavior upon reaching target
     if np.any(np.abs(sol.u[-1]) > 1.0):
         penalty += 1e10
 
