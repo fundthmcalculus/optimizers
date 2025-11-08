@@ -9,7 +9,7 @@ description = "A collection of optimization algorithms (GA, PSO, ACO, GD, etc.)"
 authors = [ { name = "fundthmcalculus" } ]
 license = { file = "LICENSE" }
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 keywords = ["optimization", "GA", "PSO", "ACO", "GD"]
 dependencies = [
 	"numpy>=1.21",
@@ -19,7 +19,7 @@ dependencies = [
     "contextlib2>=0.6.0",
     "kmodes>=0.12.2",
     "scikit-learn>=1.7.2",
-    "scipy>=1.16",
+    "scipy",
     "pandas>=2.0.0"
 ]
 

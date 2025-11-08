@@ -158,6 +158,7 @@ class ParticleSwarmOptimizer(IOptimizer):
 
             # Merge candidates into the archive
             self.update_solution_deck(generation_pbar, job_output)
+            best_soln_history[generations_completed] = self.soln_deck.get_best()[1]
 
         # Mark finalize phase
         self._set_phase("finalize")

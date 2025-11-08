@@ -30,11 +30,10 @@ def literal_options(literal_type) -> list:
         return []
 
 
-def ensure_literal_choice(name: str, value, literal_type) -> None:
+def ensure_literal_choice(value, literal_type) -> None:
     """Validate a value against a typing.Literal and raise a helpful error.
 
     Args:
-        name: The name of the option (for error message context)
         value: The provided value
         literal_type: The Literal type alias to validate against
     Raises:
@@ -43,7 +42,9 @@ def ensure_literal_choice(name: str, value, literal_type) -> None:
     allowed = literal_options(literal_type)
     if allowed and value not in allowed:
         allowed_str = ", ".join(repr(x) for x in allowed)
-        raise ValueError(f"Invalid {name}={value!r}. Allowed options: {allowed_str}")
+        raise ValueError(
+            f"Invalid {type(literal_type)}={value!r}. Allowed options: {allowed_str}"
+        )
 
 
 T = TypeVar("T")

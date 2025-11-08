@@ -157,12 +157,13 @@ class SolutionDeck:
                 "Number of variables does not match the initialized deck size."
             )
         # Validate initialization type early
-        ensure_literal_choice("init_type", init_type, InitializationType)
+        ensure_literal_choice(init_type, InitializationType)
         num_preserve = int(self.archive_size * preserve_percent)
         if init_type == "fibonacci" and num_preserve < self.archive_size:
             fibb_spiral_points = fibonacci_sphere_points(
                 self.archive_size - num_preserve, self.num_vars
             )
+
         for k in range(self.archive_size):
             for i, variable in enumerate(variables):
                 if k >= num_preserve:
@@ -177,6 +178,8 @@ class SolutionDeck:
                         self.solution_archive[k, i] = variable.range_value(
                             fibb_spiral_points[k - num_preserve, i]
                         )
+        # TODO - Parallelize this across cores?
+        for k in range(self.archive_size):
             if k >= num_preserve:
                 self.solution_value[k] = eval_fcn(self.solution_archive[k])
                 self.is_local_optima[k] = False  # Initially, none are local optima
