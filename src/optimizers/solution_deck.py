@@ -1,29 +1,17 @@
 from functools import lru_cache, cache
-from typing import Any, Callable, Literal, Optional, Sequence, Union
-
-from .core.base import ensure_literal_choice, literal_options
+from typing import Literal, Optional, Sequence
 
 import numpy as np
 import scipy
 from kmodes.kmodes import KModes
 
-from .core.types import f64, af64, ab8, b8, i64, AF, F
-from .core.variables import InputVariables
+from .core.base import ensure_literal_choice, WrappedConstraintFcn, WrappedGoalFcn
 from .core.random import get_seed
+from .core.types import f64, af64, ab8, b8, i64
+from .core.variables import InputVariables
 
 # Some type hinting
-InputArguments = dict[str, Any]
-GoalFcn = Union[
-    Callable[[AF], F],
-    Callable[[AF, InputArguments], F],
-    Callable[[AF], float],
-    Callable[[AF, InputArguments], float],
-]
-WrappedGoalFcn = Callable[[AF], F]
 InitializationType = Literal["random", "fibonacci", "spiral"]
-
-ConstraintFcn = GoalFcn
-WrappedConstraintFcn = WrappedGoalFcn
 
 
 class SolutionDeck:
@@ -304,6 +292,13 @@ class SolutionDeck:
             self.solution_value[idx],
             self.is_local_optima[idx],
         )
+
+    def set(
+        self, idx: int, x0: af64, x_val: f64, is_local_optima: bool = False
+    ) -> None:
+        self.solution_archive[idx] = x0
+        self.solution_value[idx] = x_val
+        self.is_local_optima[idx] = is_local_optima
 
     def get_constraint_results(
         self, idx: int

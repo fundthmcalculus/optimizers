@@ -7,21 +7,14 @@ from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
     OptimizerRun,
-    LocalOptimType,
 )
 from ..core.types import AF, F
 from ..solution_deck import (
     WrappedGoalFcn,
-    GoalFcn,
-    InputArguments,
     InputVariables,
     SolutionDeck,
 )
-from .base import (
-    IOptimizer,
-    check_stop_early,
-)
-from ..core.types import af64
+from .base import IOptimizer, check_stop_early, GoalFcn, InputArguments
 
 
 @dataclass
