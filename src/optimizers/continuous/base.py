@@ -24,7 +24,6 @@ from ..core.types import AF, F
 from ..solution_deck import (
     SolutionDeck,
     WrappedGoalFcn,
-    WrappedConstraintFcn,
 )
 
 
@@ -69,8 +68,6 @@ class IOptimizer(abc.ABC):
         variables: InputVariables,
         args: Optional[InputArguments] = None,
         existing_soln_deck: Optional[SolutionDeck] = None,
-        inequality_constraints: Optional[list[GoalFcn]] = None,
-        equality_constraints: Optional[list[GoalFcn]] = None,
     ):
         self.config: IOptimizerConfig = config
         self.variables: InputVariables = variables
@@ -113,41 +110,18 @@ class IOptimizer(abc.ABC):
 
             return __wrapped  # type: ignore[return-value]
 
-        def _wrap_constraint(func: GoalFcn) -> WrappedConstraintFcn:
-            takes_args = _accepts_args(func)
-
-            def __wrapped(x: AF, _f=func, _ap=self._arg_provider):
-                _ap.bump_eval()
-                if takes_args:
-                    return _f(x, _ap.current())
-                return _f(x)
-
-            return __wrapped  # type: ignore[return-value]
-
         # Wrap the goal function and constraint functions
         self.wrapped_fcn: WrappedGoalFcn = _wrap_goal(fcn)
 
-        wrapped_ineq: list[WrappedConstraintFcn] | None = None
-        wrapped_eq: list[WrappedConstraintFcn] | None = None
-        if inequality_constraints:
-            wrapped_ineq = [_wrap_constraint(g) for g in inequality_constraints]
-        if equality_constraints:
-            wrapped_eq = [_wrap_constraint(h) for h in equality_constraints]
-
-        # Save wrapped constraints for use by optimizers that don't use SolutionDeck internally
-        self.wrapped_ineq_constraints = wrapped_ineq or []
-        self.wrapped_eq_constraints = wrapped_eq or []
         self.soln_deck = existing_soln_deck or SolutionDeck(
             archive_size=config.solution_archive_size,
             num_vars=len(variables),
-            inequality_constraints=self.wrapped_ineq_constraints,
-            equality_constraints=self.wrapped_eq_constraints,
         )
 
     def _set_phase(self, phase: Phase) -> None:
         # Validate at runtime for extra safety in non-type-checked contexts
         try:
-            ensure_literal_choice("phase", phase, Phase)
+            ensure_literal_choice(phase, Phase)
         except Exception:
             # Keep fail-soft: still set, but this should not happen given our callers
             pass
