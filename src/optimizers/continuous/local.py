@@ -60,7 +60,7 @@ def full_grad_optim(
 ) -> tuple[AF, F]:
     # Configure a continuous only gradient optimizer around this (ACO handles the discrete variable searching already)
     # Don't fire this off on another process, to prevent overloading the OS.
-    result = solve_gd_from_x0(new_solution, variables, fcn)
+    result, _ = solve_gd_from_x0(new_solution, variables, fcn)
     new_value = result.solution_score
     new_solution = result.solution_vector
     return new_solution, new_value

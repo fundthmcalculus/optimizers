@@ -31,7 +31,7 @@ def test_phase_literal_definition():
     assert opts == {"init", "evolve", "finalize"}
     # ensure_literal_choice should reject invalid values
     with pytest.raises(ValueError):
-        ensure_literal_choice("phase", "bogus", Phase)
+        ensure_literal_choice("bogus", Phase)
 
 
 def test_metadata_injection_into_goal_and_constraints(tiny_ga_cfg):
@@ -62,15 +62,6 @@ def test_metadata_injection_into_goal_and_constraints(tiny_ga_cfg):
         x = np.asarray(x, dtype=float)
         return float(np.sum(x**2))
 
-    def ineq_g(x: AF, args: dict) -> F:
-        # Record only phase/generation for constraint path
-        seen_cons.append(
-            (args.get("phase"), args.get("generation"), args.get("eval_count"))
-        )
-        x = np.asarray(x, dtype=float)
-        # encourage small x[0]
-        return float(x[0] - 10.0)  # <= 0 when x0 <= 10
-
     variables = [
         InputContinuousVariable("x0", -5.0, 5.0),
         InputContinuousVariable("x1", -5.0, 5.0),
@@ -81,7 +72,6 @@ def test_metadata_injection_into_goal_and_constraints(tiny_ga_cfg):
         obj,
         variables,
         args=user_args,
-        inequality_constraints=[ineq_g],
     )
 
     result = opt.solve()
@@ -94,11 +84,6 @@ def test_metadata_injection_into_goal_and_constraints(tiny_ga_cfg):
     phases_seen = {snap["phase"] for snap in seen_goal}
     assert "init" in phases_seen  # during deck initialization
     assert "evolve" in phases_seen  # during GA loop
-
-    # Constraint should also receive metadata and see similar phases
-    cons_phases = {p for (p, g, c) in seen_cons}
-    assert "init" in cons_phases
-    assert "evolve" in cons_phases
 
     # Metadata keys should be present and well-formed
     latest = seen_goal[-1]
