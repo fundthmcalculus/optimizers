@@ -10,6 +10,8 @@ from ..core.base import (
     IOptimizerConfig,
     OptimizerRun,
     LocalOptimType,
+    GoalFcn,
+    InputArguments,
 )
 from .base import (
     check_stop_early,
@@ -17,11 +19,9 @@ from .base import (
 from ..core.variables import InputVariables
 from .base import IOptimizer
 
-from optimizers.solution_deck import (
-    GoalFcn,
+from ..solution_deck import (
     SolutionDeck,
     WrappedGoalFcn,
-    InputArguments,
 )
 
 

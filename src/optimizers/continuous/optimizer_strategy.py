@@ -12,9 +12,11 @@ from ..core.base import (
     create_from_dict,
     ensure_literal_choice,
     literal_options,
+    GoalFcn,
+    InputArguments,
 )
 from .base import IOptimizer
-from optimizers.solution_deck import GoalFcn, InputArguments, InputVariables
+from ..solution_deck import InputVariables
 from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from .pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
 from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig

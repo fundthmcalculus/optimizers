@@ -17,11 +17,11 @@ from ..core.base import (
     JoblibPrefer,
     setup_for_generations,
     Phase,
+    InputArguments,
+    GoalFcn,
 )
 from ..core.types import AF, F
 from ..solution_deck import (
-    GoalFcn,
-    InputArguments,
     SolutionDeck,
     WrappedGoalFcn,
     WrappedConstraintFcn,

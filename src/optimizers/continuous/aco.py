@@ -9,14 +9,14 @@ from ..core.base import (
     OptimizerResult,
     OptimizerRun,
     LocalOptimType,
+    GoalFcn,
+    InputArguments,
 )
 from ..continuous.base import check_stop_early, cdf
 from ..core.types import af64
 from ..solution_deck import (
-    GoalFcn,
     SolutionDeck,
     WrappedGoalFcn,
-    InputArguments,
 )
 from ..core.random import rng as global_rng
 
