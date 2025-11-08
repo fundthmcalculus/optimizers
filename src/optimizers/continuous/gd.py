@@ -26,7 +26,9 @@ class GradientDescentOptimizerConfig(IOptimizerConfig):
     discrete_search_size: int = -1  # Defaults to number of discrete variables
 
 
-def solve_gd(variables: InputVariables, fcn: WrappedGoalFcn) -> tuple[OptimizeResult, list[float]]:
+def solve_gd(
+    variables: InputVariables, fcn: WrappedGoalFcn
+) -> tuple[OptimizeResult, list[float]]:
     x0 = [x.initial_value for x in variables]
     # Effectively pin the discrete values.
     bounds = [
@@ -58,7 +60,10 @@ def solve_gd_from_x0(
     res: OptimizeResult = minimize(fcn, np.array(x0), bounds=bounds)
     x0_val = fcn(x0)
     x1_val = fcn(res.x)
-    return OptimizerResult(solution_vector=res.x, solution_score=res.fun), [x0_val, x1_val]
+    return OptimizerResult(solution_vector=res.x, solution_score=res.fun), [
+        x0_val,
+        x1_val,
+    ]
 
 
 def solve_gd_with_mutate(

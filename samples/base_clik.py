@@ -4,7 +4,10 @@ import numpy as np
 
 from optimizers import plot_convergence
 from optimizers.continuous.step import StepWiseOptimizer, StepWiseOptimizerConfig
-from optimizers.continuous.gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
+from optimizers.continuous.gd import (
+    GradientDescentOptimizer,
+    GradientDescentOptimizerConfig,
+)
 from optimizers.continuous.variables import InputContinuousVariable
 
 from remi.src.clik_functions import get_gam2_vals, calc_clik_params

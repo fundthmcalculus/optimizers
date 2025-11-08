@@ -93,7 +93,10 @@ class StepWiseOptimizer(IOptimizer):
                 self.soln_deck.set(
                     soln_idx, x0, x0_val, stop_reason == "no_improvement"
                 )
-                if cur_best_soln_value[-1] < best_soln_value[-1] or len(best_soln_value) == 0:
+                if (
+                    cur_best_soln_value[-1] < best_soln_value[-1]
+                    or len(best_soln_value) == 0
+                ):
                     best_soln_vector = x0
                     best_soln_value.append(cur_best_soln_value[-1])
 
