@@ -70,7 +70,9 @@ class SolutionDeck:
                 self.archive_size - num_preserve, self.num_vars
             )
         elif init_type == "spiral" and num_preserve < self.archive_size:
-            fibb_spiral_points = spiral_points(self.archive_size - num_preserve, self.num_vars)
+            fibb_spiral_points = spiral_points(
+                self.archive_size - num_preserve, self.num_vars
+            )
 
         for k in range(self.archive_size):
             for i, variable in enumerate(variables):
