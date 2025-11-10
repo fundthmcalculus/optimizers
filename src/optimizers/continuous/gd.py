@@ -5,18 +5,17 @@ import numpy as np
 from scipy.optimize import OptimizeResult, minimize
 from tqdm.std import tqdm
 
-from optimizers.core.base import (
+from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
-)
-from optimizers.solution_deck import (
-    WrappedGoalFcn,
     GoalFcn,
     InputArguments,
-    InputVariables,
-    WrappedConstraintFcn,
 )
-from optimizers.core.tqdm_joblib import tqdm_joblib
+from ..solution_deck import (
+    WrappedGoalFcn,
+    InputVariables,
+)
+from ..core.tqdm_joblib import tqdm_joblib
 from .base import IOptimizer
 from .variables import InputContinuousVariable, InputDiscreteVariable
 
@@ -27,7 +26,9 @@ class GradientDescentOptimizerConfig(IOptimizerConfig):
     discrete_search_size: int = -1  # Defaults to number of discrete variables
 
 
-def solve_gd(variables: InputVariables, fcn: WrappedGoalFcn) -> OptimizeResult:
+def solve_gd(
+    variables: InputVariables, fcn: WrappedGoalFcn
+) -> tuple[OptimizeResult, list[float]]:
     x0 = [x.initial_value for x in variables]
     # Effectively pin the discrete values.
     bounds = [
@@ -39,12 +40,14 @@ def solve_gd(variables: InputVariables, fcn: WrappedGoalFcn) -> OptimizeResult:
         for x in variables
     ]
     res: OptimizeResult = minimize(fcn, np.array(x0), bounds=bounds)
-    return res
+    x0_val = fcn(x0)
+    x1_val = fcn(res.x)
+    return res, [x0_val, x1_val]
 
 
 def solve_gd_from_x0(
     x0: np.ndarray, variables: InputVariables, fcn: WrappedGoalFcn
-) -> OptimizerResult:
+) -> tuple[OptimizeResult, list[float]]:
     # Effectively pin the discrete values.
     bounds = [
         (
@@ -55,7 +58,12 @@ def solve_gd_from_x0(
         for ij, x in enumerate(variables)
     ]
     res: OptimizeResult = minimize(fcn, np.array(x0), bounds=bounds)
-    return OptimizerResult(solution_vector=res.x, solution_score=res.fun)
+    x0_val = fcn(x0)
+    x1_val = fcn(res.x)
+    return OptimizerResult(solution_vector=res.x, solution_score=res.fun), [
+        x0_val,
+        x1_val,
+    ]
 
 
 def solve_gd_with_mutate(
@@ -103,16 +111,12 @@ class GradientDescentOptimizer(IOptimizer):
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
-        inequality_constraints: list[GoalFcn] | None = None,
-        equality_constraints: list[GoalFcn] | None = None,
     ):
         super().__init__(
             config,
             fcn,
             variables,
             args,
-            inequality_constraints=inequality_constraints,
-            equality_constraints=equality_constraints,
         )
         self.config: GradientDescentOptimizerConfig = GradientDescentOptimizerConfig(
             **{**config.__dict__}
@@ -127,36 +131,6 @@ class GradientDescentOptimizer(IOptimizer):
         Returns:
             The result of the optimization.
         """
-
-        def compute_constraints_for_x(x: np.ndarray):
-            # Evaluate wrapped constraints (already handle args) for a single x
-            ineq_vals = None
-            eq_vals = None
-            ineq_rel = None
-            eq_rel = None
-            total = None
-            if getattr(self, "wrapped_ineq_constraints", None):
-                ineq_vals = np.array(
-                    [g(x) for g in self.wrapped_ineq_constraints], dtype=float
-                )
-                ineq_rel = np.maximum(ineq_vals, 0.0)
-            if getattr(self, "wrapped_eq_constraints", None):
-                eq_vals = np.array(
-                    [h(x) for h in self.wrapped_eq_constraints], dtype=float
-                )
-                eq_rel = np.abs(eq_vals)
-            if ineq_rel is not None or eq_rel is not None:
-                total = 0.0
-                n_cons = 0
-                if ineq_rel is not None:
-                    total += float(np.sum(ineq_rel))
-                    n_cons += int(ineq_rel.shape[0])
-                if eq_rel is not None:
-                    total += float(np.sum(eq_rel))
-                    n_cons += int(eq_rel.shape[0])
-                n_cons = max(1, n_cons)
-                total = total / n_cons
-            return ineq_vals, eq_vals, ineq_rel, eq_rel, total
 
         if self.config.parallel_discrete_search:
             # Look at the number of discrete variables
@@ -183,39 +157,19 @@ class GradientDescentOptimizer(IOptimizer):
                 # Pick the best solution of the output options
                 job_output = sorted(job_output, key=lambda x: x.solution_score)
                 best = job_output[0]
-                ineq_vals, eq_vals, ineq_rel, eq_rel, total = compute_constraints_for_x(
-                    best.solution_vector
-                )
                 return OptimizerResult(
                     solution_vector=best.solution_vector,
                     solution_score=best.solution_score,
                     solution_history=best.solution_history,
                     stop_reason=best.stop_reason,
                     generations_completed=best.generations_completed,
-                    total_constraint_violation=total,
-                    ineq_relative_violations=ineq_rel,
-                    eq_relative_violations=eq_rel,
-                    ineq_values=ineq_vals,
-                    eq_values=eq_vals,
-                    unconstrained_best_score=best.solution_score,
-                    unconstrained_best_vector=best.solution_vector,
                 )
         else:
-            res = solve_gd(self.variables, self.wrapped_fcn)
-            ineq_vals, eq_vals, ineq_rel, eq_rel, total = compute_constraints_for_x(
-                res.x
-            )
+            res, history = solve_gd(self.variables, self.wrapped_fcn)
             return OptimizerResult(
                 solution_vector=res.x,
                 solution_score=res.fun,
-                solution_history=None,
+                solution_history=np.array(history),
                 stop_reason="max_iterations",
                 generations_completed=1,
-                total_constraint_violation=total,
-                ineq_relative_violations=ineq_rel,
-                eq_relative_violations=eq_rel,
-                ineq_values=ineq_vals,
-                eq_values=eq_vals,
-                unconstrained_best_score=res.fun,
-                unconstrained_best_vector=res.x,
             )

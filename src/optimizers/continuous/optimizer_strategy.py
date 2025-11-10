@@ -12,9 +12,11 @@ from ..core.base import (
     create_from_dict,
     ensure_literal_choice,
     literal_options,
+    GoalFcn,
+    InputArguments,
 )
 from .base import IOptimizer
-from optimizers.solution_deck import GoalFcn, InputArguments, InputVariables
+from ..solution_deck import InputVariables
 from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from .pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
 from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
@@ -32,7 +34,7 @@ def config_to_type(
     | GeneticAlgorithmOptimizerConfig
     | GradientDescentOptimizerConfig
 ):
-    ensure_literal_choice("to_type", to_type, OptimizationType)
+    ensure_literal_choice(to_type, OptimizationType)
     if to_type == "aco":
         # If you want to use default meta-parameters, you can just instantiate without extra fields
         return create_from_dict(config.__dict__, AntColonyOptimizerConfig)
@@ -96,7 +98,7 @@ class MultiTypeOptimizer(IOptimizer):
             else self.initial_optimizer
         )
         # Validate selection
-        ensure_literal_choice("selected_type", selected_type, OptimizationType)
+        ensure_literal_choice(selected_type, OptimizationType)
         self.optimizer_choice_history.append(selected_type)
         logging.info(f"Selected optimizer: {selected_type}")
         converted_config = config_to_type(self.config, selected_type)

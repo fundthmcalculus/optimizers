@@ -7,21 +7,14 @@ from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
     OptimizerRun,
-    LocalOptimType,
 )
 from ..core.types import AF, F
 from ..solution_deck import (
     WrappedGoalFcn,
-    GoalFcn,
-    InputArguments,
     InputVariables,
     SolutionDeck,
 )
-from .base import (
-    IOptimizer,
-    check_stop_early,
-)
-from ..core.types import af64
+from .base import IOptimizer, check_stop_early, GoalFcn, InputArguments
 
 
 @dataclass
@@ -111,8 +104,6 @@ class ParticleSwarmOptimizer(IOptimizer):
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
-        inequality_constraints: list[GoalFcn] | None = None,
-        equality_constraints: list[GoalFcn] | None = None,
     ):
         super().__init__(
             config,
@@ -120,8 +111,6 @@ class ParticleSwarmOptimizer(IOptimizer):
             variables,
             args,
             existing_soln_deck,
-            inequality_constraints=inequality_constraints,
-            equality_constraints=equality_constraints,
         )
         self.config: ParticleSwarmOptimizerConfig = ParticleSwarmOptimizerConfig(
             **{**config.__dict__}
@@ -138,6 +127,10 @@ class ParticleSwarmOptimizer(IOptimizer):
             stopped_early,
         ) = self.initialize(preserve_percent)
         for generations_completed in generation_pbar:
+            # Update runtime metadata for this generation
+            self._set_phase("evolve")
+            self._set_generation(generations_completed)
+
             stopped_early = check_stop_early(
                 self.config, best_soln_history, self.soln_deck.solution_value
             )
@@ -161,25 +154,18 @@ class ParticleSwarmOptimizer(IOptimizer):
 
             # Merge candidates into the archive
             self.update_solution_deck(generation_pbar, job_output)
+            best_soln_history.append(self.soln_deck.get_best()[1])
+
+        # Mark finalize phase
+        self._set_phase("finalize")
 
         stopped_early = stopped_early if stopped_early != "none" else "max_iterations"
         # Return the best solution, including constraint metrics and unconstrained best
         best_x, best_val, _ = self.soln_deck.get_best()
-        ineq_vals, eq_vals, ineq_rel, eq_rel, total = (
-            self.soln_deck.get_constraint_results(0)
-        )
-        ub_x, ub_val, _ = self.soln_deck.get_best_unconstrained()
         return OptimizerResult(
             solution_vector=best_x,
             solution_score=best_val,
             solution_history=best_soln_history,
             stop_reason=stopped_early,
             generations_completed=generations_completed + 1,
-            total_constraint_violation=None if total is None else float(total),
-            ineq_relative_violations=None if ineq_rel is None else ineq_rel,
-            eq_relative_violations=None if eq_rel is None else eq_rel,
-            ineq_values=None if ineq_vals is None else ineq_vals,
-            eq_values=None if eq_vals is None else eq_vals,
-            unconstrained_best_score=float(ub_val),
-            unconstrained_best_vector=ub_x,
         )
