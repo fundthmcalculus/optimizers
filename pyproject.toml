@@ -31,7 +31,8 @@ dev = [
     "flake8",
     "Flake8-pyproject",
     "optuna>=4.3.0",
-    "pyclustertend"
+    "pyclustertend",
+    "numba"
 ]
 
 [tool.setuptools]
