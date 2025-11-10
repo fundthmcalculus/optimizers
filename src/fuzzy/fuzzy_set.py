@@ -1,18 +1,17 @@
 from abc import ABC, abstractmethod
-from typing import Union, List, Callable
+from typing import Union, List, Callable, Literal, Tuple, Dict
 
 import numpy as np
 
-from .membership import MembershipFunction, FuzzyVariable
+from optimizers.core.base import ensure_literal_choice
+from .membership import MembershipFunction, FuzzyVariable, FuzzyInput
 from .operator import FuzzyNot, FuzzyOperator, FuzzyArgument
 from optimizers.core.types import AF, F
-
-# Some more type hints
-FuzzyInput = Union[AF, FuzzyVariable, List[FuzzyVariable]]
 
 
 class FuzzySet:
     def __init__(self, var_name: str, mf: list[MembershipFunction]):
+        # TODO - Enable enforcement of semantic sequence
         self.membership_functions = mf
         self.var_name = var_name
 
@@ -26,6 +25,9 @@ class FuzzySet:
 
     def __str__(self) -> str:
         return f"FuzzySet:{self.var_name}: {self.membership_functions}"
+
+    def __repr__(self) -> str:
+        return f"FuzzySet({self.var_name}, {self.membership_functions})"
 
     def __getitem__(self, item: str) -> MembershipFunction:
         for mf in self.membership_functions:
@@ -109,13 +111,22 @@ class FuzzySet:
         )
 
 
-class FuzzyInference(FuzzyVariable):
+class MamadaniFuzzyInference(FuzzyVariable):
     def __init__(self, output_set: FuzzySet, var_name: str, mu_value: AF):
         super().__init__(var_name, mu_value)
         self.output_set: FuzzySet = output_set
 
     def __str__(self) -> str:
-        return f"FuzzyInference:{self.var_name}:{self.value}"
+        return f"MamadaniFuzzyInference:{self.var_name}:{self.value}"
+
+
+class TSKFuzzyInference(FuzzyVariable):
+    def __init__(self, var_name: str, rule_weight: AF, output_value: F):
+        super().__init__(var_name, rule_weight)
+        self.output_value: F = output_value
+
+    def __str__(self) -> str:
+        return f"TSKFuzzyInference:{self.var_name}:{self.value}"
 
 
 class FuzzyEquals(FuzzyOperator):
@@ -199,11 +210,11 @@ class FuzzyRule(ABC):
     def __str__(self) -> str:
         return f"{self.rule_name}: IF {self.antecedent} THEN {self.consequent}"
 
-    def __call__(self, x: FuzzyInput) -> FuzzyInference | AF:
+    def __call__(self, x: FuzzyInput) -> MamadaniFuzzyInference | TSKFuzzyInference:
         return self.evaluate(x)
 
     @abstractmethod
-    def evaluate(self, x: FuzzyInput) -> FuzzyInference | AF:
+    def evaluate(self, x: FuzzyInput) -> MamadaniFuzzyInference | TSKFuzzyInference:
         raise NotImplementedError("evaluate() must be implemented in subclass")
 
 
@@ -221,12 +232,12 @@ class MamdaniRule(FuzzyRule):
     def __str__(self) -> str:
         return f"{self.rule_name}: IF ({self.antecedent}) THEN {self.consequent.var_name} = {self.consequent_target}"
 
-    def __call__(self, x: FuzzyInput) -> FuzzyInference:
+    def __call__(self, x: FuzzyInput) -> MamadaniFuzzyInference:
         return self.evaluate(x)
 
-    def evaluate(self, x: FuzzyInput) -> FuzzyInference:
+    def evaluate(self, x: FuzzyInput) -> MamadaniFuzzyInference:
         mu_x = self.antecedent(x)
-        return FuzzyInference(self.consequent, self.consequent_target, mu_x)
+        return MamadaniFuzzyInference(self.consequent, self.consequent_target, mu_x)
 
 
 class TSKRule(FuzzyRule):
@@ -235,26 +246,40 @@ class TSKRule(FuzzyRule):
         rule_name: str,
         antecedent: FuzzyOperator,
         consequent_var_name: str,
-        consequent_function: Callable[[AF], np.float64],
+        consequent_function: Callable[[FuzzyInput], F],
+        consequent_order: int = 1,
     ):
+        # NOTE - Consequent-order doesn't matter since the consequent function handles it internally!
         super().__init__(rule_name, antecedent, None)
         self.consequent_var_name = consequent_var_name
         self.consequent_function = consequent_function
+        if consequent_order > 1:
+            raise NotImplementedError("TSKRule only supports order-0 or order-1!")
+        if consequent_order < 0:
+            raise ValueError("TSKRule order must be non-negative!")
+        self.consequent_order = consequent_order
 
     def __str__(self) -> str:
-        return f"{self.rule_name}: IF ({self.antecedent}) THEN {self.consequent_var_name} = {self.consequent}"
+        return f"{self.rule_name}: IF ({self.antecedent}) THEN {self.consequent_var_name} = f(x)"
 
-    def __call__(self, x: AF | list[FuzzyVariable]) -> AF:
+    def __repr__(self) -> str:
+        return f"TSKRule({self.rule_name}, {self.antecedent}, {self.consequent_var_name}, {self.consequent_function}, {self.consequent_order})"
+
+    def __call__(self, x: FuzzyInput) -> TSKFuzzyInference:
         return self.evaluate(x)
 
-    def evaluate(self, x: AF | list[FuzzyVariable]) -> AF:
-        mu_x = self.antecedent(x)
-        return mu_x * self.consequent_function(x)
+    def evaluate(self, x: FuzzyInput) -> TSKFuzzyInference:
+        return TSKFuzzyInference(
+            self.consequent_var_name,
+            self.antecedent(x),
+            self.consequent_function(x),
+        )
 
 
 class FuzzySystem(ABC):
-    def __init__(self, fs: FuzzySet):
-        self.fs = fs
+    def __init__(self, sets: List[FuzzySet], rules: List[FuzzyRule]):
+        self.sets = sets
+        self.rules = rules
 
     def __call__(self, x: AF) -> AF:
         return self.inference(x)
@@ -262,3 +287,29 @@ class FuzzySystem(ABC):
     @abstractmethod
     def inference(self, x: AF) -> AF:
         raise NotImplementedError("inference() must be implemented in subclass")
+
+
+DefuzzificationMethod = Literal["centroid","first-of-maxima","first-of-minima","maxima","minima"]
+"""Various Mamdani defuzzification methods"""
+
+class MamdaniSystem(FuzzySystem):
+    def __init__(self, sets: List[FuzzySet], rules: List[MamdaniRule], method:DefuzzificationMethod="centroid"):
+        super().__init__(sets, rules)
+        # Redeclare for typing
+        self.rules: List[MamdaniRule] = rules
+        # TODO - Make the default defuzzification method something correct - not centroid!
+        ensure_literal_choice("DefuzzificationMethod",method,DefuzzificationMethod)
+        self.method = method
+
+    def inference(self, x: AF) -> AF:
+        raise NotImplementedError(f"Mamdani defuzzification not yet implemented for method '{self.method}'!")
+
+
+class TSKSystem(FuzzySystem):
+    def __init__(self, sets: List[FuzzySet], rules: List[TSKRule]):
+        super().__init__(sets, rules)
+        # Redeclare for typing
+        self.rules: List[TSKRule] = rules
+
+    def inference(self, x: AF) -> AF:
+        raise NotImplementedError("TSK defuzzification not yet implemented!")

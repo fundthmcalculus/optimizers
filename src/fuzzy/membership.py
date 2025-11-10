@@ -1,10 +1,9 @@
 from abc import ABC
-from typing import Union
+from typing import Union, List, Tuple, Dict
 
 import numpy as np
 
 from optimizers.core.types import AF
-
 
 class FuzzyVariable:
     def __init__(self, var_name: str, value: AF):
@@ -17,13 +16,16 @@ class FuzzyVariable:
     def __str__(self) -> str:
         return repr(self)
 
+# Some more type hints
+FuzzyInput = Union[Tuple[AF, Dict[str, int]], FuzzyVariable, List[FuzzyVariable]]
+
 
 class MembershipFunction(ABC):
     def __init__(self, name: str):
         self.name = name
         pass
 
-    def __call__(self, x: AF | list[FuzzyVariable]) -> AF:
+    def __call__(self, x: FuzzyInput) -> AF:
         return self.mu(x)
 
     def __str__(self):

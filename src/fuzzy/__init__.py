@@ -1,4 +1,4 @@
-from fuzzy.base import (
+from .base import (
     TNormBase,
     MinMaxNorm,
     ProbabilityNorm,
@@ -10,8 +10,33 @@ from fuzzy.base import (
     set_default_norm,
     reset_default_norm,
 )
+from .fuzzy_set import (
+    FuzzySet,
+    FuzzyRule,
+    MamdaniRule,
+    TSKRule,
+    MamadaniFuzzyInference, TSKFuzzyInference, MamdaniSystem, TSKSystem,
+)
+from .operator import FuzzyOperator, FuzzyAnd, FuzzyOr, FuzzyNot
+from .membership import (
+    FuzzyVariable,
+    MembershipFunction,
+    TriangleMF,
+    TrapezoidMF,
+    LeftShoulderMF,
+    RightShoulderMF,
+    SinusoidMF,
+    LeftSinusoidMF,
+    RightSinusoidMF,
+    CauchyMF,
+    GuassianMF,
+    create_triangle_memberships,
+    create_uniform_triangle_memberships,
+    create_sinusoid_memberships,
+)
 
 __all__ = [
+    # Norms
     "TNormBase",
     "MinMaxNorm",
     "ProbabilityNorm",
@@ -22,4 +47,32 @@ __all__ = [
     "get_default_norm",
     "set_default_norm",
     "reset_default_norm",
+    # Core fuzzy components
+    "FuzzySet",
+    "FuzzyRule",
+    "MamdaniRule",
+    "TSKRule",
+    "MamadaniFuzzyInference",
+    "TSKFuzzyInference",
+    "MamdaniSystem",
+    "TSKSystem",
+    "FuzzyOperator",
+    "FuzzyAnd",
+    "FuzzyOr",
+    "FuzzyNot",
+    # Memberships
+    "FuzzyVariable",
+    "MembershipFunction",
+    "TriangleMF",
+    "TrapezoidMF",
+    "LeftShoulderMF",
+    "RightShoulderMF",
+    "SinusoidMF",
+    "LeftSinusoidMF",
+    "RightSinusoidMF",
+    "CauchyMF",
+    "GuassianMF",
+    "create_triangle_memberships",
+    "create_uniform_triangle_memberships",
+    "create_sinusoid_memberships",
 ]

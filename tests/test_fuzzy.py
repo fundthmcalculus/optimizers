@@ -5,10 +5,12 @@ from numpy.typing import NDArray
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from fuzzy import TSKSystem
 from optimizers import AntColonyOptimizerConfig, AntColonyOptimizer
 from optimizers.continuous.variables import InputContinuousVariable
-from fuzzy.fuzzy_set import FuzzySet, MamdaniRule, FuzzyRule, FuzzyInference
-from fuzzy.membership import create_sinusoid_memberships, FuzzyVariable
+from fuzzy.fuzzy_set import FuzzySet, MamdaniRule, FuzzyRule, MamadaniFuzzyInference, TSKRule
+from fuzzy.membership import create_sinusoid_memberships, FuzzyVariable, create_uniform_triangle_memberships
+from optimizers.core.types import AF
 
 
 def plot_membership_functions(*varargs: FuzzySet) -> None:
@@ -400,7 +402,7 @@ def simulate_system(all_rules: list[FuzzyRule], l_steps, q_steps):
             q_v = FuzzyVariable("Flow Rate", q_i)
             l_v = FuzzyVariable("Water Level", l_j)
             fuzzy_vars = [q_v, l_v]
-            rule_output: list[FuzzyInference] = [r(fuzzy_vars) for r in all_rules]
+            rule_output: list[MamadaniFuzzyInference] = [r(fuzzy_vars) for r in all_rules]
             # TODO - Handle TKS defuzzification!
             rule_result = [
                 ro.output_set[ro.var_name].centroid() * ro.value for ro in rule_output
@@ -448,3 +450,70 @@ Z_ref = np.array(
 
 def get_reference_surface():
     return Z_ref
+
+
+def build_sample_tsk_system() -> tuple[TSKSystem, FuzzySet, FuzzySet]:
+    """Construct a small 2-input, 1-output TSK fuzzy system for demonstration.
+
+    Inputs X (0..10) and Y (0..10) each have three triangular terms: Low, Mid, High.
+    Consequents are first-order polynomials with different coefficients per rule.
+    Returns the system and the input fuzzy sets for convenience.
+    """
+    # Define inputs
+    x_terms = create_uniform_triangle_memberships(["Low", "Mid", "High"], 0.0, 10.0, 3)
+    y_terms = create_uniform_triangle_memberships(["Low", "Mid", "High"], 0.0, 10.0, 3)
+    x_set = FuzzySet("X", x_terms)
+    y_set = FuzzySet("Y", y_terms)
+
+    # Helper to make antecedents
+    def aeq(fs: FuzzySet, name: str):
+        return fs == name
+
+    rules: list[TSKRule] = []
+
+    # Define nine rules over the grid with simple first-order consequents
+    # f(x,y) = a0 + a1*x + a2*y
+    def mk_model(a0: float, a1: float, a2: float) -> TSKSystem:
+        return TSKSystem.first_order([a0, a1, a2])
+
+    coeff_grid = {
+        ("Low", "Low"): [0.0, 0.8, 0.2],
+        ("Low", "Mid"): [1.0, 0.6, 0.4],
+        ("Low", "High"): [2.0, 0.4, 0.6],
+        ("Mid", "Low"): [1.0, 0.4, 0.6],
+        ("Mid", "Mid"): [2.0, 0.5, 0.5],
+        ("Mid", "High"): [3.0, 0.6, 0.4],
+        ("High", "Low"): [2.0, 0.6, 0.4],
+        ("High", "Mid"): [3.0, 0.4, 0.6],
+        ("High", "High"): [4.0, 0.5, 0.5],
+    }
+
+    for nx in ("Low", "Mid", "High"):
+        for ny in ("Low", "Mid", "High"):
+            antecedent = aeq(x_set, nx) & aeq(y_set, ny)
+            model = mk_model(*coeff_grid[(nx, ny)])
+            # TSKRule expects a callable consequent; TSKModel is callable
+            rule = TSKRule(
+                rule_name=f"R_{nx}_{ny}",
+                antecedent=antecedent,
+                consequent_var_name="Z",
+                consequent_function=model,
+            )
+            rules.append(rule)
+
+    system = TSKSystem(rules, input_names=["X", "Y"])
+    return system, x_set, y_set
+
+
+def sample_tsk_function(x: AF) -> AF:
+    """Convenience function that evaluates the sample TSK system.
+
+    x should be an array-like with shape (..., 2) for inputs (X, Y).
+    Returns the inferred crisp output with the same leading shape.
+    """
+    system, _, _ = build_sample_tsk_system()
+    return system(x)
+
+
+def test_tsk_system():
+    build_sample_tsk_system()
