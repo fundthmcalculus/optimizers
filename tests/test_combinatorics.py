@@ -39,6 +39,8 @@ HALF_CIRCLE = False
 def random_cities(center_x, center_y, n_cities=-1) -> np.ndarray:
     if n_cities == -1:
         n_cities = N_CITIES_CLUSTER
+    if n_cities == 1:
+        return np.array([[center_x, center_y]])
     # Randomly distribute cities in a uniform circle?
     theta = np.linspace(0, 2 * np.pi, n_cities + 1, dtype=np.float32)
     theta = theta[:-1]
