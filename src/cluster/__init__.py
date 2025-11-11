@@ -3,26 +3,22 @@ import numba
 import numpy as np
 
 
-@numba.jit
-def compute_ordered_dis_njit_merge(matrix_of_pairwise_distance: np.ndarray):
+@numba.jit(cache=True)
+def compute_ordered_dis_njit_merge(matrix_of_pairwise_distance: np.ndarray) -> tuple[np.ndarray, list[int]]:
     N = matrix_of_pairwise_distance.shape[0]
-    ordered_matrix = np.zeros(matrix_of_pairwise_distance.shape)
+    ordered_matrix: np.ndarray = np.zeros(matrix_of_pairwise_distance.shape)
     p: list[int] = vat_prim_mst(matrix_of_pairwise_distance)
-    # Replace the only "-1" with the index of the maximum value.
-    p = np.array(p).astype(np.int32)
-    # Step 3:
-    for column_index_of_maximum_value in range(N):
-        for j in range(N):
-            ordered_matrix[column_index_of_maximum_value, j] = (
-                matrix_of_pairwise_distance[p[column_index_of_maximum_value], p[j]]
-            )
+    # Step 3 - since this is symmetric, we only have to do half
+    for ij in range(N):
+        for jk in range(ij,N):
+            ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = matrix_of_pairwise_distance[p[ij], p[jk]]
 
-    # Step 4 :
+    # Step 4 - since this is symmetric, we only have to do half
     return ordered_matrix, p
 
 
-@numba.jit
-def vat_prim_mst(adj: np.ndarray) -> list[int]:
+@numba.jit(cache=True)
+def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
     N = len(adj)
 
     # Find the column of the maximum value.
@@ -31,23 +27,23 @@ def vat_prim_mst(adj: np.ndarray) -> list[int]:
     src_key = np.max(adj)
 
     # Create a list for keys and initialize all keys as infinite (INF)
-    key: list[float] = [float("inf")] * N
+    key: np.ndarray = np.full(N, float("inf"))
 
     # To store the parent array which, in turn, stores MST
-    parent: list[int] = [-1] * N
+    parent: np.ndarray = np.full(N, -1)
 
     # To keep track of vertices included in MST
-    in_mst: list[bool] = [False] * N
+    in_mst = np.full(N, False)
 
     # Insert the source itself into the priority queue and initialize its key as 0
     pq: list[tuple[float, int]] = [
         (src_key, src)
     ]  # Priority queue to store vertices that are being processed
-    # heapq.heappush(pq, (src_key, src))
     key[src] = src_key
 
     # The final sequence of vertices in MST
-    heap_seq: list[int] = [-1]
+    heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    heap_seq_idx = 0
 
     # Loop until the priority queue becomes empty
     while pq:
@@ -63,19 +59,16 @@ def vat_prim_mst(adj: np.ndarray) -> list[int]:
             continue
 
         in_mst[u] = True  # Include the vertex in MST
-        heap_seq.append(u)
+        heap_seq[heap_seq_idx] = u
+        heap_seq_idx += 1
 
         # Iterate through all adjacent vertices of a vertex
-        for v in range(N):
-            if v == u:
-                continue
-            weight = adj[u, v]
-            # If v is not in MST and the weight of (u, v) is smaller than the current key of v
-            if not in_mst[v] and key[v] > weight:
-                # Update the key of v
-                key[v] = weight
-                heapq.heappush(pq, (key[v], v))
-                parent[v] = u
+        # Parallel processing of adjacent vertices
+        vertices = np.arange(N)
+        mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
+        key[mask] = adj[u, mask]
+        for v in vertices[mask]:
+            heapq.heappush(pq, (key[v], v))
+            parent[v] = u
 
-    # Remove the preallocated sequence entry of `-1`
-    return heap_seq[1:]
+    return heap_seq

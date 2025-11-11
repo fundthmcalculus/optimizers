@@ -24,6 +24,8 @@ from .variables import InputContinuousVariable, InputDiscreteVariable
 class GradientDescentOptimizerConfig(IOptimizerConfig):
     parallel_discrete_search: bool = False
     discrete_search_size: int = -1  # Defaults to number of discrete variables
+    sequential_search: bool = False
+    """Whether to GD each continuous variable in sequence, vs all variables at once."""
 
 
 def solve_gd(
@@ -165,11 +167,43 @@ class GradientDescentOptimizer(IOptimizer):
                     generations_completed=best.generations_completed,
                 )
         else:
-            res, history = solve_gd(self.variables, self.wrapped_fcn)
-            return OptimizerResult(
-                solution_vector=res.x,
-                solution_score=res.fun,
-                solution_history=np.array(history),
-                stop_reason="max_iterations",
-                generations_completed=1,
-            )
+            if not self.config.sequential_search:
+                res, history = solve_gd(self.variables, self.wrapped_fcn)
+                return OptimizerResult(
+                    solution_vector=res.x,
+                    solution_score=res.fun,
+                    solution_history=np.array(history),
+                    stop_reason="max_iterations",
+                    generations_completed=1,
+                )
+            else:
+                best_soln_value: list[float] = list()
+                x0 = np.array([v.initial_random_value(0.0) for v in self.variables])
+                stop_reason = "max_iterations"
+                for gen in tqdm(
+                        range(self.config.num_generations),
+                        desc="Stepwise optimization generations",
+                ):
+                    x0_val = self.wrapped_fcn(x0)
+                    for var_idx, variable in enumerate(self.variables):
+                        if isinstance(variable, InputDiscreteVariable):
+                            continue
+                        result = solve_gd_for_1var(x0, self.variables, var_idx, self.wrapped_fcn)
+                        x0_val = result.solution_score
+                        x0 = result.solution_vector
+                    if len(best_soln_value) == 0:
+                        best_soln_value.append(x0_val)
+                    else:
+                        best_soln_value.append(min(min(best_soln_value), x0_val))
+                    if gen >= 2 and np.allclose(
+                            best_soln_value[-1], best_soln_value[-2], atol=1e-2, rtol=1e-2
+                    ):
+                        stop_reason = "no_improvement"
+                        break
+
+                return OptimizerResult(
+                    solution_score=best_soln_value[-1],
+                    solution_history=np.array(best_soln_value),
+                    solution_vector=x0,
+                    stop_reason=stop_reason,
+                )

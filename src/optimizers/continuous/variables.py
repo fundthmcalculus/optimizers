@@ -26,7 +26,7 @@ class InputDiscreteVariable(InputVariable):
     def __str__(self):
         return self.__repr__()
 
-    def perturb_value(self, current_value: F | I) -> F | I:
+    def perturb_value(self, current_value: F | I, perturbation: float = 0.1) -> F | I:
         # Just randomly tweak to another choice.
         return self.initial_random_value()
 
@@ -97,9 +97,9 @@ class InputContinuousVariable(InputVariable):
     def __str__(self):
         return self.__repr__()
 
-    def perturb_value(self, current_value: float) -> float:
+    def perturb_value(self, current_value: float, perturbation: float = 0.1) -> float:
         # Move it in a gaussian spread around the current value.
-        sigma = self.domain / 10
+        sigma = self.domain * perturbation
         new_value = current_value + sigma * global_rng().normal()
         return max(min(self.upper_bound, new_value), self.lower_bound)
 

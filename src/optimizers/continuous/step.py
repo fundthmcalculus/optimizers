@@ -14,6 +14,7 @@ from ..solution_deck import SolutionDeck
 @dataclass
 class StepWiseOptimizerConfig(IOptimizerConfig):
     optimize_whole_solution_deck: bool = False
+    max_perturbation: float = 0.1 # Fraction of domain
     pass
 
 
@@ -47,7 +48,7 @@ class StepWiseOptimizer(IOptimizer):
                 range(self.config.num_generations),
                 desc="Stepwise optimization generations",
             ):
-                x0, x0_val = local_perturb_optim(self.wrapped_fcn, x0, self.variables)
+                x0, x0_val = local_perturb_optim(self.wrapped_fcn, x0, self.variables, self.config.max_perturbation)
                 if len(best_soln_value) == 0:
                     best_soln_value.append(x0_val)
                 else:
@@ -58,7 +59,6 @@ class StepWiseOptimizer(IOptimizer):
                     stop_reason = "no_improvement"
                     break
 
-            # TODO - Handle the constraints optimization
             return OptimizerResult(
                 solution_score=best_soln_value[-1],
                 solution_history=np.array(best_soln_value),
