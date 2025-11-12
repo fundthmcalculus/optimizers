@@ -178,7 +178,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         return OptimizerResult(
             solution_vector=best_x,
             solution_score=best_val,
-            solution_history=best_soln_history,
+            solution_history=np.array(best_soln_history),
             stop_reason=stopped_early,
             generations_completed=generations_completed + 1,
         )

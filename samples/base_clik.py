@@ -75,7 +75,7 @@ sys1 = System(y0, parameters, settings)
 
 
 def calculate_cost(sol):
-    # NOTE - Lifted from TruuAI version
+    # NOTE - Lifted from TruEAI version
     if sol.status == -1:
         return 1e100
     elif sol.status == 0:
@@ -343,6 +343,7 @@ def fuzzy_optimize():
 
 
 def main():
+    print("Optimizing Fixed Control parameters")
     results = fuzzy_optimize()
     print("Optimized Fixed Control parameters:", results)
     plot_convergence(results.solution_history, "Optimization")
