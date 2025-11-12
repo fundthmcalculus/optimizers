@@ -4,7 +4,9 @@ import numpy as np
 
 
 @numba.jit(cache=True)
-def compute_ordered_dis_njit_merge(matrix_of_pairwise_distance: np.ndarray, inplace=False) -> tuple[np.ndarray, list[int]]:
+def compute_ordered_dis_njit_merge(
+    matrix_of_pairwise_distance: np.ndarray, inplace=False
+) -> tuple[np.ndarray, list[int]]:
     N = matrix_of_pairwise_distance.shape[0]
     if inplace:
         ordered_matrix = matrix_of_pairwise_distance
@@ -12,25 +14,31 @@ def compute_ordered_dis_njit_merge(matrix_of_pairwise_distance: np.ndarray, inpl
         ordered_matrix: np.ndarray = np.zeros(matrix_of_pairwise_distance.shape)
     p: list[int] = vat_prim_mst(matrix_of_pairwise_distance)
     # Step 3 - since this is symmetric, we only have to do half
-    n_bit_mask = int(np.ceil(N/8))
-    visited = np.zeros((N,n_bit_mask), dtype=np.uint8) # Boolean is stored as a byte, so this is smaller
+    n_bit_mask = int(np.ceil(N / 8))
+    visited = np.zeros(
+        (N, n_bit_mask), dtype=np.uint8
+    )  # Boolean is stored as a byte, so this is smaller
 
     for ij in range(N):
-        for jk in range(ij,N):
+        for jk in range(ij, N):
             if not inplace:
-                ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = matrix_of_pairwise_distance[p[ij], p[jk]]
+                ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = (
+                    matrix_of_pairwise_distance[p[ij], p[jk]]
+                )
             else:
-                if get_bit(visited, ij,jk):
+                if get_bit(visited, ij, jk):
                     continue
                 # Walk this loop, and store which visited
-                r0, c0 = ij,jk
+                r0, c0 = ij, jk
                 r1, c1 = -1, -1
                 p0 = ordered_matrix[r0, c0]
                 while r1 != ij or c1 != jk:
                     r1, c1 = p[r0], p[c0]
                     set_bit(visited, r0, c0)
                     set_bit(visited, c0, r0)
-                    ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = ordered_matrix[r1, c1]
+                    ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = ordered_matrix[
+                        r1, c1
+                    ]
                     # Next step!
                     r0, c0 = r1, c1
                 # Close the final block
@@ -38,18 +46,18 @@ def compute_ordered_dis_njit_merge(matrix_of_pairwise_distance: np.ndarray, inpl
                 set_bit(visited, r0, c0)
                 set_bit(visited, c0, r0)
 
-
     # Step 4 - since this is symmetric, we only have to do half
     return ordered_matrix, p
 
+
 @numba.jit(cache=True)
 def set_bit(bitmask, row, col):
-    bitmask[row,col//8] |= (1 << (col % 8))
+    bitmask[row, col // 8] |= 1 << (col % 8)
 
 
 @numba.jit(cache=True)
 def get_bit(bitmask, row, col):
-    return (bitmask[row,col//8] >> (col % 8)) & 1
+    return (bitmask[row, col // 8] >> (col % 8)) & 1
 
 
 @numba.jit(cache=True)

@@ -3,6 +3,7 @@ import time
 import numpy as np
 from cluster import compute_ordered_dis_njit_merge
 from matplotlib import pyplot as plt
+
 # from pyclustertend.visual_assessment_of_tendency import compute_ordered_dis_njit
 from sklearn.metrics import pairwise_distances
 from PIL import Image
@@ -13,6 +14,7 @@ from test_combinatorics import circle_random_clusters
 def test_cluster_uci_letter_reco():
     print("\n")
     from ucimlrepo import fetch_ucirepo
+
     # fetch dataset
     # 59 is letter recognition
     # 827 is sepsis survival (allocates 80+ GB RAM)
@@ -31,10 +33,14 @@ def test_cluster_uci_letter_reco():
 
     # Compute the pairwise distances
     matrix_of_pairwise_distance = np.log(pairwise_distances(X))
-    matrix_of_pairwise_distance = matrix_of_pairwise_distance / matrix_of_pairwise_distance.max()
+    matrix_of_pairwise_distance = (
+        matrix_of_pairwise_distance / matrix_of_pairwise_distance.max()
+    )
     print(f"Pairwise distance matrix shape: {matrix_of_pairwise_distance.shape}")
     t0 = time.time()
-    ordered_matrix, path_merge = compute_ordered_dis_njit_merge(matrix_of_pairwise_distance, inplace=True)
+    ordered_matrix, path_merge = compute_ordered_dis_njit_merge(
+        matrix_of_pairwise_distance, inplace=True
+    )
     t1 = time.time()
 
     print(f"Elapsed time for {len(X)} data points: {t1-t0:.02f}")
@@ -60,14 +66,18 @@ def test_vat_scaling():
         # Scramble the order to ensure we sort it!
         cols = np.arange(len(all_cities), dtype="int")
         rand_col_order = np.random.permutation(cols)
-        matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][rand_col_order, :]
+        matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][
+            rand_col_order, :
+        ]
         # Cluster using our IVAT
         t0 = time.time()
-        ordered_matrix2, path_merge = compute_ordered_dis_njit_merge(matrix_of_pairwise_distance, inplace=True)
+        ordered_matrix2, path_merge = compute_ordered_dis_njit_merge(
+            matrix_of_pairwise_distance, inplace=True
+        )
         t1 = time.time()
         # Cluster using the library IVAT
         # ordered_matrix = compute_ordered_dis_njit(matrix_of_pairwise_distance.copy())
-        ordered_matrix = 0*ordered_matrix2
+        ordered_matrix = 0 * ordered_matrix2
         t2 = time.time()
 
         # Print the results
