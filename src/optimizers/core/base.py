@@ -126,16 +126,6 @@ class OptimizerResult:
     """Whether the optimizer stopped early due to convergence criteria."""
     generations_completed: int = 0
     """Number of generations completed before stopping."""
-    # Constraint-related outputs (relative violations)
-    total_constraint_violation: Optional[F] = None
-    ineq_relative_violations: Optional[AF] = None
-    eq_relative_violations: Optional[AF] = None
-    # Raw constraint results for the reported best solution
-    ineq_values: Optional[AF] = None
-    eq_values: Optional[AF] = None
-    # Best overall result ignoring constraints for user awareness
-    unconstrained_best_score: Optional[F] = None
-    unconstrained_best_vector: Optional[AF] = None
 
     def __repr__(self):
         return (

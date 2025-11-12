@@ -25,8 +25,6 @@ class StepWiseOptimizer(IOptimizer):
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
-        inequality_constraints: list[GoalFcn] | None = None,
-        equality_constraints: list[GoalFcn] | None = None,
     ):
         super().__init__(
             config,
@@ -34,8 +32,6 @@ class StepWiseOptimizer(IOptimizer):
             variables,
             args,
             existing_soln_deck,
-            inequality_constraints=inequality_constraints,
-            equality_constraints=equality_constraints,
         )
         self.config: StepWiseOptimizerConfig = StepWiseOptimizerConfig(
             **{**config.__dict__}
