@@ -48,7 +48,7 @@ class AntColonyTSP(TSPBase):
         # Pheromone matrix
         tau = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
-        optimal_city_order: Optional[list[int]] = None
+        optimal_city_order: Optional[np.ndarray] = None
         tour_lengths = []
         optimal_tour_length = np.inf
         if self.config.hot_start is not None:

@@ -1,3 +1,4 @@
+import heapq
 from dataclasses import dataclass
 from typing import Optional
 
@@ -12,7 +13,7 @@ from ..core.types import AI, F, AF
 class TwoOptTSPConfig(IOptimizerConfig):
     back_to_start: bool = True
     """Whether to return to the start node"""
-    num_iterations: int = 10
+    num_iterations: int = -1
     """Number of iterations to run"""
     nearest_neighbors: int = -1
     """Only check the next nodes, which makes this O(n), but lower chance of finding crossovers"""
@@ -50,7 +51,7 @@ class TwoOptTSP(TSPBase):
                         self.network_routes[new_route[ij], new_route[jk]]
                         + self.network_routes[new_route[ij + 1], new_route[jk + 1]]
                     )
-                    if d1 > d2:
+                    if d2 > d1:
                         new_route[jk], new_route[ij + 1] = (
                             new_route[ij + 1],
                             new_route[jk],
@@ -110,8 +111,8 @@ class ThreeOptTSP(TwoOptTSP):
         no_moves = True
         for cur_iter in range(self.config.num_iterations):
             no_moves = True
-            for ij in range(0, N - 2):
-                k_nn = N
+            for ij in range(0, N - 4):
+                k_nn = N - 2
                 if self.config.nearest_neighbors > 0:
                     k_nn = min(k_nn, ij + self.config.nearest_neighbors)
                 for jk in range(ij + 2, k_nn):
