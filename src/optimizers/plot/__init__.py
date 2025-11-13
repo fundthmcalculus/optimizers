@@ -64,18 +64,30 @@ def plot_cities_and_route(
 
     # Plot route
     for ir, route in enumerate(route):
-        route_cities = np.vstack(
-            (cities[route], cities[route[0]])
-        )  # Connect back to start
-        fig.add_trace(
-            go.Scatter(
-                x=route_cities[:, 0],
-                y=route_cities[:, 1],
-                mode="lines",
-                name=trace_names[ir] if trace_names else f"Route-{ir+1}",
-                line=dict(width=2),
+        # If 1D, this is a tour, if 2D, this is a route
+        if route.ndim == 1:
+            route_cities = np.vstack(
+                (cities[route], cities[route[0]])
+            )  # Connect back to start
+            fig.add_trace(
+                go.Scatter(
+                    x=route_cities[:, 0],
+                    y=route_cities[:, 1],
+                    mode="lines",
+                    name=trace_names[ir] if trace_names else f"Route-{ir+1}",
+                    line=dict(width=2),
+                )
             )
-        )
+        elif route.ndim == 2:
+            for _, r in enumerate(route):
+                fig.add_trace(
+                    go.Scatter(
+                        x=route_cities[r, 0],
+                        y=route_cities[r, 1],
+                        mode="lines",
+                        name=trace_names[ir] if trace_names else f"MST-{ir+1}",
+                        line=dict(width=2),
+                    ))
 
     fig.update_layout(
         title="TSP Route",
