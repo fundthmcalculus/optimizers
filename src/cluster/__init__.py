@@ -118,3 +118,76 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
             parent[v] = u
 
     return heap_seq
+
+
+@numba.jit(cache=True)
+def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
+    N = len(samples)
+
+    # Find the column of the maximum value.
+    max_adj = -np.inf
+    max_idx = (-1,-1)
+    for ij in range(N):
+        for jk in range(ij, N):
+            cur_dist = _get_dist(samples, ij, jk)
+            if cur_dist > max_adj:
+                max_adj = cur_dist
+                max_idx = (ij,jk)
+
+    src = max_idx[0]
+    src_key = max_adj
+
+    # Create a list for keys and initialize all keys as infinite (INF)
+    key: np.ndarray = np.full(N, float("inf"))
+
+    # To store the parent array which, in turn, stores MST
+    parent: np.ndarray = np.full(N, -1)
+
+    # To keep track of vertices included in MST
+    in_mst = np.full(N, False)
+
+    # Insert the source itself into the priority queue and initialize its key as 0
+    pq: list[tuple[float, int]] = [
+        (src_key, src)
+    ]  # Priority queue to store vertices that are being processed
+    key[src] = src_key
+
+    # The final sequence of vertices in MST
+    heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    heap_seq_idx = 0
+
+    # Preallocated
+    vertices = np.arange(N)
+
+    # Loop until the priority queue becomes empty
+    while pq:
+        # The first vertex in the pair is the minimum key vertex
+        # Extract it from the priority queue
+        # The vertex label is stored in the second of the pair
+        u = heapq.heappop(pq)[1]
+
+        # Different key values for the same vertex may exist in the priority queue.
+        # The one with the least key value is always processed first.
+        # Therefore, ignore the rest.
+        if in_mst[u]:
+            continue
+
+        in_mst[u] = True  # Include the vertex in MST
+        heap_seq[heap_seq_idx] = u
+        heap_seq_idx += 1
+
+        # Iterate through all adjacent vertices of a vertex
+        # Parallel processing of adjacent vertices
+
+        mask = (vertices != u) & ~in_mst & (key[vertices] > _get_dist(samples,u, vertices))
+        key[mask] = _get_dist(samples,u, vertices[mask])
+        for v in vertices[mask]:
+            heapq.heappush(pq, (key[v], v))
+            parent[v] = u
+
+    return heap_seq
+
+@numba.jit(cache=True)
+def _get_dist(samples: np.ndarray, idx1: int, idx2: int) -> float:
+    diff = samples[idx1,:]-samples[idx2,:]
+    return np.sqrt(np.sum(np.square(diff)))

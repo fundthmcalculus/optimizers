@@ -1,7 +1,7 @@
 import time
 
 import numpy as np
-from cluster import compute_ordered_dis_njit_merge
+from cluster import compute_ordered_dis_njit_merge, vat_prim_mst_seq
 from matplotlib import pyplot as plt
 
 from pyclustertend.visual_assessment_of_tendency import compute_ordered_dis_njit
@@ -51,6 +51,33 @@ def test_cluster_uci_letter_reco():
     # img_array = (ordered_matrix * 255).astype(np.uint8)
     # img = Image.fromarray(img_array)
     # img.save('ordered_matrix.png')
+
+
+def test_cluster_sequencing():
+    print("\n")
+    from ucimlrepo import fetch_ucirepo
+
+    # fetch dataset
+    # 59 is letter recognition
+    # 827 is sepsis survival (allocates 80+ GB RAM)
+    # 148 is shuttle stat log (allocates 50 GB RAM)
+    letter_recognition = fetch_ucirepo(id=59)
+
+    # data (as pandas dataframes)
+    X = np.array(letter_recognition.data.features)
+
+    # metadata
+    print(f"Metadata: {letter_recognition.metadata}")
+
+    # variable information
+    print(f"Variable Information: {letter_recognition.variables}")
+
+    # Compute the pairwise distances
+    t0 = time.time()
+    ordered_matrix = vat_prim_mst_seq(X)
+    t1 = time.time()
+
+    print(f"Elapsed time for {len(X)} data points: {t1-t0:.02f}")
 
 
 def test_vat_scaling():
