@@ -46,7 +46,6 @@ def test_cluster_uci_letter_reco():
 
     print(f"Elapsed time for {len(X)} data points: {t1-t0:.02f}")
 
-
     # Save the ordered matrix as an image
     # img_array = (ordered_matrix * 255).astype(np.uint8)
     # img = Image.fromarray(img_array)
@@ -86,7 +85,7 @@ def test_vat_scaling():
     lib_time: list[float] = []
     o1 = 7
     o2 = 11
-    n = 2*(o2-o1+1)
+    n = 2 * (o2 - o1 + 1)
     for group_count in np.logspace(o1, o2, n, base=2, dtype="int"):
         city_count.append(group_count)
         # print(f"City count: {group_count}")
@@ -128,17 +127,21 @@ def test_vat_scaling():
 
     # Plot scaling variance
     plt.figure()
-    plt.semilogy(city_count_scl, merge_count_scl, 'o-', label='Merge VAT')
-    plt.semilogy(city_count_scl, lib_count_scl, 'o-', label='Lib VAT')
-    plt.semilogy(city_count_scl, city_count_scl**2, '-', label='$O(N)=N^2$')
-    plt.semilogy(city_count_scl, city_count_scl**2*np.log(city_count_scl+1), '-', label='$O(N)=N^2*log(N)$')
-    plt.semilogy(city_count_scl, city_count_scl**3, '-', label='$O(N)=N^3$')
+    plt.semilogy(city_count_scl, merge_count_scl, "o-", label="Merge VAT")
+    plt.semilogy(city_count_scl, lib_count_scl, "o-", label="Lib VAT")
+    plt.semilogy(city_count_scl, city_count_scl**2, "-", label="$O(N)=N^2$")
+    plt.semilogy(
+        city_count_scl,
+        city_count_scl**2 * np.log(city_count_scl + 1),
+        "-",
+        label="$O(N)=N^2*log(N)$",
+    )
+    plt.semilogy(city_count_scl, city_count_scl**3, "-", label="$O(N)=N^3$")
     plt.xlabel("N Scaling")
     plt.ylabel("Time Scaling")
     plt.legend()
     plt.title("VAT Scaling Test")
     plt.show()
-
 
     plt.figure()
     plt.loglog(city_count, merge_time, "o", label="Merge VAT")

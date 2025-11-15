@@ -5,7 +5,12 @@ from fuzzy.membership import create_sinusoid_memberships
 
 
 class FuzzyControl:
-    def __init__(self, shape:tuple[int, int], input_range:tuple[float, float], output_range:tuple[float, float]) -> None:
+    def __init__(
+        self,
+        shape: tuple[int, int],
+        input_range: tuple[float, float],
+        output_range: tuple[float, float],
+    ) -> None:
         self.shape = shape
         self.input_range = input_range
         self.output_range = output_range

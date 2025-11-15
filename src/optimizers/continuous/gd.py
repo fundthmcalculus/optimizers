@@ -181,14 +181,16 @@ class GradientDescentOptimizer(IOptimizer):
                 x0 = np.array([v.initial_random_value(0.0) for v in self.variables])
                 stop_reason = "max_iterations"
                 for gen in tqdm(
-                        range(self.config.num_generations),
-                        desc="Stepwise optimization generations",
+                    range(self.config.num_generations),
+                    desc="Stepwise optimization generations",
                 ):
                     x0_val = self.wrapped_fcn(x0)
                     for var_idx, variable in enumerate(self.variables):
                         if isinstance(variable, InputDiscreteVariable):
                             continue
-                        result = solve_gd_for_1var(x0, self.variables, var_idx, self.wrapped_fcn)
+                        result = solve_gd_for_1var(
+                            x0, self.variables, var_idx, self.wrapped_fcn
+                        )
                         x0_val = result.solution_score
                         x0 = result.solution_vector
                     if len(best_soln_value) == 0:
@@ -196,7 +198,7 @@ class GradientDescentOptimizer(IOptimizer):
                     else:
                         best_soln_value.append(min(min(best_soln_value), x0_val))
                     if gen >= 2 and np.allclose(
-                            best_soln_value[-1], best_soln_value[-2], atol=1e-2, rtol=1e-2
+                        best_soln_value[-1], best_soln_value[-2], atol=1e-2, rtol=1e-2
                     ):
                         stop_reason = "no_improvement"
                         break

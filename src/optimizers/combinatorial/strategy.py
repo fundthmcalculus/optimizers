@@ -19,6 +19,17 @@ class TwoOptTSPConfig(IOptimizerConfig):
     """Only check the next nodes, which makes this O(n), but lower chance of finding crossovers"""
 
 
+def _swap_segment(ij, jk, new_route):
+    ij += 1
+    while ij < jk:
+        temp = new_route[ij]
+        new_route[ij] = new_route[jk]
+        new_route[jk] = temp
+        ij += 1
+        jk -= 1
+    return new_route
+
+
 class TwoOptTSP(TSPBase):
     def __init__(
         self,
@@ -51,11 +62,8 @@ class TwoOptTSP(TSPBase):
                         self.network_routes[new_route[ij], new_route[jk]]
                         + self.network_routes[new_route[ij + 1], new_route[jk + 1]]
                     )
-                    if d2 > d1:
-                        new_route[jk], new_route[ij + 1] = (
-                            new_route[ij + 1],
-                            new_route[jk],
-                        )
+                    if d1 > d2:
+                        new_route = _swap_segment(ij, jk, new_route)
                         no_moves = False
 
             if no_moves:

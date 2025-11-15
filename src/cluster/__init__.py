@@ -126,13 +126,13 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
 
     # Find the column of the maximum value.
     max_adj = -np.inf
-    max_idx = (-1,-1)
+    max_idx = (-1, -1)
     for ij in range(N):
         for jk in range(ij, N):
             cur_dist = _get_dist(samples, ij, jk)
             if cur_dist > max_adj:
                 max_adj = cur_dist
-                max_idx = (ij,jk)
+                max_idx = (ij, jk)
 
     src = max_idx[0]
     src_key = max_adj
@@ -179,15 +179,20 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
         # Iterate through all adjacent vertices of a vertex
         # Parallel processing of adjacent vertices
 
-        mask = (vertices != u) & ~in_mst & (key[vertices] > _get_dist(samples,u, vertices))
-        key[mask] = _get_dist(samples,u, vertices[mask])
+        mask = (
+            (vertices != u)
+            & ~in_mst
+            & (key[vertices] > _get_dist(samples, u, vertices))
+        )
+        key[mask] = _get_dist(samples, u, vertices[mask])
         for v in vertices[mask]:
             heapq.heappush(pq, (key[v], v))
             parent[v] = u
 
     return heap_seq
 
+
 @numba.jit(cache=True)
 def _get_dist(samples: np.ndarray, idx1: int, idx2: int) -> float:
-    diff = samples[idx1,:]-samples[idx2,:]
+    diff = samples[idx1, :] - samples[idx2, :]
     return np.sqrt(np.sum(np.square(diff)))
