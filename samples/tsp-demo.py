@@ -42,7 +42,6 @@ def compute_tsp_bounds(cities: AF):
     # Compute upper bound using Nearest Neighbor
     distances: AF = pairwise_distances(cities)
 
-
     # Time Nearest Neighbor
     start_time = time.time()
     nn_config = NearestNeighborTSPConfig(name="NN TSP", back_to_start=True)
@@ -129,7 +128,9 @@ def compute_tsp_bounds(cities: AF):
     )
     print(f"TSP GA Solution: {ga_result.optimal_value:.2f} (Time: {ga_time:.2f}s)")
     print(f"TSP ACO Solution: {aco_result.optimal_value:.2f} (Time: {aco_time:.2f}s)")
-    print(f"MST ACO Solution: {aco_mst_result.optimal_value:.2f} (Time: {aco_mst_time:.2f}s)")
+    print(
+        f"MST ACO Solution: {aco_mst_result.optimal_value:.2f} (Time: {aco_mst_time:.2f}s)"
+    )
 
     return nn_result, topt_result, ch_result, ga_result, aco_result, aco_mst_result
 

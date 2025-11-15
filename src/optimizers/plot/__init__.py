@@ -93,7 +93,8 @@ def plot_cities_and_route(
                     mode="lines",
                     name=trace_names[ir] if trace_names else f"MST-{ir+1}",
                     line=dict(width=2),
-                ))
+                )
+            )
 
     fig.update_layout(
         title="TSP Route",

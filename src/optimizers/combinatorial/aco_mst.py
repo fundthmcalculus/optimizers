@@ -38,7 +38,7 @@ class AntColonyMST(TSPBase):
             optimal_tour_length = self.config.hot_start_length
             optimal_city_order = self.config.hot_start
             for ij in range(self.config.hot_start.shape[0]):
-                tau[self.config.hot_start[ij,0], self.config.hot_start[ij,0]] += (
+                tau[self.config.hot_start[ij, 0], self.config.hot_start[ij, 0]] += (
                     10 * self.config.q / self.config.hot_start_length
                 )
 
@@ -55,7 +55,9 @@ class AntColonyMST(TSPBase):
                     results = []
                     for _ in range(individuals_per_job):
                         results.append(
-                            run_ant_mst(self.network_routes, eta, tau, self.config, start_idx)
+                            run_ant_mst(
+                                self.network_routes, eta, tau, self.config, start_idx
+                            )
                         )
                     return results
 
@@ -105,7 +107,7 @@ def pheromone_update(tau_xy, delta_tau_xy, rho):
 def p_xy(eta_xy, tau_xy, allowed_y, alpha, beta):
     p = np.power(tau_xy[~allowed_y, :], alpha) * np.power(eta_xy[~allowed_y, :], beta)
     # Remove negative probabilities, those are not allowed
-    p[:,~allowed_y] = 0
+    p[:, ~allowed_y] = 0
     p[p < 0] = 0
     # Normalize the probabilities
     if np.sum(p) == 0.0:
@@ -152,11 +154,11 @@ def run_ant_mst(
         choice_idx = np.argmin(new_p > cum_p)
         from_row = choice_idx // order_len
         from_col = choice_idx % order_len
-        city_order[idx,0] = from_row
-        city_order[idx,1] = choice_indexes[from_col]
-        total_length += network_routes[city_order[idx,0], city_order[idx,1]]
-        allowed_cities[city_order[idx,0]] = False
-        allowed_cities[city_order[idx,1]] = False
+        city_order[idx, 0] = from_row
+        city_order[idx, 1] = choice_indexes[from_col]
+        total_length += network_routes[city_order[idx, 0], city_order[idx, 1]]
+        allowed_cities[city_order[idx, 0]] = False
+        allowed_cities[city_order[idx, 1]] = False
 
         idx += 1
 
