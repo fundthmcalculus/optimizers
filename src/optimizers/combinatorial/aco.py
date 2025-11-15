@@ -12,13 +12,13 @@ from ..core.types import AI, AF, F, i32, i16
 
 @dataclass
 class AntColonyTSPConfig(IOptimizerConfig):
-    rho: float = 0.451  # 0.5
+    rho: float = 0.2  # 0.451  # 0.5
     """Pheromone decay parameter"""
-    alpha: float = 1.88  # 1.0
+    alpha: float = 0.8  # 1.88  # 1.0
     """Pheromone deposit parameter"""
-    beta: float = 1.88  # 1.0
+    beta: float = 2  # 1.88  # 1.0
     """Pheromone evaporation parameter"""
-    q: float = 2.17  # 1.0
+    q: float = 1  # 2.17  # 1.0
     """Weighting parameter for selecting better ranked solutions"""
     back_to_start: bool = True
     """Whether to return to the start node"""
