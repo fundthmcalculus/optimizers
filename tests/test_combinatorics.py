@@ -71,6 +71,26 @@ def poly_perimeter(n_sides, r):
     return n_sides * 2 * r * np.sin(2 * np.pi / (2 * n_sides))
 
 
+def test_aco_mst():
+    all_cities = circle_random_clusters()
+    # Compute all distances
+    distances: AF = pairwise_distances(all_cities)
+    # Compute TSP optimized distance
+    config = AntColonyTSPConfig(
+        name="Test TSP",
+        num_generations=N_GENERATIONS,
+        population_size=N_ANTS,
+        stop_after_iterations=5,
+        joblib_prefer="threads",
+    )
+    optimizer = AntColonyTSP(
+        config, network_routes=distances, city_locations=all_cities
+    )
+    result = optimizer.solve()
+    plot_convergence(result.value_history)
+    plot_cities_and_route(all_cities, result.optimal_path)
+
+
 def test_aco_tsp():
     all_cities = circle_random_clusters()
     # Compute all distances

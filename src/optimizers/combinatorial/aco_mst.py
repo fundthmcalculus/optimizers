@@ -8,29 +8,12 @@ from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, setup_for_generations
 from ..core.types import AI, AF, F, i32, i16
+from .aco import AntColonyTSPConfig
+
+# NOTE - MST is the same as TSP parameters, except the "back to start" is ignored.
 
 
-@dataclass
-class AntColonyTSPConfig(IOptimizerConfig):
-    rho: float = 0.2  # 0.451  # 0.5
-    """Pheromone decay parameter"""
-    alpha: float = 0.8  # 1.88  # 1.0
-    """Pheromone deposit parameter"""
-    beta: float = 2  # 1.88  # 1.0
-    """Pheromone evaporation parameter"""
-    q: float = 1  # 2.17  # 1.0
-    """Weighting parameter for selecting better ranked solutions"""
-    back_to_start: bool = True
-    """Whether to return to the start node"""
-    local_optimize: bool = False
-    """Local optimization using 2OPT method"""
-    hot_start: Optional[np.ndarray] = None
-    """Hot start solution"""
-    hot_start_length: Optional[float] = None
-    """Hot start length"""
-
-
-class AntColonyTSP(TSPBase):
+class AntColonyMST(TSPBase):
     def __init__(
         self,
         config: AntColonyTSPConfig,
@@ -40,7 +23,7 @@ class AntColonyTSP(TSPBase):
         super().__init__(network_routes, city_locations)
         self.config = config
 
-    def solve(self) -> CombinatoricsResult:
+    def solve(self, start_idx: int = 0) -> CombinatoricsResult:
         self.network_routes[self.network_routes == 0] = -1
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes
@@ -54,8 +37,8 @@ class AntColonyTSP(TSPBase):
         if self.config.hot_start is not None:
             optimal_tour_length = self.config.hot_start_length
             optimal_city_order = self.config.hot_start
-            for i in range(len(self.config.hot_start) - 1):
-                tau[self.config.hot_start[i], self.config.hot_start[i + 1]] += (
+            for ij in range(self.config.hot_start.shape[0]):
+                tau[self.config.hot_start[ij, 0], self.config.hot_start[ij, 0]] += (
                     10 * self.config.q / self.config.hot_start_length
                 )
 
@@ -72,7 +55,9 @@ class AntColonyTSP(TSPBase):
                     results = []
                     for _ in range(individuals_per_job):
                         results.append(
-                            run_ant(self.network_routes, eta, tau, self.config)
+                            run_ant_mst(
+                                self.network_routes, eta, tau, self.config, start_idx
+                            )
                         )
                     return results
 
@@ -106,26 +91,6 @@ class AntColonyTSP(TSPBase):
                 if stop_reason != "none":
                     break
 
-        if self.config.local_optimize:
-            # TODO - Better parameters?
-            two_opt_config = TwoOptTSPConfig()
-            two_opt_optimize = TwoOptTSP(
-                two_opt_config,
-                initial_route=optimal_city_order,
-                initial_value=optimal_tour_length,
-                network_routes=self.network_routes,
-                city_locations=self.city_locations,
-            )
-            result = two_opt_optimize.solve()
-            tour_lengths.append(result.optimal_value)
-
-            return CombinatoricsResult(
-                optimal_path=result.optimal_path,
-                optimal_value=result.optimal_value,
-                value_history=np.array(tour_lengths),
-                stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
-            )
-        else:
             return CombinatoricsResult(
                 optimal_path=optimal_city_order,
                 optimal_value=optimal_tour_length,
@@ -139,10 +104,10 @@ def pheromone_update(tau_xy, delta_tau_xy, rho):
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_xy, tau_xy, allowed_y, alpha, beta, x):
-    p = np.power(tau_xy[x, :], alpha) * np.power(eta_xy[x, :], beta)
+def p_xy(eta_xy, tau_xy, allowed_y, alpha, beta):
+    p = np.power(tau_xy[~allowed_y, :], alpha) * np.power(eta_xy[~allowed_y, :], beta)
     # Remove negative probabilities, those are not allowed
-    p[~allowed_y] = 0
+    p[:, ~allowed_y] = 0
     p[p < 0] = 0
     # Normalize the probabilities
     if np.sum(p) == 0.0:
@@ -151,41 +116,50 @@ def p_xy(eta_xy, tau_xy, allowed_y, alpha, beta, x):
     return p
 
 
-def run_ant(
-    network_routes: AF, eta: AF, tau_xy: AF, config: AntColonyTSPConfig
+def run_ant_mst(
+    network_routes: AF, eta: AF, tau_xy: AF, config: AntColonyTSPConfig, start_idx: int
 ) -> tuple[AI, F]:
-    # Start at city 1, and visit each city exactly once
-    cur_city = 0  # Offset by 1, so we start at city 1
-    eta_shape_ = eta.shape[0]
-    order_len = eta_shape_
+    cur_city = start_idx
+    order_len = eta.shape[0]
     # If fewer than 32,000 cities, we can use i16
     dtype = i32
     if order_len < 32000:
         dtype = i16
-    city_order = np.zeros(order_len, dtype=dtype)
+
+    # (FROM, TO) ordering
+    city_order = np.zeros((order_len, 2), dtype=dtype)
+
     idx = 0
     total_length = 0
-    allowed_cities = np.ones(eta_shape_, dtype=bool)
-    choice_indexes = np.arange(eta_shape_)
+    allowed_cities = np.ones(order_len, dtype=bool)
+    choice_indexes = np.arange(order_len)
+
+    # Mark off the current city
+    allowed_cities[cur_city] = False
+    city_order[idx, 0] = cur_city
+
     while np.any(allowed_cities):
-        # Mark off the current city
-        allowed_cities[cur_city] = False
-        city_order[idx] = cur_city
         # Compute the probability of each city
-        p = p_xy(eta, tau_xy, allowed_cities, config.alpha, config.beta, cur_city)
+        p = p_xy(eta, tau_xy, allowed_cities, config.alpha, config.beta)
         # If the probability is zero, we're stuck, this is a dead end!
         if np.sum(p) == 0 or np.any(np.isnan(p)):
             # If we have hit every city, we're done! We don't need to go back to the start, since we solved in reverse.
             if np.sum(allowed_cities) != 0:
                 # Invalid route!
                 total_length = np.inf
-            # IF back-to-start, include that option
-            if config.back_to_start:
-                total_length += network_routes[city_order[-1], city_order[0]]
             break
-        # Choose the next city
-        cur_city = np.random.choice(choice_indexes, p=p)
-        total_length += network_routes[city_order[idx], cur_city]
+        # Choose the next city-pair, must flatten probability matrix first
+        cum_p = np.cumsum(p.flatten())
+        new_p = np.random.random()
+        choice_idx = np.argmin(new_p > cum_p)
+        from_row = choice_idx // order_len
+        from_col = choice_idx % order_len
+        city_order[idx, 0] = from_row
+        city_order[idx, 1] = choice_indexes[from_col]
+        total_length += network_routes[city_order[idx, 0], city_order[idx, 1]]
+        allowed_cities[city_order[idx, 0]] = False
+        allowed_cities[city_order[idx, 1]] = False
+
         idx += 1
 
     return city_order, total_length

@@ -5,6 +5,7 @@ import numpy as np
 from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.aco import AntColonyTSPConfig, AntColonyTSP
+from optimizers.combinatorial.aco_mst import AntColonyMST
 from optimizers.combinatorial.ga import GeneticAlgorithmTSP, GeneticAlgorithmTSPConfig
 from optimizers.combinatorial.strategy import (
     ConvexHullTSPConfig,
@@ -27,6 +28,7 @@ def main():
         "Convex Hull",
         "Genetic Algorithm",
         "Ant Colony",
+        "Ant Colony MST",
     ]
     plot_convergence([x.value_history for x in results], trace_names)
     plot_cities_and_route(
@@ -97,6 +99,7 @@ def compute_tsp_bounds(cities: AF):
         solution_archive_size=solution_archive_size,
         population_size=n_ants,
         joblib_prefer="threads",
+        # n_jobs=1,
         stop_after_iterations=n_generations,  # No early stopping!
     )
     aco_optimizer = AntColonyTSP(
@@ -104,6 +107,14 @@ def compute_tsp_bounds(cities: AF):
     )
     aco_result = aco_optimizer.solve()
     aco_time = time.time() - start_time
+
+    # Compute the MST
+    start_time = time.time()
+    aco_optimizer = AntColonyMST(
+        aco_config, network_routes=distances, city_locations=cities
+    )
+    aco_mst_result = aco_optimizer.solve()
+    aco_mst_time = time.time() - start_time
 
     print("\n")
     print(
@@ -117,8 +128,11 @@ def compute_tsp_bounds(cities: AF):
     )
     print(f"TSP GA Solution: {ga_result.optimal_value:.2f} (Time: {ga_time:.2f}s)")
     print(f"TSP ACO Solution: {aco_result.optimal_value:.2f} (Time: {aco_time:.2f}s)")
+    print(
+        f"MST ACO Solution: {aco_mst_result.optimal_value:.2f} (Time: {aco_mst_time:.2f}s)"
+    )
 
-    return nn_result, topt_result, ch_result, ga_result, aco_result
+    return nn_result, topt_result, ch_result, ga_result, aco_result, aco_mst_result
 
 
 def project_2_data() -> AF:
