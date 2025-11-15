@@ -158,8 +158,6 @@ def run_ant(
     cur_city = 0  # Offset by 1, so we start at city 1
     eta_shape_ = eta.shape[0]
     order_len = eta_shape_
-    if config.back_to_start:
-        order_len += 1
     # If fewer than 32,000 cities, we can use i16
     dtype = i32
     if order_len < 32000:
@@ -183,8 +181,7 @@ def run_ant(
                 total_length = np.inf
             # IF back-to-start, include that option
             if config.back_to_start:
-                city_order[-1] = 0
-                total_length += network_routes[city_order[-2], city_order[-1]]
+                total_length += network_routes[city_order[-1], city_order[0]]
             break
         # Choose the next city
         cur_city = np.random.choice(choice_indexes, p=p)

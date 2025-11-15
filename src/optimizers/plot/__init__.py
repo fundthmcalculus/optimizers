@@ -79,15 +79,21 @@ def plot_cities_and_route(
                 )
             )
         elif route.ndim == 2:
+            x_route = list()
+            y_route = list()
             for _, r in enumerate(route):
-                fig.add_trace(
-                    go.Scatter(
-                        x=route_cities[r, 0],
-                        y=route_cities[r, 1],
-                        mode="lines",
-                        name=trace_names[ir] if trace_names else f"MST-{ir+1}",
-                        line=dict(width=2),
-                    ))
+                x_route.extend(cities[r, 0][:])
+                y_route.extend(cities[r, 1][:])
+                x_route.append(None)
+                y_route.append(None)
+            fig.add_trace(
+                go.Scatter(
+                    x=x_route,
+                    y=y_route,
+                    mode="lines",
+                    name=trace_names[ir] if trace_names else f"MST-{ir+1}",
+                    line=dict(width=2),
+                ))
 
     fig.update_layout(
         title="TSP Route",
