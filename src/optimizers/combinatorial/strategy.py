@@ -16,7 +16,7 @@ class TwoOptTSPConfig(IOptimizerConfig):
     num_iterations: int = -1
     """Number of iterations to run"""
     nearest_neighbors: int = -1
-    """Only check the next nodes, which makes this O(n), but lower chance of finding crossovers"""
+    """Only check the next nodes, which makes this O(nk), but lower chance of finding crossovers"""
 
 
 def _swap_segment(ij, jk, new_route):
@@ -34,10 +34,10 @@ class TwoOptTSP(TSPBase):
     def __init__(
         self,
         config: TwoOptTSPConfig,
-        initial_route: Optional[AI] = None,
-        initial_value: Optional[F] = None,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
+        initial_route: Optional[AI] = None,
+        initial_value: Optional[F] = None,
     ):
         super().__init__(network_routes, city_locations)
         self.config = config
@@ -50,7 +50,7 @@ class TwoOptTSP(TSPBase):
         for cur_iter in range(self.config.num_iterations):
             no_moves = True
             for ij in range(0, N - 2):
-                k_nn = N
+                k_nn = N-1
                 if self.config.nearest_neighbors > 0:
                     k_nn = min(k_nn, ij + self.config.nearest_neighbors)
                 for jk in range(ij + 2, k_nn):
@@ -88,12 +88,14 @@ class TwoOptTSP(TSPBase):
             nn_config = NearestNeighborTSPConfig(
                 back_to_start=self.config.back_to_start, name=self.config.name
             )
-            nn_solver = NearestNeighborTSP(nn_config)
+            nn_solver = NearestNeighborTSP(nn_config, network_routes=self.network_routes, city_locations=self.city_locations)
             solution = nn_solver.solve()
             self.initial_route = solution.optimal_path
             self.initial_value = solution.optimal_value
         new_route = self.initial_route.copy()
         N = self.network_routes.shape[0]
+        if self.config.num_iterations == -1:
+            self.config.num_iterations = N
         return N, new_route
 
 
