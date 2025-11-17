@@ -141,7 +141,8 @@ def test_vat_scaling():
     plt.ylabel("Time Scaling")
     plt.legend()
     plt.title("VAT Scaling Test")
-    plt.show()
+    plt.savefig('vat_scaling_comparison.eps', format='eps')
+    plt.close()
 
     plt.figure()
     plt.loglog(city_count, merge_time, "o", label="Merge VAT")
@@ -150,10 +151,11 @@ def test_vat_scaling():
     plt.ylabel("Time (seconds)")
     plt.legend()
     plt.title("VAT Scaling Test")
-    plt.show()
+    plt.savefig('vat_scaling_time.eps', format='eps')
+    plt.close()
 
     # Plot the results
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(4, 10))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
     fig.suptitle(f"VAT Scaling Test (N={group_count})")
     im1 = ax1.imshow(ordered_matrix, cmap="viridis")
     ax1.set_title(f"Library VAT Result: {t2-t1:.2f} seconds")
@@ -164,4 +166,5 @@ def test_vat_scaling():
     plt.colorbar(im2, ax=ax2)
 
     plt.tight_layout()
-    plt.show()
+    plt.savefig('vat_comparison.eps', format='eps')
+    plt.close()

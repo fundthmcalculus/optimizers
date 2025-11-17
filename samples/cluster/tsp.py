@@ -11,7 +11,7 @@ from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
 
 lines = []
 optim = "two-opt" # "aco"
-file_name = "d1291"
+file_name = "berlin52"
 optimal_length = None
 with open(f"./{file_name}.txt") as f:
     lines = [l.strip() for l in f.readlines()]
@@ -135,17 +135,19 @@ plt.ylabel("Y Coordinate")
 plt.grid(True)
 plt.tight_layout()
 plt.legend()
-plt.show()
+plt.savefig('tsp_route.eps', format='eps')
+plt.close()
 
 # Show both the VAT image and the ACO-TSP optimized image.
-fig = plt.figure(figsize=(4,8))
-fig.subplots(2,1)
-plt.subplot(2,1,1)
+fig = plt.figure(figsize=(4, 8))
+fig.subplots(2, 1)
+plt.subplot(2, 1, 1)
 plt.imshow(city_vat, cmap="viridis")
 plt.colorbar()
 plt.title(f"VAT-{file_name}")
-plt.subplot(2,1,2)
-plt.imshow(cities_dist[:,opt_city_sequence][opt_city_sequence,:], cmap="viridis")
+plt.subplot(2, 1, 2)
+plt.imshow(cities_dist[:, opt_city_sequence][opt_city_sequence, :], cmap="viridis")
 plt.colorbar()
 plt.title(f"Optimized VAT-{file_name}")
-plt.show()
+plt.savefig('vat_comparison2.eps', format='eps')
+plt.close()
