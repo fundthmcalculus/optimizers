@@ -27,10 +27,10 @@ print(f"Metadata: {letter_recognition.metadata}")
 print(f"Variable Information: {letter_recognition.variables}")
 
 # Compute the pairwise distances - float32 for space-saving.
-matrix_of_pairwise_distance = np.log(pairwise_distances(X)+1).astype(np.float32)
+matrix_of_pairwise_distance = np.log(pairwise_distances(X) + 1).astype(np.float32)
 del X
 matrix_of_pairwise_distance = (
-        matrix_of_pairwise_distance / matrix_of_pairwise_distance.max()
+    matrix_of_pairwise_distance / matrix_of_pairwise_distance.max()
 )
 print(f"Pairwise distance matrix shape: {matrix_of_pairwise_distance.shape}")
 t0 = time.time()
@@ -45,6 +45,6 @@ print(f"Elapsed time for {len(X)} data points: {t1 - t0:.02f}")
 # Save the ordered matrix as an image
 img_array = (ordered_matrix * 255).astype(np.uint8)
 img = Image.fromarray(img_array)
-img.save(f'ordered_matrix_{dataset_id}.png')
+img.save(f"ordered_matrix_{dataset_id}.png")
 t2 = time.time()
 print(f"Elapsed time for {len(X)} data points image saving: {t2 - t1:.02f}")

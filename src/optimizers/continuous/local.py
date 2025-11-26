@@ -31,7 +31,10 @@ def apply_local_optimization(
 
 
 def local_perturb_optim(
-    fcn: WrappedGoalFcn, new_solution: AF, variables: list[InputVariable], max_perturbation: float = 0.1
+    fcn: WrappedGoalFcn,
+    new_solution: AF,
+    variables: list[InputVariable],
+    max_perturbation: float = 0.1,
 ) -> tuple[AF, F]:
     cur_value = fcn(new_solution)
     # One variable at a time, do a stepwise optimization.

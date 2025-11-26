@@ -2,8 +2,13 @@ import os
 
 import numpy as np
 
-from optimizers import plot_convergence, AntColonyOptimizer, AntColonyOptimizerConfig, GeneticAlgorithmOptimizer, \
-    GeneticAlgorithmOptimizerConfig
+from optimizers import (
+    plot_convergence,
+    AntColonyOptimizer,
+    AntColonyOptimizerConfig,
+    GeneticAlgorithmOptimizer,
+    GeneticAlgorithmOptimizerConfig,
+)
 from optimizers.continuous.step import StepWiseOptimizer, StepWiseOptimizerConfig
 from optimizers.continuous.gd import (
     GradientDescentOptimizer,
@@ -100,14 +105,18 @@ def calculate_cost(sol):
 
 # CLIK control goes here...
 def controls(t, y, control_params: np.ndarray | None = None) -> np.ndarray:
-    bounds = np.ones(8) # or 10
-    bounds[0::2] = 0.0 # [0,1]
+    bounds = np.ones(8)  # or 10
+    bounds[0::2] = 0.0  # [0,1]
     bounds[:4] *= 0.001
     bounds[4:] *= 0.2
 
     # Don't want the bounds to be the same, if so then fuzzy isn't
     # used
-    if (bounds[0] == bounds[1] or bounds[2] == bounds[3] or bounds[4] == bounds[5] or bounds[6] == bounds[7]
+    if (
+        bounds[0] == bounds[1]
+        or bounds[2] == bounds[3]
+        or bounds[4] == bounds[5]
+        or bounds[6] == bounds[7]
     ):  # or\
         #    bounds[8] == bounds[9]:
         return 1e99
