@@ -23,6 +23,8 @@ from remi.src.kinematics import (
     calc_J_dot,
 )
 
+np.seterr(invalid='ignore', divide='ignore', over='ignore')
+
 # TODO - This allows us to change the optimizer type at the drop of a hat
 # Optimizer = GradientDescentOptimizer
 # OptimizerConfig = GradientDescentOptimizerConfig
@@ -284,11 +286,9 @@ def fuzzy_optimize():
         name="CLIK Controller",
         joblib_prefer="processes",
         local_grad_optim="perturb",  # this slows things down!
-        population_size=16,
+        population_size=32,
         solution_archive_size=64,
         n_jobs=8,
-        # sequential_search=True
-        # max_perturbation=0.2
     )
 
     w_l = 1.9

@@ -85,7 +85,7 @@ def test_vat_scaling():
     merge_time: list[float] = []
     lib_time: list[float] = []
     o1 = 7
-    o2 = 11
+    o2 = 12
     n = 2*(o2-o1+1)
     for group_count in np.logspace(o1, o2, n, base=2, dtype="int"):
         city_count.append(group_count)
