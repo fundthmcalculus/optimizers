@@ -127,16 +127,11 @@ def test_vat_scaling():
 
     # Plot scaling variance
     plt.figure()
-    plt.semilogy(city_count_scl, merge_count_scl, "o-", label="Merge VAT")
-    plt.semilogy(city_count_scl, lib_count_scl, "o-", label="Lib VAT")
-    plt.semilogy(city_count_scl, city_count_scl**2, "-", label="$O(N)=N^2$")
-    plt.semilogy(
-        city_count_scl,
-        city_count_scl**2 * np.log(city_count_scl + 1),
-        "-",
-        label="$O(N)=N^2*log(N)$",
-    )
-    plt.semilogy(city_count_scl, city_count_scl**3, "-", label="$O(N)=N^3$")
+     plt.plot(city_count_scl, merge_count_scl, "o-", label="Merge VAT")
+    plt.plot(city_count_scl, lib_count_scl, "o-", label="Lib VAT")
+    plt.plot(city_count_scl, city_count_scl**2, "-", label="$O(N)=N^2$")
+    plt.plot(city_count_scl, city_count_scl**2 * np.log(city_count_scl + 1), "-", label="$O(N)=N^2*log(N)$")
+    plt.plot(city_count_scl, city_count_scl**3, "-", label="$O(N)=N^3$")
     plt.xlabel("N Scaling")
     plt.ylabel("Time Scaling")
     plt.legend()
