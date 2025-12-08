@@ -127,7 +127,7 @@ def test_vat_scaling():
 
     # Plot scaling variance
     plt.figure()
-     plt.plot(city_count_scl, merge_count_scl, "o-", label="Merge VAT")
+    plt.plot(city_count_scl, merge_count_scl, "o-", label="Merge VAT")
     plt.plot(city_count_scl, lib_count_scl, "o-", label="Lib VAT")
     plt.plot(city_count_scl, city_count_scl**2, "-", label="$O(N)=N^2$")
     plt.plot(city_count_scl, city_count_scl**2 * np.log(city_count_scl + 1), "-", label="$O(N)=N^2*log(N)$")
@@ -163,3 +163,28 @@ def test_vat_scaling():
     plt.tight_layout()
     plt.savefig('vat_comparison.eps', format='eps')
     plt.close()
+
+
+def test_merge_ivat():
+    all_cities = circle_random_clusters(n_clusters=10, n_cities=1)
+    matrix_of_pairwise_distance = pairwise_distances(all_cities)
+    # Scramble the order to ensure we sort it!
+    cols = np.arange(len(all_cities), dtype="int")
+    rand_col_order = np.random.permutation(cols)
+    matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][
+        rand_col_order, :
+    ]
+    ivat_mat, vat_mat = compute_ivat_merge(matrix_of_pairwise_distance)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+
+    im1 = ax1.imshow(vat_mat, cmap='viridis')
+    ax1.set_title('VAT Matrix')
+    plt.colorbar(im1, ax=ax1)
+
+    im2 = ax2.imshow(ivat_mat, cmap='viridis')
+    ax2.set_title('iVAT Matrix')
+    plt.colorbar(im2, ax=ax2)
+
+    plt.tight_layout()
+    plt.show()

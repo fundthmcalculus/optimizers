@@ -102,6 +102,10 @@ def plot_cities_and_route(
         yaxis_title="Y",
         showlegend=True,
         template="plotly_white",
+        yaxis=dict(
+            scaleanchor="x",
+            scaleratio=1
+        )
     )
 
     fig.show()

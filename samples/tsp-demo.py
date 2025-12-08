@@ -29,6 +29,7 @@ def main():
         "Genetic Algorithm",
         "Ant Colony",
         "Ant Colony MST",
+        "VAT"
     ]
     plot_convergence([x.value_history for x in results], trace_names)
     plot_cities_and_route(
@@ -75,15 +76,16 @@ def compute_tsp_bounds(cities: AF):
     solution_archive_size = 100
 
     # Time Genetic Algorithm
+    # NOTE - Anecdotally, GA runs about 3x faster than ACO, but worse.
     start_time = time.time()
     ga_config = GeneticAlgorithmTSPConfig(
         name="GA TSP",
-        num_generations=n_generations
-        * 3,  # NOTE - Anecdotally, GA runs about 3x faster than ACO, but worse.
+        num_generations=n_generations * 4,
         population_size=n_ants,
         solution_archive_size=solution_archive_size,
         joblib_prefer="threads",
-        stop_after_iterations=n_generations * 3,  # No early stopping!
+        n_jobs=1,
+        stop_after_iterations=n_generations * 4,  # No early stopping!
     )
     ga_optimizer = GeneticAlgorithmTSP(
         ga_config, network_routes=distances, city_locations=cities
@@ -99,7 +101,7 @@ def compute_tsp_bounds(cities: AF):
         solution_archive_size=solution_archive_size,
         population_size=n_ants,
         joblib_prefer="threads",
-        # n_jobs=1,
+        n_jobs=1,
         stop_after_iterations=n_generations,  # No early stopping!
     )
     aco_optimizer = AntColonyTSP(
@@ -109,6 +111,14 @@ def compute_tsp_bounds(cities: AF):
     aco_time = time.time() - start_time
 
     # Compute the MST
+    start_time = time.time()
+    aco_optimizer = AntColonyMST(
+        aco_config, network_routes=distances, city_locations=cities
+    )
+    aco_mst_result = aco_optimizer.solve()
+    aco_mst_time = time.time() - start_time
+
+    # Compute the VAT-MST
     start_time = time.time()
     aco_optimizer = AntColonyMST(
         aco_config, network_routes=distances, city_locations=cities
