@@ -11,7 +11,7 @@ from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
 
 lines = []
 optim = "two-opt" # "aco"
-file_name = "berlin52"
+file_name = "rl5915"
 optimal_length = None
 with open(f"./{file_name}.txt") as f:
     lines = [l.strip() for l in f.readlines()]
@@ -66,6 +66,7 @@ elif optim == "two-opt":
     topt_config = TwoOptTSPConfig(
         name="ACO TSP",
         back_to_start=True,
+        nearest_neighbors=50
     )
     topt_optimizer = TwoOptTSP(
         topt_config,
@@ -86,13 +87,13 @@ print(f"ACO-TSP time: {topt_time:.02f}, distance={topt_result.optimal_value:.0f}
 print(f"ACO-TSP order: {opt_city_sequence}")
 
 # Plot the convergence
-plt.figure(figsize=(10, 5))
-plt.plot(topt_result.value_history)
-plt.title("ACO Convergence History")
-plt.xlabel("Generation")
-plt.ylabel("Tour Length")
-plt.grid(True)
-plt.show()
+# plt.figure(figsize=(10, 5))
+# plt.plot(topt_result.value_history)
+# plt.title("ACO Convergence History")
+# plt.xlabel("Generation")
+# plt.ylabel("Tour Length")
+# plt.grid(True)
+# plt.show()
 
 # Plot the cities and route
 plt.figure(figsize=(10, 10))
@@ -135,8 +136,8 @@ plt.ylabel("Y Coordinate")
 plt.grid(True)
 plt.tight_layout()
 plt.legend()
-plt.savefig('tsp_route.eps', format='eps')
-plt.close()
+# plt.savefig('tsp_route.eps', format='eps')
+# plt.close()
 
 # Show both the VAT image and the ACO-TSP optimized image.
 fig = plt.figure(figsize=(4, 8))
@@ -149,5 +150,6 @@ plt.subplot(2, 1, 2)
 plt.imshow(cities_dist[:, opt_city_sequence][opt_city_sequence, :], cmap="viridis")
 plt.colorbar()
 plt.title(f"Optimized VAT-{file_name}")
-plt.savefig('vat_comparison2.eps', format='eps')
-plt.close()
+# plt.savefig('vat_comparison2.eps', format='eps')
+# plt.close()
+plt.show()

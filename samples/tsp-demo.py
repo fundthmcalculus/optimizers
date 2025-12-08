@@ -2,10 +2,12 @@ import os
 import time
 
 import numpy as np
+from cluster import compute_ordered_dis_njit_merge
 from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.aco import AntColonyTSPConfig, AntColonyTSP
 from optimizers.combinatorial.aco_mst import AntColonyMST
+from optimizers.combinatorial.base import CombinatoricsResult
 from optimizers.combinatorial.ga import GeneticAlgorithmTSP, GeneticAlgorithmTSPConfig
 from optimizers.combinatorial.strategy import (
     ConvexHullTSPConfig,
@@ -119,12 +121,22 @@ def compute_tsp_bounds(cities: AF):
     aco_mst_time = time.time() - start_time
 
     # Compute the VAT-MST
-    start_time = time.time()
-    aco_optimizer = AntColonyMST(
-        aco_config, network_routes=distances, city_locations=cities
-    )
-    aco_mst_result = aco_optimizer.solve()
-    aco_mst_time = time.time() - start_time
+    t0 = time.time()
+    city_vat, city_sequence = compute_ordered_dis_njit_merge(distances)
+    t1 = time.time()
+    vat_time = t1 - t0
+
+    # Since this is a loop, the start location really doesn't matter!
+    vat_optimal_value = 0
+    for ij, city in enumerate(city_sequence):
+        # Initial round will close the loop (-1 -> 0)
+        vat_optimal_value += distances[city_sequence[ij - 1], city_sequence[ij]]
+
+    vat_result = CombinatoricsResult(
+        optimal_path=city_sequence,
+        optimal_value=vat_optimal_value,
+        value_history=[vat_optimal_value],
+        stop_reason="max_iterations",)
 
     print("\n")
     print(
@@ -141,8 +153,11 @@ def compute_tsp_bounds(cities: AF):
     print(
         f"MST ACO Solution: {aco_mst_result.optimal_value:.2f} (Time: {aco_mst_time:.2f}s)"
     )
+    print(
+        f"VAT Solution: {vat_result.optimal_value:.2f} (Time: {vat_time:.2f}s)"
+    )
 
-    return nn_result, topt_result, ch_result, ga_result, aco_result, aco_mst_result
+    return nn_result, topt_result, ch_result, ga_result, aco_result, aco_mst_result, vat_result
 
 
 def project_2_data() -> AF:
