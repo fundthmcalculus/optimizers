@@ -21,7 +21,7 @@ class InputVariable(ABC):
         pass
 
     @abstractmethod
-    def perturb_value(self, current_value: float) -> float:
+    def perturb_value(self, current_value: float, perturbation: float = 0.1) -> float:
         pass
 
     @abstractmethod
