@@ -9,6 +9,7 @@ from optimizers.combinatorial.aco import AntColonyTSPConfig, AntColonyTSP
 from optimizers.combinatorial.aco_mst import AntColonyMST
 from optimizers.combinatorial.base import CombinatoricsResult
 from optimizers.combinatorial.ga import GeneticAlgorithmTSP, GeneticAlgorithmTSPConfig
+from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.strategy import (
     ConvexHullTSPConfig,
     ConvexHullTSP,
@@ -22,6 +23,26 @@ from optimizers.plot import plot_cities_and_route, plot_convergence
 
 
 def main():
+    # part1()
+    city_locations = project_2_data()
+    # Part 2.1 2-UAV clustering
+    # Compute TSP optimized distance
+    config = AntColonyMTSPConfig(
+        name="Test TSP",
+        num_generations=50,
+        population_size=50,
+        n_clusters=2,
+        clustering_method="kmeans",
+        stop_after_iterations=15,
+        local_optimize=True,
+    )
+    optimizer = AntColonyMTSP(config, city_locations)
+    result = optimizer.solve()
+    plot_convergence(result.value_history)
+    plot_cities_and_route(city_locations, result.optimal_path)
+
+
+def part1():
     city_locations = project_2_data()
     results = compute_tsp_bounds(city_locations)
     trace_names = [
