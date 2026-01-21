@@ -12,7 +12,7 @@ def compute_ordered_dis_njit_merge(
         ordered_matrix = matrix_of_pairwise_distance
     else:
         ordered_matrix: np.ndarray = np.zeros(matrix_of_pairwise_distance.shape)
-    p: list[int] = vat_prim_mst(matrix_of_pairwise_distance)
+    p: np.ndarray = vat_prim_mst(matrix_of_pairwise_distance)
     # Step 3 - since this is symmetric, we only have to do half
     n_bit_mask = int(np.ceil(N / 8))
     visited = np.zeros(
@@ -47,7 +47,7 @@ def compute_ordered_dis_njit_merge(
                 set_bit(visited, c0, r0)
 
     # Step 4 - since this is symmetric, we only have to do half
-    return ordered_matrix, p
+    return ordered_matrix, list(p)
 
 
 @numba.jit(cache=True)

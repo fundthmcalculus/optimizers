@@ -1,6 +1,6 @@
 import heapq
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Literal
 
 import numpy as np
 
@@ -18,8 +18,7 @@ class TwoOptTSPConfig(IOptimizerConfig):
     nearest_neighbors: int = -1
     """Only check the next nodes, which makes this O(nk), but lower chance of finding crossovers"""
 
-
-def _swap_segment(ij, jk, new_route):
+def _swap_segment(ij: int, jk: int, new_route: AI) -> AI:
     ij += 1
     while ij < jk:
         temp = new_route[ij]
@@ -28,6 +27,21 @@ def _swap_segment(ij, jk, new_route):
         ij += 1
         jk -= 1
     return new_route
+
+def _try_swap(network_routes, ij, ij_, jk, jk_, new_route):
+    no_moves = True
+    d1 = (
+            network_routes[new_route[ij], new_route[ij_]]
+            + network_routes[new_route[jk], new_route[jk_]]
+    )
+    d2 = (
+            network_routes[new_route[ij], new_route[jk]]
+            + network_routes[new_route[ij_], new_route[jk_]]
+    )
+    if d1 > d2:
+        new_route = _swap_segment(ij, jk, new_route)
+        no_moves = False
+    return new_route, no_moves
 
 
 class TwoOptTSP(TSPBase):
@@ -54,21 +68,15 @@ class TwoOptTSP(TSPBase):
                 if self.config.nearest_neighbors > 0:
                     k_nn = min(k_nn, ij + self.config.nearest_neighbors)
                 for jk in range(ij + 2, k_nn):
-                    d1 = (
-                        self.network_routes[new_route[ij], new_route[ij + 1]]
-                        + self.network_routes[new_route[jk], new_route[jk + 1]]
-                    )
-                    d2 = (
-                        self.network_routes[new_route[ij], new_route[jk]]
-                        + self.network_routes[new_route[ij + 1], new_route[jk + 1]]
-                    )
-                    if d1 > d2:
-                        new_route = _swap_segment(ij, jk, new_route)
-                        no_moves = False
+                    ij_ = ij + 1
+                    jk_ = jk + 1
+                    new_route, _no_moves = _try_swap(self.network_routes, ij, ij_, jk, jk_, new_route)
+                    no_moves = no_moves and _no_moves
 
             if no_moves:
                 break
 
+        # TODO - Show the history through each iteration?
         history = [
             check_path_distance(
                 self.network_routes, new_route, self.config.back_to_start
@@ -82,7 +90,7 @@ class TwoOptTSP(TSPBase):
             stop_reason="no_improvement" if no_moves else "max_iterations",
         )
 
-    def setup_local_search(self) -> tuple[int, AF]:
+    def setup_local_search(self) -> tuple[int, AI]:
         if self.initial_route is None or self.initial_value == None:
             # Use the nearest neighbor
             nn_config = NearestNeighborTSPConfig(
@@ -97,6 +105,89 @@ class TwoOptTSP(TSPBase):
         if self.config.num_iterations == -1:
             self.config.num_iterations = N
         return N, new_route
+
+
+@dataclass
+class PriorityTwoOptTSPConfig(TwoOptTSPConfig):
+    priority_depth: int = 10
+    """Use a priority queue to sort the `priority_depth` worst samples"""
+    search_method: Literal["local","bisect","random"] = "random"
+    """Which method to use to break up the existing longest-steps"""
+
+
+class PriorityTwoOptTSP(TwoOptTSP):
+    def __init__(
+        self,
+        config: PriorityTwoOptTSPConfig,
+        network_routes: Optional[AF] = None,
+        city_locations: Optional[AF] = None,
+        initial_route: Optional[AI] = None,
+        initial_value: Optional[F] = None,
+    ):
+        super().__init__(config, network_routes, city_locations, initial_route, initial_value)
+        self.config: PriorityTwoOptTSPConfig = config
+        self.initial_value = initial_value
+        self.initial_route = initial_route
+
+    def solve(self) -> CombinatoricsResult:
+        N, new_route = self.setup_local_search()
+        history = [check_path_distance(self.network_routes, new_route, self.config.back_to_start)]
+
+        # To get the worst edges, use the negative distance.
+        worst_edge_heap: list[tuple[float, tuple[int,int]]] = []
+        heapq.heapify(worst_edge_heap)
+
+        # Convenience function to insert into the heap.
+        def insert_worst_edge(p0,p1):
+            nonlocal worst_edge_heap
+            heapq.heappush(worst_edge_heap, (-self.network_routes[new_route[p0], new_route[p1]], (new_route[p0], new_route[p1])))
+            # Prune to size continuously.
+            if len(worst_edge_heap) > self.config.priority_depth:
+                # TODO - Confirm that this works as expected!
+                worst_edge_heap = worst_edge_heap[:self.config.priority_depth]
+
+        if self.config.back_to_start:
+            # Manually insert the return-to-start here.
+            insert_worst_edge(-1, 0)
+        for ij in range(0, N - 2):
+            insert_worst_edge(ij, ij + 1)
+
+        # Chop to the N-smallest (most negative)
+        for _ in range(self.config.priority_depth):
+            cur_dist, cur_pts = heapq.heappop(worst_edge_heap)
+            p0 = cur_pts[0]
+            p1 = cur_pts[1]
+            if self.config.search_method == "local":
+                # TODO - Look right around the end point, take the actual shortest, not the first shortest.
+                for offset in range(-self.config.nearest_neighbors//2, self.config.nearest_neighbors//2):
+                    new_p1 = (p1 + offset) % N
+                    new_route, _no_moves = _try_swap(self.network_routes, p0, p1, p0, new_p1, new_route)
+                    if not _no_moves:
+                        break
+            elif self.config.search_method == "random":
+                # TODO - Randomly move p1 around the grid a few times and take the shortest vs the first shorter.
+                for _ in range(self.config.num_iterations):
+                    new_p1 = np.random.randint(0, N)
+                    new_route, _no_moves = _try_swap(self.network_routes, p0, p1, p0, new_p1, new_route)
+                    if not _no_moves:
+                        break
+            elif self.config.search_method == "bisect":
+                # TODO - Use bisection search to find the smallest total length to split p0 and p1.
+                pass
+
+
+        history.append(
+            check_path_distance(
+                self.network_routes, new_route, self.config.back_to_start
+            )
+        )
+
+        return CombinatoricsResult(
+            optimal_path=np.array(new_route),
+            optimal_value=history[-1],
+            value_history=np.array(history),
+            stop_reason="max_iterations",
+        )
 
 
 class ThreeOptTSP(TwoOptTSP):

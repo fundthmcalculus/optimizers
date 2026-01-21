@@ -1,5 +1,6 @@
 # Load a dataset for TSP
 import time
+from typing import Literal
 
 import numpy as np
 from sklearn.metrics import pairwise_distances
@@ -7,11 +8,11 @@ import matplotlib.pyplot as plt
 
 from cluster import compute_ordered_dis_njit_merge
 from optimizers.combinatorial.aco import AntColonyTSP, AntColonyTSPConfig
-from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
+from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP, PriorityTwoOptTSPConfig, PriorityTwoOptTSP
 
 lines = []
-optim = "two-opt" # "aco"
-file_name = "rl5915"
+optim: Literal["aco", "two-opt", "priority-two-opt"] = "priority-two-opt"
+file_name = "berlin52"
 optimal_length = None
 with open(f"./{file_name}.txt") as f:
     lines = [l.strip() for l in f.readlines()]
@@ -41,7 +42,7 @@ t1 = time.time()
 # Since this is a loop, the start location really doesn't matter!
 total_distance = 0
 for ij, city in enumerate(city_sequence):
-    # Initial round will close the loop (-1 -> 0)
+    # The initial round will close the loop (-1 -> 0)
     total_distance += cities_dist[city_sequence[ij - 1], city_sequence[ij]]
 print(f"VAT order: {city_sequence}")
 print(f"Total time: {t1-t0}")
@@ -69,6 +70,20 @@ elif optim == "two-opt":
         nearest_neighbors=50
     )
     topt_optimizer = TwoOptTSP(
+        topt_config,
+        network_routes=cities_dist,
+        initial_route=city_sequence,
+        initial_value=total_distance,
+    )
+elif optim == "priority-two-opt":
+    topt_config = PriorityTwoOptTSPConfig(
+        name="Priority 2-OPT TSP",
+        back_to_start=True,
+        nearest_neighbors=50,
+        search_method="random",
+        priority_depth=10
+    )
+    topt_optimizer = PriorityTwoOptTSP(
         topt_config,
         network_routes=cities_dist,
         initial_route=city_sequence,
