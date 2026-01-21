@@ -3,7 +3,7 @@ from ..core.base import LocalOptimType, ensure_literal_choice
 from ..solution_deck import WrappedGoalFcn
 from .variables import InputVariable, InputDiscreteVariable
 from ..core.types import AF, F
-from typing import get_args
+from typing import get_args, Optional
 
 
 def apply_local_optimization(
@@ -31,13 +31,16 @@ def apply_local_optimization(
 
 
 def local_perturb_optim(
-    fcn: WrappedGoalFcn, new_solution: AF, variables: list[InputVariable]
+    fcn: WrappedGoalFcn,
+    new_solution: AF,
+    variables: list[InputVariable],
+    max_perturbation: float = 0.1,
 ) -> tuple[AF, F]:
     cur_value = fcn(new_solution)
     # One variable at a time, do a stepwise optimization.
     for i, variable in enumerate(variables):
         old_var_value = new_solution[i]
-        new_solution[i] = variable.perturb_value(old_var_value)
+        new_solution[i] = variable.perturb_value(old_var_value, max_perturbation)
         # Evaluate the new solution value
         new_value = fcn(new_solution)
         if new_value < cur_value:

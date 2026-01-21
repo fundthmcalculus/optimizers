@@ -48,10 +48,10 @@ def run_ants(
         new_solution = np.zeros(len(variables))
         # Generate a new solution from an existing one as a base
         p = global_rng().uniform()
-        # Find the entry based upon cdf
-        base_solution_idx = np.searchsorted(cp_j, p)
-        base_solution = solution_archive[base_solution_idx, :]
         for i, variable in enumerate(variables):
+            # Find the entry based upon cdf
+            base_solution_idx = np.searchsorted(cp_j, p)
+            base_solution = solution_archive[base_solution_idx, :]
             # Compute the weighted value for the variable
             new_solution[i] = variable.random_value(
                 current_value=base_solution[i],

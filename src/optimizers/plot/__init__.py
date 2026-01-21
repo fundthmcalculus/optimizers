@@ -33,7 +33,7 @@ def plot_convergence(
     fig.update_layout(
         title="Convergence",
         xaxis_title="Generation",
-        yaxis_title="Tour Length",
+        yaxis_title="Output Value",
         template="plotly_white",
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -102,6 +102,10 @@ def plot_cities_and_route(
         yaxis_title="Y",
         showlegend=True,
         template="plotly_white",
+        yaxis=dict(
+            scaleanchor="x",
+            scaleratio=1
+        )
     )
 
     fig.show()

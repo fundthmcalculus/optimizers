@@ -2,7 +2,13 @@ import os
 
 import numpy as np
 
-from optimizers import plot_convergence
+from optimizers import (
+    plot_convergence,
+    AntColonyOptimizer,
+    AntColonyOptimizerConfig,
+    GeneticAlgorithmOptimizer,
+    GeneticAlgorithmOptimizerConfig,
+)
 from optimizers.continuous.step import StepWiseOptimizer, StepWiseOptimizerConfig
 from optimizers.continuous.gd import (
     GradientDescentOptimizer,
@@ -22,9 +28,17 @@ from remi.src.kinematics import (
     calc_J_dot,
 )
 
+np.seterr(invalid='ignore', divide='ignore', over='ignore')
+
 # TODO - This allows us to change the optimizer type at the drop of a hat
-Optimizer = GradientDescentOptimizer
-OptimizerConfig = GradientDescentOptimizerConfig
+# Optimizer = GradientDescentOptimizer
+# OptimizerConfig = GradientDescentOptimizerConfig
+# Optimizer = StepWiseOptimizer
+# OptimizerConfig = StepWiseOptimizerConfig
+# Optimizer = AntColonyOptimizer
+# OptimizerConfig = AntColonyOptimizerConfig
+Optimizer = GeneticAlgorithmOptimizer
+OptimizerConfig = GeneticAlgorithmOptimizerConfig
 
 # LOCAL PACKAGE IMPORT
 from remi.src.system import System
@@ -68,7 +82,7 @@ sys1 = System(y0, parameters, settings)
 
 
 def calculate_cost(sol):
-    # NOTE - Lifted from TruuAI version
+    # NOTE - Lifted from TruEAI version
     if sol.status == -1:
         return 1e100
     elif sol.status == 0:
@@ -91,6 +105,39 @@ def calculate_cost(sol):
 
 # CLIK control goes here...
 def controls(t, y, control_params: np.ndarray | None = None) -> np.ndarray:
+    bounds = np.ones(8)  # or 10
+    bounds[0::2] = 0.0  # [0,1]
+    bounds[:4] *= 0.001
+    bounds[4:] *= 0.2
+
+    # Don't want the bounds to be the same, if so then fuzzy isn't
+    # used
+    if (
+        bounds[0] == bounds[1]
+        or bounds[2] == bounds[3]
+        or bounds[4] == bounds[5]
+        or bounds[6] == bounds[7]
+    ):  # or\
+        #    bounds[8] == bounds[9]:
+        return 1e99
+
+    p_bounds = sorted((bounds[0], bounds[1]))
+    w_bounds = sorted((bounds[2], bounds[3]))
+    kp_bounds = sorted((bounds[4], bounds[5]))
+    kd_bounds = sorted((bounds[6], bounds[7]))
+    # kn_bounds = sorted((bounds[8], bounds[9]))
+
+    if p_bounds[0] == 0.0:
+        p_bounds[0] = 0.00001
+    if w_bounds[0] == 0.0:
+        w_bounds[0] = 0.00001
+    if kp_bounds[0] == 0.0:
+        kp_bounds[0] = 0.001
+    if kd_bounds[0] == 0.0:
+        kd_bounds[0] = 0.001
+    # if kn_bounds[0] == 0.:
+    #     kn_bounds[0] == 0.001
+
     # System limits
     q_bar = np.zeros(3)
     q_max = np.array(
@@ -137,6 +184,27 @@ def controls(t, y, control_params: np.ndarray | None = None) -> np.ndarray:
     # Calculate parameters for gam2 calculation and for inference input
     pos, vel, djk, djk_dot = get_gam2_vals(y, rho, r_s, r_t)
 
+    # TODO - INFER P, W, KP, KD, AND KN HERE
+    # p2 = fiss[0]([q[1] / max_th1, qdot[1] / max_dth1])
+    # p3 = fiss[0]([q[2] / max_th2, qdot[2] / max_dth2])
+    #
+    # w11 = fiss[1]([djk[0][0] / max_djk, djk_dot[0][0] / max_djk_dot])
+    # w12 = fiss[1]([djk[0][1] / max_djk, djk_dot[0][1] / max_djk_dot])
+    # w21 = fiss[1]([djk[1][0] / max_djk, djk_dot[1][0] / max_djk_dot])
+    # w22 = fiss[1]([djk[1][1] / max_djk, djk_dot[1][1] / max_djk_dot])
+    # w31 = fiss[1]([djk[2][0] / max_djk, djk_dot[2][0] / max_djk_dot])
+    # w32 = fiss[1]([djk[2][1] / max_djk, djk_dot[2][1] / max_djk_dot])
+    #
+    # p_rank = fiss[2]([e[0, 0] / max_djk, e[1, 0] / max_djk])
+    # d_rank = fiss[3]([e_dot[0, 0] / max_djk_dot, e_dot[1, 0] / max_djk_dot])
+    #
+    # KP = fiss[4]([p_rank, d_rank])
+    # KD = fiss[5]([p_rank, d_rank])
+
+    # KP = fiss[2]([e[0, 0]/max_djk, e[1, 0]/max_djk])
+    # KD = fiss[3]([e_dot[0, 0]/max_djk_dot, e_dot[1, 0]/max_djk_dot])
+    # KN = fiss[4]([])
+
     if control_params is not None:
         KD = control_params[0]
         KN = 1.0
@@ -146,6 +214,17 @@ def controls(t, y, control_params: np.ndarray | None = None) -> np.ndarray:
         p3 = control_params[3]
         w = control_params[4:]
         p = np.array([p1, p2, p3])
+
+        # TODO - Put gains on the appropriate range
+        # p2 = (p_bounds[1] - p_bounds[0]) * p2 + p_bounds[0]
+        # p3 = (p_bounds[1] - p_bounds[0]) * p3 + p_bounds[0]
+        #
+        # w = (w_bounds[1] - w_bounds[0]) * w + w_bounds[0]
+        #
+        # KP = (kp_bounds[1] - kp_bounds[0]) * KP + kp_bounds[0]
+        # KD = (kd_bounds[1] - kd_bounds[0]) * KD + kd_bounds[0]
+
+        # p = np.array([1e-308, p2, p3])
     else:
         KD, KN, KP, p, w = get_control_params()
 
@@ -216,8 +295,9 @@ def fuzzy_optimize():
         name="CLIK Controller",
         joblib_prefer="processes",
         local_grad_optim="perturb",  # this slows things down!
-        population_size=64,
-        n_jobs=16,
+        population_size=32,
+        solution_archive_size=64,
+        n_jobs=8,
     )
 
     w_l = 1.9
@@ -272,11 +352,12 @@ def fuzzy_optimize():
 
 
 def main():
+    print("Optimizing Fixed Control parameters")
     results = fuzzy_optimize()
     print("Optimized Fixed Control parameters:", results)
     plot_convergence(results.solution_history, "Optimization")
 
-    sol = simulate()
+    sol = simulate(results.solution_vector)
     plot_states(sol.t, sol.y, save=False, show=True)
 
     try:
