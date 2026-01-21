@@ -88,6 +88,9 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
     heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
     heap_seq_idx = 0
 
+    # Cache this and reuse it.
+    vertices = np.arange(N)
+
     # Loop until the priority queue becomes empty
     while pq:
         # The first vertex in the pair is the minimum key vertex
@@ -107,7 +110,6 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
 
         # Iterate through all adjacent vertices of a vertex
         # Parallel processing of adjacent vertices
-        vertices = np.arange(N)
         mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
         key[mask] = adj[u, mask]
         for v in vertices[mask]:
