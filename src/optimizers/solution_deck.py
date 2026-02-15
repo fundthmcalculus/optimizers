@@ -295,13 +295,14 @@ def inv_elliptic2(s: f64, m: f64) -> f64:
 
 
 @lru_cache(maxsize=16)
-def spiral_points(n: int, k: int) -> np.ndarray:
+def spiral_points(n: int, k: int, r_scale: float = 0.97) -> np.ndarray:
     """
     Generates N points in a k-dimensional space using rotation matrices. Source: https://www.fujipress.jp/jaciii/jc/jacii001500081116/
 
     Args:
         n (int): Number of points.
         k (int): Dimension of the sphere.
+        r_scale (float): Scaling factor for radial distance, default 0.97.
 
     Returns:
         np.ndarray: Array of shape (n, k) with coordinates in [0,1].
@@ -328,7 +329,6 @@ def spiral_points(n: int, k: int) -> np.ndarray:
                 r1 = np.dot(r_theta_ij(ii, jj, theta), r1)
         return r1
 
-    r_scale = 0.97
     theta_step = np.pi * (np.sqrt(5.0) + 1.0)  # golden angle
     # Start in the corner
     for i in range(1, n):

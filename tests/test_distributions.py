@@ -2,7 +2,7 @@ from typing import Callable
 
 import numpy as np
 import plotly.graph_objects as go
-import matplotlib.pyplot as plt
+from plotly.subplots import make_subplots
 
 from optimizers.solution_deck import spiral_points
 
@@ -37,37 +37,20 @@ def get_rule_idx(s: int, n_base: int, n_dim: int) -> np.ndarray:
 
 def test_membership_fcn_distribution():
     # TODO - Test the membership function distribution
-    n_rules = 10
-    n_mu = 15
-    n_vars = 2
+    n_rules = 20
+    n_mu = 5
+    n_vars = 3
     max_rules = n_mu ** n_vars
     print(f"\nmax_rules: {max_rules}")
     print(f"n_rules: {n_rules}  ({(n_rules/max_rules):.2%} coverage)")
     print(f"n_mu: {n_mu}")
     print(f"n_vars: {n_vars}")
     # I need to distribute
-    mu_selects = spiral_points(n_rules, n_vars)
+    mu_selects = spiral_points(n_rules, n_vars, r_scale=1.0)
     # Now map those points to the natural numbers interval
     mu_selects = np.int32(np.round(mu_selects * (n_mu - 1), 0))
-    # Compute the L-1 norm for each set, and report the minimum.
-    # TODO - Generalize this to higher dimensions
-    all_norms = np.zeros((n_rules, n_rules), dtype=np.int32)
-    # TODO - Vectorize this
-    for ij in range(n_rules):
-        for jk in range(ij, n_rules):
-            all_norms[ij, jk] = np.sum(np.abs(mu_selects[ij,:] - mu_selects[jk,:]))
-            all_norms[jk, ij] = all_norms[ij, jk]
-
-
-    # Do the entire domain of possible rules
-    # TODO - Generalize this to higher dimensions
-    possible_norms = np.zeros((max_rules, max_rules), dtype=np.int32)
-    for ij in range(max_rules):
-        idx_ij = get_rule_idx(ij, n_mu, n_vars)
-        for jk in range(ij, max_rules):
-            idx_jk = get_rule_idx(jk, n_mu, n_vars)
-            possible_norms[ij, jk] = np.sum(np.abs(idx_ij - idx_jk))
-            possible_norms[jk, ij] = possible_norms[ij, jk]
+    all_norms = get_selected_rule_dists(mu_selects, n_rules)
+    possible_norms = get_all_rule_dists(max_rules, n_mu, n_vars)
 
     # Convert sampled rules to linear indices in the full rule space
     sampled_linear_indices = []
@@ -80,8 +63,6 @@ def test_membership_fcn_distribution():
 
     # Plot the norms as an image
     # Create subplots using plotly
-    from plotly.subplots import make_subplots
-
     fig = make_subplots(
         rows=2, cols=1,
         subplot_titles=(f'L-1 Norms Between {n_rules}-Sampled Rules',
@@ -144,3 +125,26 @@ def test_membership_fcn_distribution():
     print(f"Median norm: {np.median(non_diag_norms):.2f}")
     print(f"Mean norm: {np.mean(non_diag_norms):.2f}")
     print(f"Max norm: {np.max(non_diag_norms):.2f}")
+
+
+def get_selected_rule_dists(mu_selects, n_rules):
+    # Compute the L-1 norm for each set, and report the minimum.
+    all_norms = np.zeros((n_rules, n_rules), dtype=np.int32)
+    # TODO - Vectorize this
+    for ij in range(n_rules):
+        for jk in range(ij, n_rules):
+            all_norms[ij, jk] = np.sum(np.abs(mu_selects[ij, :] - mu_selects[jk, :]))
+            all_norms[jk, ij] = all_norms[ij, jk]
+    return all_norms
+
+
+def get_all_rule_dists(max_rules, n_mu, n_vars):
+    # Do the entire domain of possible rules
+    possible_norms = np.zeros((max_rules, max_rules), dtype=np.int32)
+    for ij in range(max_rules):
+        idx_ij = get_rule_idx(ij, n_mu, n_vars)
+        for jk in range(ij, max_rules):
+            idx_jk = get_rule_idx(jk, n_mu, n_vars)
+            possible_norms[ij, jk] = np.sum(np.abs(idx_ij - idx_jk))
+            possible_norms[jk, ij] = possible_norms[ij, jk]
+    return possible_norms
