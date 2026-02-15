@@ -1,0 +1,146 @@
+from typing import Callable
+
+import numpy as np
+import plotly.graph_objects as go
+import matplotlib.pyplot as plt
+
+from optimizers.solution_deck import spiral_points
+
+
+# TODO - Demo function to approximate using fuzzy
+def griewank_fcn(x):
+    p_i = [np.cos(x[:, ij] / np.sqrt(ij + 1)) for ij in range(x.shape[1])]
+    return 1 + 1.0 / 4000.0 * np.sum(np.square(x), axis=1) - np.prod(p_i, axis=0)
+
+
+def plot_fcn(fcn: Callable, x_domain, n=2) -> None:
+    x_s = np.linspace(x_domain[0], x_domain[1], 100)
+    x = [x_s for ij in range(n)]
+    x_grid = np.meshgrid(*x)
+    x_flat = np.stack([grid.flatten() for grid in x_grid], axis=1)
+    z = fcn(x_flat)
+    z = z.reshape(x_grid[0].shape)
+
+    fig = go.Figure(data=[go.Surface(z=z)])
+    fig.show()
+
+
+def get_rule_idx(s: int, n_base: int, n_dim: int) -> np.ndarray:
+    idxes_rev = list()
+    for idim in range(n_dim):
+        idxes_rev.append(np.mod(s, n_base))
+        s //= n_base
+    idxes_rev.reverse()
+    # NOTE - It really doesn't matter that this is backwards from logic.
+    return np.array(idxes_rev)
+
+
+def test_membership_fcn_distribution():
+    # TODO - Test the membership function distribution
+    n_rules = 10
+    n_mu = 15
+    n_vars = 2
+    max_rules = n_mu ** n_vars
+    print(f"\nmax_rules: {max_rules}")
+    print(f"n_rules: {n_rules}  ({(n_rules/max_rules):.2%} coverage)")
+    print(f"n_mu: {n_mu}")
+    print(f"n_vars: {n_vars}")
+    # I need to distribute
+    mu_selects = spiral_points(n_rules, n_vars)
+    # Now map those points to the natural numbers interval
+    mu_selects = np.int32(np.round(mu_selects * (n_mu - 1), 0))
+    # Compute the L-1 norm for each set, and report the minimum.
+    # TODO - Generalize this to higher dimensions
+    all_norms = np.zeros((n_rules, n_rules), dtype=np.int32)
+    # TODO - Vectorize this
+    for ij in range(n_rules):
+        for jk in range(ij, n_rules):
+            all_norms[ij, jk] = np.sum(np.abs(mu_selects[ij,:] - mu_selects[jk,:]))
+            all_norms[jk, ij] = all_norms[ij, jk]
+
+
+    # Do the entire domain of possible rules
+    # TODO - Generalize this to higher dimensions
+    possible_norms = np.zeros((max_rules, max_rules), dtype=np.int32)
+    for ij in range(max_rules):
+        idx_ij = get_rule_idx(ij, n_mu, n_vars)
+        for jk in range(ij, max_rules):
+            idx_jk = get_rule_idx(jk, n_mu, n_vars)
+            possible_norms[ij, jk] = np.sum(np.abs(idx_ij - idx_jk))
+            possible_norms[jk, ij] = possible_norms[ij, jk]
+
+    # Convert sampled rules to linear indices in the full rule space
+    sampled_linear_indices = []
+    for rule_idx in range(n_rules):
+        linear_idx = 0
+        for dim in range(n_vars):
+            linear_idx = linear_idx * n_mu + mu_selects[rule_idx, dim]
+        sampled_linear_indices.append(linear_idx)
+    sampled_linear_indices = np.array(sampled_linear_indices)
+
+    # Plot the norms as an image
+    # Create subplots using plotly
+    from plotly.subplots import make_subplots
+
+    fig = make_subplots(
+        rows=2, cols=1,
+        subplot_titles=(f'L-1 Norms Between {n_rules}-Sampled Rules',
+                        'L-1 Norms Between All Rules'),
+        vertical_spacing=0.15
+    )
+
+    # First heatmap - sampled rules norms
+    fig.add_trace(
+        go.Heatmap(
+            z=all_norms,
+            colorscale='Viridis',
+            colorbar=dict(title='L-1 Norm', y=0.75, len=0.4),
+            showscale=True
+        ),
+        row=1, col=1
+    )
+
+    # Second heatmap - all possible rules norms
+    fig.add_trace(
+        go.Heatmap(
+            z=possible_norms,
+            colorscale='Viridis',
+            colorbar=dict(title='L-1 Norm', y=0.25, len=0.4),
+            showscale=True
+        ),
+        row=2, col=1
+    )
+
+    # Add scatter markers for sampled rules on second plot
+    fig.add_trace(
+        go.Scatter(
+            x=sampled_linear_indices,
+            y=sampled_linear_indices,
+            mode='markers',
+            marker=dict(color='red', size=8, symbol='circle'),
+            name='Sampled Rules',
+            showlegend=True
+        ),
+        row=2, col=1
+    )
+
+    # Update layout
+    fig.update_xaxes(title_text='Rule Index', row=2, col=1)
+    fig.update_yaxes(title_text='Rule Index', row=2, col=1)
+    fig.update_xaxes(showticklabels=False, row=1, col=1)
+    fig.update_yaxes(showticklabels=False, row=1, col=1)
+
+    fig.update_layout(
+        height=1000,
+        width=600,
+        showlegend=True
+    )
+
+    fig.show()
+
+    # Report statistics (excluding diagonal which is always 0)
+    non_diag_norms = all_norms[np.triu_indices(n_rules, k=1)]
+    print(f"Min norm: {np.min(non_diag_norms):.2f}")
+    print(f"Median norm: {np.median(non_diag_norms):.2f}")
+    print(f"Mean norm: {np.mean(non_diag_norms):.2f}")
+    print(f"Max norm: {np.max(non_diag_norms):.2f}")
