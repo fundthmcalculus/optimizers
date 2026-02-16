@@ -6,7 +6,6 @@ from matplotlib import pyplot as plt
 
 from pyclustertend.visual_assessment_of_tendency import compute_ordered_dis_njit
 from sklearn.metrics import pairwise_distances
-from PIL import Image
 
 from test_combinatorics import circle_random_clusters
 
@@ -137,6 +136,7 @@ def test_vat_scaling():
     plt.legend()
     plt.title("VAT Scaling Test")
     plt.savefig('vat_scaling_comparison.eps', format='eps')
+    plt.savefig('vat_scaling_comparison.svg', format='svg')
     plt.close()
 
     plt.figure()
@@ -147,6 +147,7 @@ def test_vat_scaling():
     plt.legend()
     plt.title("VAT Scaling Test")
     plt.savefig('vat_scaling_time.eps', format='eps')
+    plt.savefig('vat_scaling_time.svg', format='svg')
     plt.close()
 
     # Plot the results
@@ -162,6 +163,7 @@ def test_vat_scaling():
 
     plt.tight_layout()
     plt.savefig('vat_comparison.eps', format='eps')
+    plt.savefig('vat_comparison.svg', format='svg')
     plt.close()
 
 

@@ -11,7 +11,7 @@ from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
 
 lines = []
 optim = "two-opt" # "aco"
-file_name = "rl5915"
+file_name = "d1291"
 optimal_length = None
 with open(f"./{file_name}.txt") as f:
     lines = [l.strip() for l in f.readlines()]
@@ -64,7 +64,7 @@ if optim == "aco":
     )
 elif optim == "two-opt":
     topt_config = TwoOptTSPConfig(
-        name="ACO TSP",
+        name="2-Opt TSP",
         back_to_start=True,
         nearest_neighbors=50
     )
@@ -79,9 +79,6 @@ else:
 
 topt_result = topt_optimizer.solve()
 topt_time = time.time() - start_time
-# TODO - Try the actual MST!
-
-
 opt_city_sequence = topt_result.optimal_path
 print(f"ACO-TSP time: {topt_time:.02f}, distance={topt_result.optimal_value:.0f}")
 print(f"ACO-TSP order: {opt_city_sequence}")
@@ -136,8 +133,9 @@ plt.ylabel("Y Coordinate")
 plt.grid(True)
 plt.tight_layout()
 plt.legend()
-# plt.savefig('tsp_route.eps', format='eps')
-# plt.close()
+plt.savefig('tsp_route.eps', format='eps')
+plt.savefig('tsp_route.svg', format='svg')
+plt.close()
 
 # Show both the VAT image and the ACO-TSP optimized image.
 fig = plt.figure(figsize=(4, 8))
@@ -150,6 +148,6 @@ plt.subplot(2, 1, 2)
 plt.imshow(cities_dist[:, opt_city_sequence][opt_city_sequence, :], cmap="viridis")
 plt.colorbar()
 plt.title(f"Optimized VAT-{file_name}")
-# plt.savefig('vat_comparison2.eps', format='eps')
-# plt.close()
-plt.show()
+plt.savefig('vat_comparison2.eps', format='eps')
+plt.savefig('vat_comparison2.svg', format='svg')
+plt.close()

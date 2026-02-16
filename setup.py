@@ -6,7 +6,7 @@ setup(
     description="A collection of optimization algorithms (GA, PSO, ACO, GD, etc.)",
     author="fundthmcalculus",
     packages=find_packages(),
-    install_requires=["numpy", "kmodes", 'scipy'],
+    install_requires=["numpy", "kmodes", 'scipy', 'numba'],
     python_requires=">=3.7",
     url="https://github.com/fundthmcalculus/optimizers",
     license="MIT",

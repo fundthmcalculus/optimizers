@@ -36,10 +36,10 @@ def get_rule_idx(s: int, n_base: int, n_dim: int) -> np.ndarray:
 
 
 def test_membership_fcn_distribution():
-    n_rules = 20
-    n_mu = 5
+    n_rules = 10
+    n_mu = 8
     n_vars = 4
-    l_norm = 0
+    l_norm = 1
     max_rules = n_mu ** n_vars
     print(f"\nmax_rules: {max_rules}")
     print(f"n_rules: {n_rules}  ({(n_rules/max_rules):.2%} coverage)")
@@ -49,9 +49,22 @@ def test_membership_fcn_distribution():
     mu_selects = spiral_points(n_rules, n_vars, r_scale=1.0)
     # Now map those points to the natural numbers interval
     mu_selects = np.int32(np.round(mu_selects * (n_mu - 1), 0))
-    all_norms = get_selected_rule_dists(mu_selects, l_norm)
-    possible_norms = get_all_rule_dists(max_rules, n_mu, n_vars, l_norm)
+    selected_norms = get_selected_rule_dists(mu_selects, l_norm)
+    all_norms = get_all_rule_dists(max_rules, n_mu, n_vars, l_norm)
+    sampled_linear_indices = get_sampled_linear_indices(mu_selects, n_mu, n_rules, n_vars)
 
+    # Plot the norms as an image
+    plot_mu_fcns(all_norms, l_norm, max_rules, n_rules, sampled_linear_indices, selected_norms)
+
+    # Report statistics (excluding diagonal which is always 0)
+    non_diag_norms = selected_norms[np.triu_indices(n_rules, k=1)]
+    print(f"Min norm: {np.min(non_diag_norms):.2f}")
+    print(f"Median norm: {np.median(non_diag_norms):.2f}")
+    print(f"Mean norm: {np.mean(non_diag_norms):.2f}")
+    print(f"Max norm: {np.max(non_diag_norms):.2f}")
+
+
+def get_sampled_linear_indices(mu_selects, n_mu, n_rules, n_vars):
     # Convert sampled rules to linear indices in the full rule space
     sampled_linear_indices = []
     for rule_idx in range(n_rules):
@@ -60,8 +73,10 @@ def test_membership_fcn_distribution():
             linear_idx = linear_idx * n_mu + mu_selects[rule_idx, dim]
         sampled_linear_indices.append(linear_idx)
     sampled_linear_indices = np.array(sampled_linear_indices)
+    return sampled_linear_indices
 
-    # Plot the norms as an image
+
+def plot_mu_fcns(all_norms, l_norm, max_rules, n_rules, sampled_linear_indices, selected_norms):
     # Create subplots using plotly
     fig = make_subplots(
         rows=2, cols=1,
@@ -73,7 +88,7 @@ def test_membership_fcn_distribution():
     # First heatmap - sampled rules norms
     fig.add_trace(
         go.Heatmap(
-            z=all_norms,
+            z=selected_norms,
             colorscale='Viridis',
             colorbar=dict(title=f'L-{l_norm} Norm', y=0.75, len=0.4),
             showscale=True
@@ -84,7 +99,7 @@ def test_membership_fcn_distribution():
     # Second heatmap - all possible rules norms
     fig.add_trace(
         go.Heatmap(
-            z=possible_norms,
+            z=all_norms,
             colorscale='Viridis',
             colorbar=dict(title='L-1 Norm', y=0.25, len=0.4),
             showscale=True
@@ -92,7 +107,7 @@ def test_membership_fcn_distribution():
         row=2, col=1
     )
 
-    # Add scatter markers for sampled rules on second plot
+    # Add scatter markers for sampled rules on the second plot
     fig.add_trace(
         go.Scatter(
             x=sampled_linear_indices,
@@ -146,13 +161,6 @@ def test_membership_fcn_distribution():
 
     fig.show()
 
-    # Report statistics (excluding diagonal which is always 0)
-    non_diag_norms = all_norms[np.triu_indices(n_rules, k=1)]
-    print(f"Min norm: {np.min(non_diag_norms):.2f}")
-    print(f"Median norm: {np.median(non_diag_norms):.2f}")
-    print(f"Mean norm: {np.mean(non_diag_norms):.2f}")
-    print(f"Max norm: {np.max(non_diag_norms):.2f}")
-
 
 def get_selected_rule_dists(mu_selects, l_norm: int = 1):
     # Vectorized L-norm computation using broadcasting
@@ -160,7 +168,7 @@ def get_selected_rule_dists(mu_selects, l_norm: int = 1):
     if l_norm == 0:
         all_norms = np.count_nonzero(np.abs(diff), axis=-1)
     else:
-        all_norms = np.pow(np.sum(np.abs(diff) ** l_norm, axis=-1), 1/l_norm).round(0)
+        all_norms = np.power(np.sum(np.abs(diff) ** l_norm, axis=-1), 1/l_norm).round(0)
     return all_norms.astype(np.int32)
 
 
@@ -172,7 +180,7 @@ def get_all_rule_dists(max_rules, n_mu, n_vars, l_norm: int = 1):
         for jk in range(ij, max_rules):
             idx_jk = get_rule_idx(jk, n_mu, n_vars)
             if l_norm > 0:
-                possible_norms[ij, jk] = np.pow(np.sum(np.abs(idx_ij - idx_jk) ** l_norm), 1/l_norm).round(0).astype(np.int32)
+                possible_norms[ij, jk] = np.power(np.sum(np.abs(idx_ij - idx_jk) ** l_norm), 1/l_norm).round(0).astype(np.int32)
             elif l_norm == 0:
                 possible_norms[ij, jk] = np.count_nonzero(idx_ij - idx_jk, axis=-1).astype(np.int32)
             possible_norms[jk, ij] = possible_norms[ij, jk]
