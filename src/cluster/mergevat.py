@@ -1,0 +1,194 @@
+import heapq
+import numba
+import numpy as np
+
+
+@numba.jit(cache=True)
+def compute_ordered_dis_njit_merge(
+        matrix_of_pairwise_distance: np.ndarray, inplace: bool
+) -> tuple[np.ndarray, list[int]]:
+    N = matrix_of_pairwise_distance.shape[0]
+    if inplace:
+        ordered_matrix = matrix_of_pairwise_distance
+    else:
+        ordered_matrix: np.ndarray = np.zeros(matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype)
+    p: list[int] = vat_prim_mst(matrix_of_pairwise_distance)
+    # Step 3 - since this is symmetric, we only have to do half
+    n_bit_mask = int(np.ceil(N / 8))
+    # Boolean is stored as a byte, so this is smaller
+    visited = np.zeros((N, n_bit_mask), dtype=np.uint8)
+
+    for ij in range(N):
+        for jk in range(ij, N):
+            if not inplace:
+                ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = matrix_of_pairwise_distance[p[ij], p[jk]]
+            else:
+                if _get_bit(visited, ij, jk):
+                    continue
+                # Walk this loop, and store which visited
+                r0, c0 = ij, jk
+                r1, c1 = -1, -1
+                p0 = ordered_matrix[r0, c0]
+                while r1 != ij or c1 != jk:
+                    r1, c1 = p[r0], p[c0]
+                    _set_bit(visited, r0, c0)
+                    _set_bit(visited, c0, r0)
+                    ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = ordered_matrix[
+                        r1, c1
+                    ]
+                    # Next step!
+                    r0, c0 = r1, c1
+                # Close the final block
+                ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = p0
+                _set_bit(visited, r0, c0)
+                _set_bit(visited, c0, r0)
+
+    # Step 4 - since this is symmetric, we only have to do half
+    return ordered_matrix, p
+
+
+@numba.jit(cache=True)
+def _set_bit(bitmask, row, col):
+    bitmask[row, col // 8] |= 1 << (col % 8)
+
+
+@numba.jit(cache=True)
+def _get_bit(bitmask, row, col):
+    return (bitmask[row, col // 8] >> (col % 8)) & 1
+
+
+@numba.jit(cache=True)
+def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
+    N = len(adj)
+
+    # Find the column of the maximum value.
+    max_adj = np.argmax(adj)
+    src = max_adj // N
+    src_key = np.max(adj)
+
+    # Create a list for keys and initialize all keys as infinite (INF)
+    key: np.ndarray = np.full(N, float("inf"), dtype=adj.dtype)
+
+    # To store the parent array which, in turn, stores MST
+    parent: np.ndarray = np.full(N, -1, dtype=np.int32)
+
+    # To keep track of vertices included in MST
+    in_mst = np.full(N, False, dtype=np.bool_)
+
+    # Insert the source itself into the priority queue and initialize its key as 0
+    pq: list[tuple[float, int]] = [
+        (src_key, src)
+    ]  # Priority queue to store vertices that are being processed
+    key[src] = src_key
+
+    # The final sequence of vertices in MST
+    heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    heap_seq_idx = 0
+
+    # Preallocated
+    vertices = np.arange(N)
+
+    # Loop until the priority queue becomes empty
+    while pq:
+        # The first vertex in the pair is the minimum key vertex
+        # Extract it from the priority queue
+        # The vertex label is stored in the second of the pair
+        u = heapq.heappop(pq)[1]
+
+        # Different key values for the same vertex may exist in the priority queue.
+        # The one with the least key value is always processed first.
+        # Therefore, ignore the rest.
+        if in_mst[u]:
+            continue
+
+        in_mst[u] = True  # Include the vertex in MST
+        heap_seq[heap_seq_idx] = u
+        heap_seq_idx += 1
+
+        # Iterate through all adjacent vertices of a vertex
+        # Parallel processing of adjacent vertices
+        mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
+        key[mask] = adj[u, mask]
+        for v in vertices[mask]:
+            heapq.heappush(pq, (key[v], v))
+            parent[v] = u
+
+    return heap_seq
+
+
+@numba.jit(cache=True)
+def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
+    N = len(samples)
+
+    # Find the column of the maximum value.
+    max_adj = -np.inf
+    max_idx = (-1, -1)
+    for ij in range(N):
+        for jk in range(ij, N):
+            cur_dist = _get_dist(samples, ij, jk)
+            if cur_dist > max_adj:
+                max_adj = cur_dist
+                max_idx = (ij, jk)
+
+    src = max_idx[0]
+    src_key = max_adj
+
+    # Create a list for keys and initialize all keys as infinite (INF)
+    key: np.ndarray = np.full(N, float("inf"))
+
+    # To store the parent array which, in turn, stores MST
+    parent: np.ndarray = np.full(N, -1)
+
+    # To keep track of vertices included in MST
+    in_mst = np.full(N, False)
+
+    # Insert the source itself into the priority queue and initialize its key as 0
+    pq: list[tuple[float, int]] = [
+        (src_key, src)
+    ]  # Priority queue to store vertices that are being processed
+    key[src] = src_key
+
+    # The final sequence of vertices in MST
+    heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    heap_seq_idx = 0
+
+    # Preallocated
+    vertices = np.arange(N)
+
+    # Loop until the priority queue becomes empty
+    while pq:
+        # The first vertex in the pair is the minimum key vertex
+        # Extract it from the priority queue
+        # The vertex label is stored in the second of the pair
+        u = heapq.heappop(pq)[1]
+
+        # Different key values for the same vertex may exist in the priority queue.
+        # The one with the least key value is always processed first.
+        # Therefore, ignore the rest.
+        if in_mst[u]:
+            continue
+
+        in_mst[u] = True  # Include the vertex in MST
+        heap_seq[heap_seq_idx] = u
+        heap_seq_idx += 1
+
+        # Iterate through all adjacent vertices of a vertex
+        # Parallel processing of adjacent vertices
+
+        mask = (
+                (vertices != u)
+                & ~in_mst
+                & (key[vertices] > _get_dist(samples, u, vertices))
+        )
+        key[mask] = _get_dist(samples, u, vertices[mask])
+        for v in vertices[mask]:
+            heapq.heappush(pq, (key[v], v))
+            parent[v] = u
+
+    return heap_seq
+
+
+@numba.jit(cache=True)
+def _get_dist(samples: np.ndarray, idx1: int, idx2: int) -> float:
+    diff = samples[idx1, :] - samples[idx2, :]
+    return np.sqrt(np.sum(np.square(diff)))
