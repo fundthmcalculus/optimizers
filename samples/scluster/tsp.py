@@ -80,7 +80,9 @@ elif optim == "priority-two-opt":
     topt_config = PriorityTwoOptTSPConfig(
         name="Priority 2-OPT TSP",
         back_to_start=True,
-        priority_depth=50
+        nearest_neighbors=50,
+        search_method="local",
+        priority_depth=10
     )
     topt_optimizer = PriorityTwoOptTSP(
         topt_config,
