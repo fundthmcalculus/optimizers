@@ -28,7 +28,11 @@ def _swap_segment(ij: int, jk: int, new_route: AI) -> AI:
         jk -= 1
     return new_route
 
-def _try_swap(network_routes, ij, ij_, jk, jk_, new_route):
+def _try_swap(network_routes: AF, ij: int, ij_: int, jk: int, jk_: int, new_route: AI) -> tuple[AI, bool]:
+    ij = ij % len(new_route)
+    jk = jk % len(new_route)
+    ij_ = ij_ % len(new_route)
+    jk_ = jk_ % len(new_route)
     no_moves = True
     d1 = (
             network_routes[new_route[ij], new_route[ij_]]
@@ -42,6 +46,22 @@ def _try_swap(network_routes, ij, ij_, jk, jk_, new_route):
         new_route = _swap_segment(ij, jk, new_route)
         no_moves = False
     return new_route, no_moves
+
+def _try_replace(network_routes: AF, ij: int, jk: int, new_route: AI, back_to_start: bool) -> tuple[AI, bool]:
+    d0 = check_path_distance(network_routes, new_route, back_to_start)
+    # Exchange cities ij and jk
+    temp = new_route[ij]
+    new_route[ij] = new_route[jk]
+    new_route[jk] = temp
+    d1 = check_path_distance(network_routes, new_route, back_to_start)
+    if d1 < d0:
+        return new_route, True
+    else:
+        # Revert the operation
+        temp = new_route[ij]
+        new_route[ij] = new_route[jk]
+        new_route[jk] = temp
+        return new_route, False
 
 
 class TwoOptTSP(TSPBase):
@@ -111,8 +131,6 @@ class TwoOptTSP(TSPBase):
 class PriorityTwoOptTSPConfig(TwoOptTSPConfig):
     priority_depth: int = 10
     """Use a priority queue to sort the `priority_depth` worst samples"""
-    search_method: Literal["local","bisect","random"] = "random"
-    """Which method to use to break up the existing longest-steps"""
 
 
 class PriorityTwoOptTSP(TwoOptTSP):
@@ -134,46 +152,30 @@ class PriorityTwoOptTSP(TwoOptTSP):
         history = [check_path_distance(self.network_routes, new_route, self.config.back_to_start)]
 
         # To get the worst edges, use the negative distance.
-        worst_edge_heap: list[tuple[float, tuple[int,int]]] = []
+        worst_edge_heap: list[tuple[float, int]] = []
         heapq.heapify(worst_edge_heap)
 
         # Convenience function to insert into the heap.
-        def insert_worst_edge(p0,p1):
+        def insert_worst_edge(_p):
             nonlocal worst_edge_heap
-            heapq.heappush(worst_edge_heap, (-self.network_routes[new_route[p0], new_route[p1]], (new_route[p0], new_route[p1])))
-            # Prune to size continuously.
-            if len(worst_edge_heap) > self.config.priority_depth:
-                # TODO - Confirm that this works as expected!
-                worst_edge_heap = worst_edge_heap[:self.config.priority_depth]
+            heapq.heappush(worst_edge_heap, (-self.network_routes[new_route[_p], new_route[_p+1]], _p))
 
         if self.config.back_to_start:
             # Manually insert the return-to-start here.
-            insert_worst_edge(-1, 0)
+            insert_worst_edge(-1)
         for ij in range(0, N - 2):
-            insert_worst_edge(ij, ij + 1)
+            insert_worst_edge(ij)
 
         # Chop to the N-smallest (most negative)
-        for _ in range(self.config.priority_depth):
-            cur_dist, cur_pts = heapq.heappop(worst_edge_heap)
-            p0 = cur_pts[0]
-            p1 = cur_pts[1]
-            if self.config.search_method == "local":
-                # TODO - Look right around the end point, take the actual shortest, not the first shortest.
-                for offset in range(-self.config.nearest_neighbors//2, self.config.nearest_neighbors//2):
-                    new_p1 = (p1 + offset) % N
-                    new_route, _no_moves = _try_swap(self.network_routes, p0, p1, p0, new_p1, new_route)
-                    if not _no_moves:
-                        break
-            elif self.config.search_method == "random":
-                # TODO - Randomly move p1 around the grid a few times and take the shortest vs the first shorter.
-                for _ in range(self.config.num_iterations):
-                    new_p1 = np.random.randint(0, N)
-                    new_route, _no_moves = _try_swap(self.network_routes, p0, p1, p0, new_p1, new_route)
-                    if not _no_moves:
-                        break
-            elif self.config.search_method == "bisect":
-                # TODO - Use bisection search to find the smallest total length to split p0 and p1.
-                pass
+        worst_edges = heapq.nsmallest(self.config.priority_depth, worst_edge_heap)
+        for ij in range(len(worst_edges)):
+            for jk in range(ij+1, len(worst_edges)):
+                p0 = worst_edges[ij][1]
+                p1 = worst_edges[jk][1]
+                # _p0 = p0+1
+                # _p1 = p1+1
+                # new_route, _ = _try_swap(self.network_routes, p0, _p0, p1, _p1, new_route)
+                new_route, _ = _try_replace(self.network_routes, p0, p1, new_route, self.config.back_to_start)
 
 
         history.append(

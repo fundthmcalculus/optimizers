@@ -11,8 +11,8 @@ from optimizers.combinatorial.aco import AntColonyTSP, AntColonyTSPConfig
 from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP, PriorityTwoOptTSPConfig, PriorityTwoOptTSP
 
 lines = []
-optim: Literal["aco", "two-opt", "priority-two-opt"] = "priority-two-opt"
-file_name = "berlin52"
+optim: Literal["aco", "two-opt", "priority-two-opt"] = "two-opt"
+file_name = "d1291"
 optimal_length = None
 with open(f"./{file_name}.txt") as f:
     lines = [l.strip() for l in f.readlines()]
@@ -67,7 +67,8 @@ elif optim == "two-opt":
     topt_config = TwoOptTSPConfig(
         name="ACO TSP",
         back_to_start=True,
-        nearest_neighbors=50
+        nearest_neighbors=50,
+        num_iterations=1
     )
     topt_optimizer = TwoOptTSP(
         topt_config,
@@ -79,9 +80,7 @@ elif optim == "priority-two-opt":
     topt_config = PriorityTwoOptTSPConfig(
         name="Priority 2-OPT TSP",
         back_to_start=True,
-        nearest_neighbors=50,
-        search_method="random",
-        priority_depth=10
+        priority_depth=50
     )
     topt_optimizer = PriorityTwoOptTSP(
         topt_config,
@@ -90,7 +89,7 @@ elif optim == "priority-two-opt":
         initial_value=total_distance,
     )
 else:
-    raise ValueError("optim must be aco or two-opt")
+    raise ValueError("optim must be aco, two-opt, or priority-two-opt")
 
 topt_result = topt_optimizer.solve()
 topt_time = time.time() - start_time
@@ -155,16 +154,16 @@ plt.legend()
 # plt.close()
 
 # Show both the VAT image and the ACO-TSP optimized image.
-fig = plt.figure(figsize=(4, 8))
-fig.subplots(2, 1)
-plt.subplot(2, 1, 1)
-plt.imshow(city_vat, cmap="viridis")
-plt.colorbar()
-plt.title(f"VAT-{file_name}")
-plt.subplot(2, 1, 2)
-plt.imshow(cities_dist[:, opt_city_sequence][opt_city_sequence, :], cmap="viridis")
-plt.colorbar()
-plt.title(f"Optimized VAT-{file_name}")
-# plt.savefig('vat_comparison2.eps', format='eps')
-# plt.close()
-plt.show()
+# fig = plt.figure(figsize=(4, 8))
+# fig.subplots(2, 1)
+# plt.subplot(2, 1, 1)
+# plt.imshow(city_vat, cmap="viridis")
+# plt.colorbar()
+# plt.title(f"VAT-{file_name}")
+# plt.subplot(2, 1, 2)
+# plt.imshow(cities_dist[:, opt_city_sequence][opt_city_sequence, :], cmap="viridis")
+# plt.colorbar()
+# plt.title(f"Optimized VAT-{file_name}")
+# # plt.savefig('vat_comparison2.eps', format='eps')
+# # plt.close()
+# plt.show()
