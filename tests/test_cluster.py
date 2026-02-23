@@ -1,7 +1,7 @@
 import time
 
 import numpy as np
-from cluster import compute_ordered_dis_njit_merge, vat_prim_mst_seq
+from cluster import compute_ordered_dis_njit_merge, vat_prim_mst_seq, compute_ivat
 from matplotlib import pyplot as plt
 
 from pyclustertend.visual_assessment_of_tendency import compute_ordered_dis_njit
@@ -42,7 +42,7 @@ def test_vat_scaling():
     merge_time: list[float] = []
     lib_time: list[float] = []
     o1 = 7
-    o2 = 12
+    o2 = 10
     n = 2 * (o2 - o1 + 1)
     for group_count in np.logspace(o1, o2, n, base=2, dtype="int"):
         city_count.append(group_count)
@@ -94,8 +94,8 @@ def test_vat_scaling():
     plt.ylabel("Time Scaling")
     plt.legend()
     plt.title("VAT Scaling Test")
-    plt.savefig('vat_scaling_comparison.eps', format='eps')
-    plt.close()
+    # plt.savefig('vat_scaling_comparison.eps', format='eps')
+    # plt.close()
 
     plt.figure()
     plt.loglog(city_count, merge_time, "o", label="Merge VAT")
@@ -104,8 +104,8 @@ def test_vat_scaling():
     plt.ylabel("Time (seconds)")
     plt.legend()
     plt.title("VAT Scaling Test")
-    plt.savefig('vat_scaling_time.eps', format='eps')
-    plt.close()
+    # plt.savefig('vat_scaling_time.eps', format='eps')
+    # plt.close()
 
     # Plot the results
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
@@ -119,9 +119,9 @@ def test_vat_scaling():
     plt.colorbar(im2, ax=ax2)
 
     plt.tight_layout()
-    plt.savefig('vat_comparison.eps', format='eps')
-    plt.close()
-
+    # plt.savefig('vat_comparison.eps', format='eps')
+    # plt.close()
+    plt.show()
 
 def test_merge_ivat():
     all_cities = circle_random_clusters(n_clusters=10, n_cities=1)
@@ -132,15 +132,15 @@ def test_merge_ivat():
     matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][
         rand_col_order, :
     ]
-    ivat_mat, vat_mat = compute_ivat_merge(matrix_of_pairwise_distance)
+    vat_mst, ivat_mst = compute_ivat(matrix_of_pairwise_distance)
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    im1 = ax1.imshow(vat_mat, cmap='viridis')
+    im1 = ax1.imshow(vat_mst, cmap='viridis')
     ax1.set_title('VAT Matrix')
     plt.colorbar(im1, ax=ax1)
 
-    im2 = ax2.imshow(ivat_mat, cmap='viridis')
+    im2 = ax2.imshow(ivat_mst, cmap='viridis')
     ax2.set_title('iVAT Matrix')
     plt.colorbar(im2, ax=ax2)
 

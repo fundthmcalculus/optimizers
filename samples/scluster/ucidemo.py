@@ -4,11 +4,10 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 from tqdm import tqdm
-
-from cluster import compute_ordered_dis_njit_merge
+from ucimlrepo import fetch_ucirepo
+from cluster import compute_ordered_dis_njit_merge, compute_ivat
 
 print("\n")
-from ucimlrepo import fetch_ucirepo
 
 
 def pairwise_distances2(data, dtype=np.float32) -> np.ndarray:
@@ -26,7 +25,7 @@ def to_np_array(data: pd.DataFrame) -> np.ndarray:
 # 59 is letter recognition
 # 827 is sepsis survival (allocates 80+ GB RAM)
 # 148 is shuttle stat log (allocates 50 GB RAM)
-dataset_id = 827
+dataset_id = 59
 letter_recognition = fetch_ucirepo(id=dataset_id)
 
 # data (as pandas dataframes)

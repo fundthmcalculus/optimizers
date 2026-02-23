@@ -3,6 +3,21 @@ import numba
 import numpy as np
 
 
+def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> np.ndarray:
+    d_star, p_lst = compute_ordered_dis_njit_merge(matrix_of_pairwise_distance, False)
+    N = d_star.shape[0]
+    # TODO - In-place modification?
+    d_p_star = np.zeros(d_star.shape, dtype=d_star.dtype)
+    argmin_seq = []
+    for r in range(1, N):
+        jj = np.argmin(d_star[r, :r])
+        argmin_seq.append(jj)
+        for c in range(r):
+            d_p_star[c,r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c]) if jj != c else d_star[r, c]
+
+    return d_star, d_p_star
+
+
 @numba.jit(cache=True)
 def compute_ordered_dis_njit_merge(
         matrix_of_pairwise_distance: np.ndarray, inplace: bool
