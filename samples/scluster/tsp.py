@@ -5,13 +5,12 @@ import numpy as np
 from sklearn.metrics import pairwise_distances
 import matplotlib.pyplot as plt
 
-from cluster import compute_ordered_dis_njit_merge
+from cluster import compute_ordered_dis_njit_merge, compute_ivat
 from optimizers.combinatorial.aco import AntColonyTSP, AntColonyTSPConfig
 from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
 
-lines = []
 optim = "two-opt" # "aco"
-file_name = "rl5915"
+file_name = "berlin52" # "att532"
 optimal_length = None
 with open(f"./{file_name}.txt") as f:
     lines = [l.strip() for l in f.readlines()]
@@ -35,7 +34,7 @@ cities_dist = pairwise_distances(cities)
 # Compute the VAT order, determine how good a result we get in what time.
 print("Solving VAT order for TSP")
 t0 = time.time()
-city_vat, city_sequence = compute_ordered_dis_njit_merge(cities_dist)
+d_p_star, d_star, argmin_seq, city_sequence = compute_ivat(cities_dist)
 t1 = time.time()
 
 # Since this is a loop, the start location really doesn't matter!
@@ -66,7 +65,6 @@ elif optim == "two-opt":
     topt_config = TwoOptTSPConfig(
         name="ACO TSP",
         back_to_start=True,
-        nearest_neighbors=50
     )
     topt_optimizer = TwoOptTSP(
         topt_config,
@@ -140,16 +138,24 @@ plt.legend()
 # plt.close()
 
 # Show both the VAT image and the ACO-TSP optimized image.
-fig = plt.figure(figsize=(4, 8))
-fig.subplots(2, 1)
-plt.subplot(2, 1, 1)
-plt.imshow(city_vat, cmap="viridis")
+fig = plt.figure(figsize=(8, 8))
+fig.subplots(2, 2)
+plt.subplot(2, 2, 1)
+plt.imshow(d_star, cmap="viridis")
 plt.colorbar()
 plt.title(f"VAT-{file_name}")
-plt.subplot(2, 1, 2)
-plt.imshow(cities_dist[:, opt_city_sequence][opt_city_sequence, :], cmap="viridis")
+plt.subplot(2, 2, 2)
+plt.imshow(d_star[:, opt_city_sequence][opt_city_sequence, :], cmap="viridis")
 plt.colorbar()
 plt.title(f"Optimized VAT-{file_name}")
+plt.subplot(2, 2, 3)
+plt.imshow(d_p_star, cmap="viridis")
+plt.colorbar()
+plt.title(f"IVAT-{file_name}")
+plt.subplot(2, 2, 4)
+plt.imshow(d_p_star[:, opt_city_sequence][opt_city_sequence, :], cmap="viridis")
+plt.colorbar()
+plt.title(f"Optimized IVAT-{file_name}")
 # plt.savefig('vat_comparison2.eps', format='eps')
 # plt.close()
 plt.show()

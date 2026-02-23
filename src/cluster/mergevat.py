@@ -4,7 +4,7 @@ import numpy as np
 
 
 def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> np.ndarray:
-    d_star, p_lst = compute_ordered_dis_njit_merge(matrix_of_pairwise_distance, False)
+    d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(matrix_of_pairwise_distance, False)
     N = d_star.shape[0]
     # TODO - In-place modification?
     d_p_star = np.zeros(d_star.shape, dtype=d_star.dtype)
@@ -12,22 +12,23 @@ def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> np.ndarray:
     for r in range(1, N):
         jj = np.argmin(d_star[r, :r])
         argmin_seq.append(jj)
+        jj = as_seq[r-1]
         for c in range(r):
             d_p_star[c,r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c]) if jj != c else d_star[r, c]
 
-    return d_star, d_p_star
+    return d_p_star, d_star, as_seq, p_seq
 
 
-@numba.jit(cache=True)
+# @numba.jit(cache=True)
 def compute_ordered_dis_njit_merge(
         matrix_of_pairwise_distance: np.ndarray, inplace: bool
-) -> tuple[np.ndarray, list[int]]:
+) -> tuple[np.ndarray, list[int], list[int]]:
     N = matrix_of_pairwise_distance.shape[0]
     if inplace:
         ordered_matrix = matrix_of_pairwise_distance
     else:
         ordered_matrix: np.ndarray = np.zeros(matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype)
-    p: list[int] = vat_prim_mst(matrix_of_pairwise_distance)
+    p, q = vat_prim_mst(matrix_of_pairwise_distance)
     # Step 3 - since this is symmetric, we only have to do half
     n_bit_mask = int(np.ceil(N / 8))
     # Boolean is stored as a byte, so this is smaller
@@ -59,7 +60,7 @@ def compute_ordered_dis_njit_merge(
                 _set_bit(visited, c0, r0)
 
     # Step 4 - since this is symmetric, we only have to do half
-    return ordered_matrix, p
+    return ordered_matrix, p, q
 
 
 @numba.jit(cache=True)
@@ -72,7 +73,7 @@ def _get_bit(bitmask, row, col):
     return (bitmask[row, col // 8] >> (col % 8)) & 1
 
 
-@numba.jit(cache=True)
+# @numba.jit(cache=True)
 def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
     N = len(adj)
 
@@ -91,14 +92,18 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
     in_mst = np.full(N, False, dtype=np.bool_)
 
     # Insert the source itself into the priority queue and initialize its key as 0
-    pq: list[tuple[float, int]] = [
-        (src_key, src)
+    pq: list[tuple[float, int, int]] = [
+        (src_key, src, 0)
     ]  # Priority queue to store vertices that are being processed
     key[src] = src_key
 
     # The final sequence of vertices in MST
     heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
     heap_seq_idx = 0
+
+    # Parent sequences of vertices in MST (for iVAT)
+    parent_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    parent_seq_idx = 0
 
     # Preallocated
     vertices = np.arange(N)
@@ -108,7 +113,7 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
         # The first vertex in the pair is the minimum key vertex
         # Extract it from the priority queue
         # The vertex label is stored in the second of the pair
-        u = heapq.heappop(pq)[1]
+        w, u, v = heapq.heappop(pq)
 
         # Different key values for the same vertex may exist in the priority queue.
         # The one with the least key value is always processed first.
@@ -120,15 +125,18 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
         heap_seq[heap_seq_idx] = u
         heap_seq_idx += 1
 
+        parent_seq[parent_seq_idx] = v
+        parent_seq_idx += 1
+
         # Iterate through all adjacent vertices of a vertex
         # Parallel processing of adjacent vertices
         mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
         key[mask] = adj[u, mask]
         for v in vertices[mask]:
-            heapq.heappush(pq, (key[v], v))
+            heapq.heappush(pq, (key[v], v, heap_seq_idx))
             parent[v] = u
 
-    return heap_seq
+    return heap_seq, parent_seq
 
 
 @numba.jit(cache=True)

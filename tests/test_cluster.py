@@ -132,7 +132,7 @@ def test_merge_ivat():
     matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][
         rand_col_order, :
     ]
-    vat_mst, ivat_mst = compute_ivat(matrix_of_pairwise_distance)
+    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
@@ -145,4 +145,19 @@ def test_merge_ivat():
     plt.colorbar(im2, ax=ax2)
 
     plt.tight_layout()
+    plt.show()
+
+def test_show_fibb_bin_heap():
+    v = np.logspace(1,4)
+    e = (v**2-v)//2
+    arr_v = v**2
+    bin_h_v = e*np.log2(v)
+    fibb_h_v = e + v*np.log2(v)
+    plt.plot(v, arr_v, label='Array')
+    plt.plot(v, bin_h_v, label='Binary Heap')
+    plt.plot(v, fibb_h_v, label='Fibonacci Heap')
+    plt.xlabel('Number of Elements')
+    plt.ylabel('Time Complexity')
+    plt.title('Heap Time Complexity Comparison')
+    plt.legend()
     plt.show()
