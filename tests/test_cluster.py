@@ -1,7 +1,7 @@
 import time
 
 import numpy as np
-from cluster import compute_ordered_dis_njit_merge, vat_prim_mst_seq
+from cluster import compute_ordered_dis_njit_merge, vat_prim_mst_seq, fcm
 from matplotlib import pyplot as plt
 
 from pyclustertend.visual_assessment_of_tendency import compute_ordered_dis_njit
@@ -187,4 +187,39 @@ def test_merge_ivat():
     plt.colorbar(im2, ax=ax2)
 
     plt.tight_layout()
+    plt.show()
+
+def test_fuzzy_c_means():
+    all_cities = circle_random_clusters(n_clusters=10, n_cities=4)
+    meth_c, w_c = fcm.fuzzy_c_means(all_cities,  6, 2)
+
+    # Create a color map for clusters
+    colors = plt.cm.rainbow(np.linspace(0, 1, meth_c.shape[0]))
+
+    # Create plot
+    fig, ax = plt.subplots(figsize=(10, 8))
+
+    # Plot each point with blended color based on membership weights
+    for i in range(all_cities.shape[0]):
+        # Blend colors based on membership weights
+        blended_color = np.zeros(4)  # RGBA
+        for j in range(meth_c.shape[0]):
+            blended_color += w_c[i, j] * colors[j]
+
+        blended_color /= blended_color.max()
+
+        ax.scatter(all_cities[i, 0], all_cities[i, 1],
+                   c=[blended_color], s=100, alpha=0.7, edgecolors='black', linewidth=0.5)
+
+    # Plot cluster centers
+    ax.scatter(meth_c[:, 0], meth_c[:, 1],
+               c='black', s=300, marker='X', edgecolors='white', linewidth=2,
+               label='Cluster Centers')
+
+    ax.set_title('Fuzzy C-Means Clustering with Membership-based Colors')
+    ax.set_xlabel('X Coordinate')
+    ax.set_ylabel('Y Coordinate')
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig('fuzzy_c_means_membership.eps', format='eps')
     plt.show()

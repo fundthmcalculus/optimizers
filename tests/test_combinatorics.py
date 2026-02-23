@@ -1,17 +1,12 @@
-import os.path
-from typing import List
-
 import numpy as np
-import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
-import numpy as np
 
-from optimizers.combinatorial.ga import GeneticAlgorithmTSPConfig, GeneticAlgorithmTSP
-from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.aco import (
     AntColonyTSPConfig,
     AntColonyTSP,
 )
+from optimizers.combinatorial.ga import GeneticAlgorithmTSPConfig, GeneticAlgorithmTSP
+from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.strategy import (
     NearestNeighborTSPConfig,
     NearestNeighborTSP,
@@ -21,7 +16,7 @@ from optimizers.combinatorial.strategy import (
     ConvexHullTSPConfig,
     ConvexHullTSP,
 )
-from optimizers.core.types import AF, AI
+from optimizers.core.types import AF
 from optimizers.plot import plot_convergence, plot_cities_and_route
 
 N_CITIES_CLUSTER = 20
@@ -31,7 +26,7 @@ N_ANTS = 10 * N_CITIES_CLUSTER
 N_GENERATIONS = 5 * N_CLUSTERS
 
 CLUSTER_DIAMETER = 3
-CLUSTER_SPACING = 1 * CLUSTER_DIAMETER
+CLUSTER_SPACING = 4 * CLUSTER_DIAMETER
 
 HALF_CIRCLE = False
 
