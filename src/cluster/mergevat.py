@@ -79,8 +79,9 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
 
     # Find the column of the maximum value.
     max_adj = np.argmax(adj)
-    src = max_adj // N
-    src_key = np.max(adj)
+    src_i = max_adj // N
+    src_j = max_adj % N
+    src_key = adj[src_i, src_j]
 
     # Create a list for keys and initialize all keys as infinite (INF)
     key: np.ndarray = np.full(N, float("inf"), dtype=adj.dtype)
@@ -93,9 +94,9 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
 
     # Insert the source itself into the priority queue and initialize its key as 0
     pq: list[tuple[float, int, int]] = [
-        (src_key, src, 0)
+        (src_key, src_j, src_i)
     ]  # Priority queue to store vertices that are being processed
-    key[src] = src_key
+    key[src_j] = src_key
 
     # The final sequence of vertices in MST
     heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)

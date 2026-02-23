@@ -10,7 +10,7 @@ from optimizers.combinatorial.aco import AntColonyTSP, AntColonyTSPConfig
 from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
 
 optim = "two-opt" # "aco"
-file_name = "berlin52" # "att532"
+file_name = "burma14" # "att532"
 optimal_length = None
 with open(f"./{file_name}.txt") as f:
     lines = [l.strip() for l in f.readlines()]
@@ -34,7 +34,7 @@ cities_dist = pairwise_distances(cities)
 # Compute the VAT order, determine how good a result we get in what time.
 print("Solving VAT order for TSP")
 t0 = time.time()
-d_p_star, d_star, argmin_seq, city_sequence = compute_ivat(cities_dist)
+d_p_star, d_star, ivat_seq, city_sequence = compute_ivat(cities_dist)
 t1 = time.time()
 
 # Since this is a loop, the start location really doesn't matter!
