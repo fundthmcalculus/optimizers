@@ -47,9 +47,11 @@ class TwoOptTSP(TSPBase):
     def solve(self) -> CombinatoricsResult:
         N, new_route = self.setup_local_search()
         no_moves = True
-        for cur_iter in range(self.config.num_iterations):
+        cur_iter = 0
+        while cur_iter < self.config.num_iterations or self.config.num_iterations == -1:
+            cur_iter += 1
             no_moves = True
-            for ij in range(0, N - 2):
+            for ij in range(-1 if self.config.back_to_start else 0, N - 2):
                 k_nn = N-1
                 if self.config.nearest_neighbors > 0:
                     k_nn = min(k_nn, ij + self.config.nearest_neighbors)
@@ -65,7 +67,6 @@ class TwoOptTSP(TSPBase):
                     if d1 > d2:
                         new_route = _swap_segment(ij, jk, new_route)
                         no_moves = False
-
             if no_moves:
                 break
 
@@ -94,8 +95,6 @@ class TwoOptTSP(TSPBase):
             self.initial_value = solution.optimal_value
         new_route = self.initial_route.copy()
         N = self.network_routes.shape[0]
-        if self.config.num_iterations == -1:
-            self.config.num_iterations = N
         return N, new_route
 
 
