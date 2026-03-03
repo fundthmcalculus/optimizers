@@ -19,7 +19,7 @@ def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> np.ndarray:
     return d_p_star, d_star, as_seq, p_seq
 
 
-# @numba.jit(cache=True)
+@numba.jit(cache=True)
 def compute_ordered_dis_njit_merge(
         matrix_of_pairwise_distance: np.ndarray, inplace: bool
 ) -> tuple[np.ndarray, list[int], list[int]]:
@@ -73,7 +73,7 @@ def _get_bit(bitmask, row, col):
     return (bitmask[row, col // 8] >> (col % 8)) & 1
 
 
-# @numba.jit(cache=True)
+@numba.jit(cache=True)
 def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
     N = len(adj)
 
