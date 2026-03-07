@@ -1,8 +1,3 @@
-import os.path
-from typing import List
-
-import numpy as np
-import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
 import numpy as np
 
@@ -31,7 +26,7 @@ N_ANTS = 10 * N_CITIES_CLUSTER
 N_GENERATIONS = 5 * N_CLUSTERS
 
 CLUSTER_DIAMETER = 3
-CLUSTER_SPACING = 1 * CLUSTER_DIAMETER
+CLUSTER_SPACING = 3 * CLUSTER_DIAMETER
 
 HALF_CIRCLE = False
 

@@ -124,25 +124,35 @@ def test_vat_scaling():
     plt.show()
 
 def test_merge_ivat():
-    all_cities = circle_random_clusters(n_clusters=10, n_cities=1)
+    all_cities = circle_random_clusters(n_clusters=5, n_cities=4)
+    # Add a tiny scramble to all positions to reduce chances of symmetry
+    all_cities += np.random.randn(*all_cities.shape) * 0.01
+
+    # Scramble the order of the cities
+    scramble_order = np.random.permutation(len(all_cities))
+    all_cities = all_cities[scramble_order]
+
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
-    # Scramble the order to ensure we sort it!
-    cols = np.arange(len(all_cities), dtype="int")
-    rand_col_order = np.random.permutation(cols)
-    matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][
-        rand_col_order, :
-    ]
-    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    merge_ivat_mst, ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
-    im1 = ax1.imshow(vat_mst, cmap='viridis')
-    ax1.set_title('VAT Matrix')
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+
+    im1 = ax1.imshow(matrix_of_pairwise_distance, cmap='viridis')
+    ax1.set_title('OG Matrix')
     plt.colorbar(im1, ax=ax1)
 
-    im2 = ax2.imshow(ivat_mst, cmap='viridis')
-    ax2.set_title('iVAT Matrix')
+    im2 = ax2.imshow(vat_mst, cmap='viridis')
+    ax2.set_title('VAT Matrix')
     plt.colorbar(im2, ax=ax2)
+
+    im3 = ax3.imshow(ivat_mst, cmap='viridis')
+    ax3.set_title('IVAT Matrix')
+    plt.colorbar(im3, ax=ax3)
+
+    im4 = ax4.imshow(merge_ivat_mst, cmap='viridis')
+    ax4.set_title('Merge IVAT Matrix')
+    plt.colorbar(im4, ax=ax4)
 
     plt.tight_layout()
     plt.show()
