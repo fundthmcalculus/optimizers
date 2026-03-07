@@ -20,7 +20,8 @@ dependencies = [
     "kmodes>=0.12.2",
     "scikit-learn>=1.7.2",
     "scipy",
-    "pandas>=2.0.0"
+    "pandas>=2.0.0",
+    "numba"
 ]
 
 [project.optional-dependencies]
@@ -32,7 +33,6 @@ dev = [
     "Flake8-pyproject",
     "optuna>=4.3.0",
     "pyclustertend",
-    "numba"
 ]
 
 [tool.setuptools]

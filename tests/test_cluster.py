@@ -1,55 +1,13 @@
 import time
 
 import numpy as np
-from cluster import compute_ordered_dis_njit_merge, vat_prim_mst_seq, fcm
+from cluster import compute_ordered_dis_njit_merge, vat_prim_mst_seq, compute_ivat, fcm
 from matplotlib import pyplot as plt
 
 from pyclustertend.visual_assessment_of_tendency import compute_ordered_dis_njit
 from sklearn.metrics import pairwise_distances
-from PIL import Image
 
 from test_combinatorics import circle_random_clusters
-
-
-def test_cluster_uci_letter_reco():
-    print("\n")
-    from ucimlrepo import fetch_ucirepo
-
-    # fetch dataset
-    # 59 is letter recognition
-    # 827 is sepsis survival (allocates 80+ GB RAM)
-    # 148 is shuttle stat log (allocates 50 GB RAM)
-    letter_recognition = fetch_ucirepo(id=148)
-
-    # data (as pandas dataframes)
-    X = letter_recognition.data.features
-    y = letter_recognition.data.targets
-
-    # metadata
-    print(f"Metadata: {letter_recognition.metadata}")
-
-    # variable information
-    print(f"Variable Information: {letter_recognition.variables}")
-
-    # Compute the pairwise distances
-    matrix_of_pairwise_distance = np.log(pairwise_distances(X))
-    matrix_of_pairwise_distance = (
-        matrix_of_pairwise_distance / matrix_of_pairwise_distance.max()
-    )
-    print(f"Pairwise distance matrix shape: {matrix_of_pairwise_distance.shape}")
-    t0 = time.time()
-    ordered_matrix = compute_ordered_dis_njit(matrix_of_pairwise_distance)
-    # ordered_matrix, path_merge = compute_ordered_dis_njit_merge(
-    #     matrix_of_pairwise_distance, inplace=True
-    # )
-    t1 = time.time()
-
-    print(f"Elapsed time for {len(X)} data points: {t1-t0:.02f}")
-
-    # Save the ordered matrix as an image
-    # img_array = (ordered_matrix * 255).astype(np.uint8)
-    # img = Image.fromarray(img_array)
-    # img.save('ordered_matrix.png')
 
 
 def test_cluster_sequencing():
@@ -84,7 +42,7 @@ def test_vat_scaling():
     merge_time: list[float] = []
     lib_time: list[float] = []
     o1 = 7
-    o2 = 12
+    o2 = 10
     n = 2 * (o2 - o1 + 1)
     for group_count in np.logspace(o1, o2, n, base=2, dtype="int"):
         city_count.append(group_count)
@@ -136,8 +94,8 @@ def test_vat_scaling():
     plt.ylabel("Time Scaling")
     plt.legend()
     plt.title("VAT Scaling Test")
-    plt.savefig('vat_scaling_comparison.eps', format='eps')
-    plt.close()
+    # plt.savefig('vat_scaling_comparison.eps', format='eps')
+    # plt.close()
 
     plt.figure()
     plt.loglog(city_count, merge_time, "o", label="Merge VAT")
@@ -146,8 +104,8 @@ def test_vat_scaling():
     plt.ylabel("Time (seconds)")
     plt.legend()
     plt.title("VAT Scaling Test")
-    plt.savefig('vat_scaling_time.eps', format='eps')
-    plt.close()
+    # plt.savefig('vat_scaling_time.eps', format='eps')
+    # plt.close()
 
     # Plot the results
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
@@ -161,9 +119,9 @@ def test_vat_scaling():
     plt.colorbar(im2, ax=ax2)
 
     plt.tight_layout()
-    plt.savefig('vat_comparison.eps', format='eps')
-    plt.close()
-
+    # plt.savefig('vat_comparison.eps', format='eps')
+    # plt.close()
+    plt.show()
 
 def test_merge_ivat():
     all_cities = circle_random_clusters(n_clusters=10, n_cities=1)
@@ -174,19 +132,34 @@ def test_merge_ivat():
     matrix_of_pairwise_distance = matrix_of_pairwise_distance[:, rand_col_order][
         rand_col_order, :
     ]
-    ivat_mat, vat_mat = compute_ivat_merge(matrix_of_pairwise_distance)
+    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    im1 = ax1.imshow(vat_mat, cmap='viridis')
+    im1 = ax1.imshow(vat_mst, cmap='viridis')
     ax1.set_title('VAT Matrix')
     plt.colorbar(im1, ax=ax1)
 
-    im2 = ax2.imshow(ivat_mat, cmap='viridis')
+    im2 = ax2.imshow(ivat_mst, cmap='viridis')
     ax2.set_title('iVAT Matrix')
     plt.colorbar(im2, ax=ax2)
 
     plt.tight_layout()
+    plt.show()
+
+def test_show_fibb_bin_heap():
+    v = np.logspace(1,4)
+    e = (v**2-v)//2
+    arr_v = v**2
+    bin_h_v = e*np.log2(v)
+    fibb_h_v = e + v*np.log2(v)
+    plt.plot(v, arr_v, label='Array')
+    plt.plot(v, bin_h_v, label='Binary Heap')
+    plt.plot(v, fibb_h_v, label='Fibonacci Heap')
+    plt.xlabel('Number of Elements')
+    plt.ylabel('Time Complexity')
+    plt.title('Heap Time Complexity Comparison')
+    plt.legend()
     plt.show()
 
 def test_fuzzy_c_means():
