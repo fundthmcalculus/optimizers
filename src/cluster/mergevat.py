@@ -3,7 +3,7 @@ import numba
 import numpy as np
 
 
-def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> np.ndarray:
+def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(matrix_of_pairwise_distance, False)
     N = d_star.shape[0]
     # TODO - In-place modification?
@@ -12,11 +12,11 @@ def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> np.ndarray:
     for r in range(1, N):
         jj = np.argmin(d_star[r, :r])
         argmin_seq.append(jj)
-        jj = as_seq[r-1]
+        # jj = as_seq[r-1]
         for c in range(r):
             d_p_star[c,r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c]) if jj != c else d_star[r, c]
 
-    return d_p_star, d_star, as_seq, p_seq
+    return d_p_star, d_star, argmin_seq, p_seq
 
 
 @numba.jit(cache=True)

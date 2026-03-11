@@ -134,6 +134,10 @@ def test_merge_ivat():
     ]
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
+    plot_vat_ivat(ivat_mst, vat_mst)
+
+
+def plot_vat_ivat(ivat_mst, vat_mst):
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
     im1 = ax1.imshow(vat_mst, cmap='viridis')
@@ -146,6 +150,7 @@ def test_merge_ivat():
 
     plt.tight_layout()
     plt.show()
+
 
 def test_show_fibb_bin_heap():
     v = np.logspace(1,4)
@@ -164,13 +169,51 @@ def test_show_fibb_bin_heap():
 
 def test_fuzzy_c_means():
     all_cities = circle_random_clusters(n_clusters=10, n_cities=4)
+    matrix_of_pairwise_distance = pairwise_distances(all_cities)
     meth_c, w_c = fcm.fuzzy_c_means(all_cities,  6, 2)
+
+    # Compute the IVAT
+    ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
+    # Plot it.
+    plot_vat_ivat(ivat_mst, vat_mst)
+    # Look down the off-by-1 diagonal and count the number of substantial changes.
+    diagonal_values = np.diag(ivat_mst, k=1)
+    # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
+    diagonal_values = np.concatenate([np.array([diagonal_values[0]]), diagonal_values], axis=0)
+    # Expand this to the original size for convenience.
+    plt.figure()
+    plt.plot(diagonal_values, marker='o')
+    plt.title('Off-by-One Diagonal of iVAT Matrix')
+    plt.xlabel('Index')
+    plt.ylabel('Distance Value')
+    plt.grid(True)
+
+    # Count abrupt size changes using a basic stats test
+    # TODO - Use something other than std-dev, maybe a median metric because frequency vs amount?
+    mean_val = np.mean(diagonal_values)
+    threshold = mean_val + np.std(diagonal_values) * 1
+    abrupt_change_indices = np.where(diagonal_values > threshold)[0]
+    plt.axhline(y=threshold, color='r', linestyle='--', label=f'Threshold: {threshold:.2f}')
+    plt.text(0.02, 0.98, f'Abrupt changes: {len(abrupt_change_indices)}, threshold: {threshold:.2f}',
+             transform=plt.gca().transAxes, verticalalignment='top',
+             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    
+    plt.show()
+
+    # Use each section as a cluster endpoint, inclusive.
+    cluster_groups = np.concatenate([np.array([0]), abrupt_change_indices, np.array([-1])])
+    cluster_city_ids = []
+    for idx in range(0,len(cluster_groups)-1):
+        cg_start = cluster_groups[idx]
+        cg_end = cluster_groups[idx+1]
+        # Use the VAT order to pick out the cities in each cluster
+        cluster_city_ids.append(vat_order[cg_start:cg_end+1])
 
     # Create a color map for clusters
     colors = plt.cm.rainbow(np.linspace(0, 1, meth_c.shape[0]))
 
     # Create plot
-    fig, ax = plt.subplots(figsize=(10, 8))
+    fig, ax = plt.subplots()
 
     # Plot each point with blended color based on membership weights
     for i in range(all_cities.shape[0]):
@@ -182,17 +225,26 @@ def test_fuzzy_c_means():
         blended_color /= blended_color.max()
 
         ax.scatter(all_cities[i, 0], all_cities[i, 1],
-                   c=[blended_color], s=100, alpha=0.7, edgecolors='black', linewidth=0.5)
+                   c=[blended_color], s=50, alpha=0.7, edgecolors='black', linewidth=0.5)
 
     # Plot cluster centers
     ax.scatter(meth_c[:, 0], meth_c[:, 1],
                c='black', s=300, marker='X', edgecolors='white', linewidth=2,
                label='Cluster Centers')
 
+
+    # Plot cluster city IDs with "*" markers
+    for idx, cluster_ids in enumerate(cluster_city_ids):
+        cluster_points = all_cities[cluster_ids]
+        cluster_color = colors[idx % len(colors)]
+        ax.scatter(cluster_points[:, 0], cluster_points[:, 1],
+                   marker='*', s=200, edgecolors=cluster_color, linewidths=2,
+                   facecolors='none')
+
     ax.set_title('Fuzzy C-Means Clustering with Membership-based Colors')
     ax.set_xlabel('X Coordinate')
     ax.set_ylabel('Y Coordinate')
     ax.legend()
     plt.tight_layout()
-    plt.savefig('fuzzy_c_means_membership.eps', format='eps')
+    plt.savefig('fuzzy_c_means_membership.eps', format='eps', bbox_inches='tight')
     plt.show()
