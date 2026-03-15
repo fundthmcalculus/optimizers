@@ -57,7 +57,7 @@ def test_vat_scaling():
         ]
         # Cluster using our VAT
         t0 = time.time()
-        ordered_matrix2, path_merge = compute_ordered_dis_njit_merge(
+        ordered_matrix2, path_merge, path_ivat = compute_ordered_dis_njit_merge(
             matrix_of_pairwise_distance, inplace=False
         )
         t1 = time.time()
