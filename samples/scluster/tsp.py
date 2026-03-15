@@ -4,8 +4,9 @@ import time
 import numpy as np
 from sklearn.metrics import pairwise_distances
 import matplotlib.pyplot as plt
+import networkx as nx
 
-from cluster import compute_ordered_dis_njit_merge, compute_ivat
+from cluster import compute_ivat
 from optimizers.combinatorial.aco import AntColonyTSP, AntColonyTSPConfig
 from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
 
@@ -31,6 +32,24 @@ print(f"Solving TSP for {len(lines)} nodes")
 cities = np.array([[float(s) for s in l] for l in lines])
 cities_dist = pairwise_distances(cities)
 
+
+def calculate_tour_length(city_seq, dist_matrix):
+    """Calculate total tour length for a given city sequence."""
+    total_dist = 0
+    for ij in range(len(city_seq)):
+        total_dist += dist_matrix[city_seq[ij - 1], city_seq[ij]]
+    return total_dist
+
+
+# Create normal sequential order
+normal_city_sequence = np.arange(len(cities))
+t_normal_start = time.time()
+normal_distance = calculate_tour_length(normal_city_sequence, cities_dist)
+t_normal_end = time.time()
+print(f"Normal sequential order: {normal_city_sequence}")
+print(f"Total time: {t_normal_end - t_normal_start}")
+print(f"Total distance: {normal_distance:.0f}")
+
 # Compute the VAT order, determine how good a result we get in what time.
 print("Solving VAT order for TSP")
 t0 = time.time()
@@ -38,14 +57,62 @@ d_p_star, d_star, ivat_seq, city_sequence = compute_ivat(cities_dist)
 t1 = time.time()
 
 # Since this is a loop, the start location really doesn't matter!
-total_distance = 0
-for ij, city in enumerate(city_sequence):
-    # Initial round will close the loop (-1 -> 0)
-    total_distance += cities_dist[city_sequence[ij - 1], city_sequence[ij]]
+total_distance = calculate_tour_length(city_sequence, cities_dist)
 print(f"VAT order: {city_sequence}")
 print(f"Total time: {t1-t0}")
 print(f"Total distance: {total_distance:.0f}")
 
+loops = [normal_city_sequence]
+visited_cities = [False]*len(cities)
+for city_idx,city in enumerate(city_sequence):
+    c0 = normal_city_sequence[city_idx]
+    if visited_cities[c0]:
+        continue
+    c1 = c2 = city_sequence[city_idx]
+    cur_loop = [c0]
+    visited_cities[c0] = True
+    while c2 != c0:
+        c2 = city_sequence[c1]
+        visited_cities[c1] = True
+        cur_loop.append(c2)
+        c1 = c2
+    loops.append(cur_loop[:-1])
+
+print(f"Permuted Loops:\n{loops}")
+print(f"Total loops: {len(loops)}")
+
+# Visualize loops as directed graphs
+num_loops = len(loops)
+cols = min(2, num_loops)
+rows = (num_loops + cols - 1) // cols
+fig, axes = plt.subplots(rows, cols, figsize=(3 * cols, 3 * rows))
+if num_loops == 1:
+    axes = np.array([axes])
+axes = axes.flatten() if num_loops > 1 else axes
+
+for idx, loop in enumerate(loops):
+    G = nx.DiGraph()
+    # Add edges for the loop
+    for i in range(len(loop)):
+        G.add_edge(loop[i], loop[(i + 1) % len(loop)])
+
+    ax = axes[idx]
+    pos = nx.circular_layout(G)
+    nx.draw(G, pos, ax=ax, with_labels=True, node_color='lightblue',
+            node_size=500, font_size=10, font_weight='bold',
+            arrows=True, arrowsize=20, edge_color='gray',
+            connectionstyle='arc3,rad=0.1')
+    if idx > 0:
+        ax.set_title(f'Loop {idx} (size={len(loop)})')
+    else:
+        ax.set_title(f'Original Loop (size={len(loop)})')
+
+# Hide unused subplots
+for idx in range(num_loops, len(axes)):
+    axes[idx].axis('off')
+
+plt.tight_layout()
+plt.show()
 
 # city_sequence = np.append(city_sequence, city_sequence[0])
 start_time = time.time()
@@ -116,6 +183,8 @@ def get_plot_seq(city_seq):
 
 
 # Plot the route
+plot_x, plot_y = get_plot_seq(normal_city_sequence)
+plt.plot(plot_x, plot_y, "g-", label="Sequential-TSP", alpha=0.5)
 plot_x, plot_y = get_plot_seq(city_sequence)
 plt.plot(plot_x, plot_y, "b-", label="VAT-TSP")
 plot_x, plot_y = get_plot_seq(opt_city_sequence)
@@ -123,9 +192,11 @@ plt.plot(plot_x, plot_y, "r-", label="Optimized-TSP")
 
 plt.title(
     f"TSP Route through {file_name} Cities:\n"
+    f"$L_{{Sequential}}$={normal_distance:.0f}\n"
     f"$L_{{VAT}}$={total_distance:.0f}\n"
     f"$L_{{2-OPT}}$={topt_result.optimal_value:.0f}\n"
     f"$L_{{optimal}}$={optimal_length}\n"
+    f"$T_{{Sequential}}$={t_normal_end - t_normal_start:.02f}s\n"
     f"$T_{{VAT}}$={t1-t0:.02f}s\n"
     f"$T_{{2-OPT}}$={topt_time:.02f}s"
 )
