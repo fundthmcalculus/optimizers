@@ -40,8 +40,10 @@ def random_cities(center_x, center_y, n_cities: int=-1, cluster_diameter: int = 
     # Randomly distribute cities in a uniform circle?
     theta = np.linspace(0, 2 * np.pi, n_cities + 1, dtype=np.float32)
     theta = theta[:-1]
-    city_x = np.cos(theta) * cluster_diameter / 2.0 + center_x
-    city_y = np.sin(theta) * cluster_diameter / 2.0 + center_y
+    # Add slight random scramble to locations
+    scramble = np.random.uniform(-cluster_diameter * 0.1, cluster_diameter * 0.1, size=(n_cities, 2))
+    city_x = np.cos(theta) * cluster_diameter / 2.0 + center_x + scramble[:, 0]
+    city_y = np.sin(theta) * cluster_diameter / 2.0 + center_y + scramble[:, 1]
     return np.c_[city_x, city_y]
 
 
