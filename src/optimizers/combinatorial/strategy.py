@@ -52,7 +52,7 @@ class TwoOptTSP(TSPBase):
             cur_iter += 1
             no_moves = True
             for ij in range(-1 if self.config.back_to_start else 0, N - 2):
-                k_nn = N-1
+                k_nn = N - 1
                 if self.config.nearest_neighbors > 0:
                     k_nn = min(k_nn, ij + self.config.nearest_neighbors)
                 for jk in range(ij + 2, k_nn):
@@ -89,7 +89,11 @@ class TwoOptTSP(TSPBase):
             nn_config = NearestNeighborTSPConfig(
                 back_to_start=self.config.back_to_start, name=self.config.name
             )
-            nn_solver = NearestNeighborTSP(nn_config, network_routes=self.network_routes, city_locations=self.city_locations)
+            nn_solver = NearestNeighborTSP(
+                nn_config,
+                network_routes=self.network_routes,
+                city_locations=self.city_locations,
+            )
             solution = nn_solver.solve()
             self.initial_route = solution.optimal_path
             self.initial_value = solution.optimal_value

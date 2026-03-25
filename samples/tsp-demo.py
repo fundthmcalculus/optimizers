@@ -52,7 +52,7 @@ def part1():
         "Genetic Algorithm",
         "Ant Colony",
         "Ant Colony MST",
-        "VAT"
+        "VAT",
     ]
     plot_convergence([x.value_history for x in results], trace_names)
     plot_cities_and_route(
@@ -157,7 +157,8 @@ def compute_tsp_bounds(cities: AF):
         optimal_path=city_sequence,
         optimal_value=vat_optimal_value,
         value_history=[vat_optimal_value],
-        stop_reason="max_iterations",)
+        stop_reason="max_iterations",
+    )
 
     print("\n")
     print(
@@ -174,11 +175,17 @@ def compute_tsp_bounds(cities: AF):
     print(
         f"MST ACO Solution: {aco_mst_result.optimal_value:.2f} (Time: {aco_mst_time:.2f}s)"
     )
-    print(
-        f"VAT Solution: {vat_result.optimal_value:.2f} (Time: {vat_time:.2f}s)"
-    )
+    print(f"VAT Solution: {vat_result.optimal_value:.2f} (Time: {vat_time:.2f}s)")
 
-    return nn_result, topt_result, ch_result, ga_result, aco_result, aco_mst_result, vat_result
+    return (
+        nn_result,
+        topt_result,
+        ch_result,
+        ga_result,
+        aco_result,
+        aco_mst_result,
+        vat_result,
+    )
 
 
 def project_2_data() -> AF:

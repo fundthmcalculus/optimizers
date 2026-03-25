@@ -6,8 +6,12 @@ from numba_progress import ProgressBar
 from numpy import ndarray
 
 
-def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> np.ndarray:
-    d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(matrix_of_pairwise_distance, False)
+def compute_ivat(
+    matrix_of_pairwise_distance: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    d_star, p_seq, as_seq = compute_ordered_dis_njit_merge(
+        matrix_of_pairwise_distance, False
+    )
     N = d_star.shape[0]
     # TODO - In-place modification?
     d_p_star = np.zeros(d_star.shape, dtype=d_star.dtype)
@@ -15,22 +19,28 @@ def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> np.ndarray:
     for r in range(1, N):
         jj = np.argmin(d_star[r, :r])
         argmin_seq.append(jj)
-        jj = as_seq[r-1]
+        # jj = as_seq[r-1]
         for c in range(r):
-            d_p_star[c,r] = d_p_star[r, c] = max(d_star[r, jj], d_p_star[jj, c]) if jj != c else d_star[r, c]
+            d_p_star[c, r] = d_p_star[r, c] = (
+                max(d_star[r, jj], d_p_star[jj, c]) if jj != c else d_star[r, c]
+            )
 
-    return d_p_star, d_star, as_seq, p_seq
+    return d_p_star, d_star, argmin_seq, p_seq
 
 
 @njit(cache=True, parallel=True, nogil=True)
 def compute_ordered_dis_njit_merge(
-        matrix_of_pairwise_distance: np.ndarray, inplace: bool=False, progress_bar: ProgressBar=None
+    matrix_of_pairwise_distance: np.ndarray,
+    inplace: bool = False,
+    progress_bar: ProgressBar = None,
 ) -> tuple[np.ndarray, list[int], list[int]]:
     N = matrix_of_pairwise_distance.shape[0]
     if inplace:
         ordered_matrix = matrix_of_pairwise_distance
     else:
-        ordered_matrix: np.ndarray = np.zeros(matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype)
+        ordered_matrix: np.ndarray = np.zeros(
+            matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype
+        )
     p, q = vat_prim_mst(matrix_of_pairwise_distance, progress_bar=progress_bar)
     # Step 3 - since this is symmetric, we only have to do half
     n_bit_mask = int(np.ceil(N / 8))
@@ -49,7 +59,9 @@ def compute_ordered_dis_njit_merge(
     else:
         for ij in prange(N):
             for jk in range(ij, N):
-                ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = matrix_of_pairwise_distance[p[ij], p[jk]]
+                ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = (
+                    matrix_of_pairwise_distance[p[ij], p[jk]]
+                )
                 if progress_bar is not None:
                     progress_bar.update(1)
 
@@ -58,7 +70,9 @@ def compute_ordered_dis_njit_merge(
 
 
 @njit(cache=True)
-def shuffle_ordered_column(N: int, ij: int, ordered_matrix: ndarray, p: ndarray, visited: ndarray):
+def shuffle_ordered_column(
+    N: int, ij: int, ordered_matrix: ndarray, p: ndarray, visited: ndarray
+):
     for jk in range(ij, N):
         if _get_bit(visited, ij, jk):
             continue
@@ -70,9 +84,7 @@ def shuffle_ordered_column(N: int, ij: int, ordered_matrix: ndarray, p: ndarray,
             r1, c1 = p[r0], p[c0]
             _set_bit(visited, r0, c0)
             _set_bit(visited, c0, r0)
-            ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = ordered_matrix[
-                r1, c1
-            ]
+            ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = ordered_matrix[r1, c1]
             # Next step!
             r0, c0 = r1, c1
         # Close the final block
@@ -92,7 +104,7 @@ def _get_bit(bitmask, row, col):
 
 
 @njit(cache=True)
-def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar=None) -> np.ndarray:
+def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar = None) -> np.ndarray:
     N = len(adj)
 
     # Find the column of the maximum value.
@@ -221,9 +233,9 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
         # Parallel processing of adjacent vertices
 
         mask = (
-                (vertices != u)
-                & ~in_mst
-                & (key[vertices] > _get_dist(samples, u, vertices))
+            (vertices != u)
+            & ~in_mst
+            & (key[vertices] > _get_dist(samples, u, vertices))
         )
         key[mask] = _get_dist(samples, u, vertices[mask])
         for v in vertices[mask]:

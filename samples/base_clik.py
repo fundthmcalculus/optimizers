@@ -28,7 +28,7 @@ from remi.src.kinematics import (
     calc_J_dot,
 )
 
-np.seterr(invalid='ignore', divide='ignore', over='ignore')
+np.seterr(invalid="ignore", divide="ignore", over="ignore")
 
 # TODO - This allows us to change the optimizer type at the drop of a hat
 # Optimizer = GradientDescentOptimizer
