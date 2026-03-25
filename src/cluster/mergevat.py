@@ -1,6 +1,9 @@
 import heapq
-import numba
+
+from numba import njit, prange
 import numpy as np
+from numba_progress import ProgressBar
+from numpy import ndarray
 
 
 def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -19,62 +22,77 @@ def compute_ivat(matrix_of_pairwise_distance: np.ndarray) -> tuple[np.ndarray, n
     return d_p_star, d_star, argmin_seq, p_seq
 
 
-@numba.jit(cache=True)
+@njit(cache=True, parallel=True, nogil=True)
 def compute_ordered_dis_njit_merge(
-        matrix_of_pairwise_distance: np.ndarray, inplace: bool
+        matrix_of_pairwise_distance: np.ndarray, inplace: bool=False, progress_bar: ProgressBar=None
 ) -> tuple[np.ndarray, list[int], list[int]]:
     N = matrix_of_pairwise_distance.shape[0]
     if inplace:
         ordered_matrix = matrix_of_pairwise_distance
     else:
         ordered_matrix: np.ndarray = np.zeros(matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype)
-    p, q = vat_prim_mst(matrix_of_pairwise_distance)
+    p, q = vat_prim_mst(matrix_of_pairwise_distance, progress_bar=progress_bar)
     # Step 3 - since this is symmetric, we only have to do half
     n_bit_mask = int(np.ceil(N / 8))
     # Boolean is stored as a byte, so this is smaller
     visited = np.zeros((N, n_bit_mask), dtype=np.uint8)
 
-    for ij in range(N):
-        for jk in range(ij, N):
-            if not inplace:
+    if progress_bar is not None:
+        progress_bar.set(0)
+
+    if inplace:
+        # Due to loop-walking, we cannot use the parallel operations since we cannot know a-priori which loops are different.
+        for ij in range(N):
+            shuffle_ordered_column(N, ij, ordered_matrix, p, visited)
+            if progress_bar is not None:
+                progress_bar.update(1)
+    else:
+        for ij in prange(N):
+            for jk in range(ij, N):
                 ordered_matrix[ij, jk] = ordered_matrix[jk, ij] = matrix_of_pairwise_distance[p[ij], p[jk]]
-            else:
-                if _get_bit(visited, ij, jk):
-                    continue
-                # Walk this loop, and store which visited
-                r0, c0 = ij, jk
-                r1, c1 = -1, -1
-                p0 = ordered_matrix[r0, c0]
-                while r1 != ij or c1 != jk:
-                    r1, c1 = p[r0], p[c0]
-                    _set_bit(visited, r0, c0)
-                    _set_bit(visited, c0, r0)
-                    ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = ordered_matrix[
-                        r1, c1
-                    ]
-                    # Next step!
-                    r0, c0 = r1, c1
-                # Close the final block
-                ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = p0
-                _set_bit(visited, r0, c0)
-                _set_bit(visited, c0, r0)
+                if progress_bar is not None:
+                    progress_bar.update(1)
 
     # Step 4 - since this is symmetric, we only have to do half
     return ordered_matrix, p, q
 
 
-@numba.jit(cache=True)
+@njit(cache=True)
+def shuffle_ordered_column(N: int, ij: int, ordered_matrix: ndarray, p: ndarray, visited: ndarray):
+    for jk in range(ij, N):
+        if _get_bit(visited, ij, jk):
+            continue
+        # Walk this loop, and store which visited
+        r0, c0 = ij, jk
+        r1, c1 = -1, -1
+        p0 = ordered_matrix[r0, c0]
+        while r1 != ij or c1 != jk:
+            r1, c1 = p[r0], p[c0]
+            _set_bit(visited, r0, c0)
+            _set_bit(visited, c0, r0)
+            ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = ordered_matrix[
+                r1, c1
+            ]
+            # Next step!
+            r0, c0 = r1, c1
+        # Close the final block
+        ordered_matrix[r0, c0] = ordered_matrix[c0, r0] = p0
+        _set_bit(visited, r0, c0)
+        _set_bit(visited, c0, r0)
+
+
+@njit(cache=True)
 def _set_bit(bitmask, row, col):
     bitmask[row, col // 8] |= 1 << (col % 8)
 
 
-@numba.jit(cache=True)
+@njit(cache=True)
 def _get_bit(bitmask, row, col):
     return (bitmask[row, col // 8] >> (col % 8)) & 1
 
 
-@numba.jit(cache=True)
-def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
+@njit(cache=True)
+def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar=None) -> np.ndarray:
     N = len(adj)
 
     # Find the column of the maximum value.
@@ -129,6 +147,9 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
         parent_seq[parent_seq_idx] = v
         parent_seq_idx += 1
 
+        if progress_bar is not None:
+            progress_bar.update(1)
+
         # Iterate through all adjacent vertices of a vertex
         # Parallel processing of adjacent vertices
         mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
@@ -140,7 +161,7 @@ def vat_prim_mst(adj: np.ndarray) -> np.ndarray:
     return heap_seq, parent_seq
 
 
-@numba.jit(cache=True)
+@njit(cache=True)
 def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
     N = len(samples)
 
@@ -212,7 +233,7 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
     return heap_seq
 
 
-@numba.jit(cache=True)
+@njit(cache=True)
 def _get_dist(samples: np.ndarray, idx1: int, idx2: int) -> float:
     diff = samples[idx1, :] - samples[idx2, :]
     return np.sqrt(np.sum(np.square(diff)))
