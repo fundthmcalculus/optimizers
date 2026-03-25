@@ -179,9 +179,10 @@ def test_show_fibb_bin_heap():
     plt.show()
 
 def test_fuzzy_c_means():
-    all_cities = circle_random_clusters(n_clusters=10, n_cities=4)
+    n_clusters = 15
+    all_cities = circle_random_clusters(n_clusters=n_clusters, n_cities=5, cluster_spacing=5, cluster_diameter=0.5)
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
-    meth_c, w_c = fcm.fuzzy_c_means(all_cities,  6, 2)
+    meth_c, w_c = fcm.fuzzy_c_means(all_cities,  n_clusters, 2)
 
     # Compute the IVAT
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
@@ -190,29 +191,45 @@ def test_fuzzy_c_means():
     # Look down the off-by-1 diagonal and count the number of substantial changes.
     diagonal_values = np.diag(ivat_mst, k=1)
     # Augment back to original size, just prepend the initial value to avoid throwing off the diff fcn
-    diagonal_values = np.concatenate([np.array([diagonal_values[0]]), diagonal_values], axis=0)
     # Expand this to the original size for convenience.
-    plt.figure()
-    plt.plot(diagonal_values, marker='o')
-    plt.title('Off-by-One Diagonal of iVAT Matrix')
-    plt.xlabel('Index')
-    plt.ylabel('Distance Value')
-    plt.grid(True)
+    diagonal_values = np.concatenate([np.array([diagonal_values[0]]), diagonal_values], axis=0)
+    # Sort the diagonal values
+    sorted_diagonal = np.sort(diagonal_values)
+    # Find the maximum difference and the index thereof
+    diagonal_diffs = np.diff(sorted_diagonal)
+    max_diff_index = np.argmax(diagonal_diffs)
+    peaks_threshold = sorted_diagonal[max_diff_index+1]
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(5, 8))
+    ax1.plot(diagonal_values, marker='o')
+    ax1.set_title('Off-by-One Diagonal of iVAT Matrix')
+    ax1.set_xlabel('Index')
+    ax1.set_ylabel('Distance Value')
+    ax1.grid(True)
+
+    ax2.plot(sorted_diagonal, marker='o')
+    ax2.axvline(x=max_diff_index, color='r', linestyle='--', label=f'Max diff at index {max_diff_index}')
+    ax2.plot([max_diff_index, max_diff_index + 1],
+             [sorted_diagonal[max_diff_index], sorted_diagonal[max_diff_index + 1]], 'ro-', linewidth=3, markersize=8)
+    ax2.legend()
+    ax2.set_title('Sorted Off-by-One Diagonal of iVAT Matrix')
+    ax2.set_xlabel('Index')
+    ax2.set_ylabel('Distance Value')
+    ax2.grid(True)
+    plt.tight_layout()
 
     # Count abrupt size changes using a basic stats test
-    # TODO - Use something other than std-dev, maybe a median metric because frequency vs amount?
-    mean_val = np.mean(diagonal_values)
-    threshold = mean_val + np.std(diagonal_values) * 1
-    abrupt_change_indices = np.where(diagonal_values > threshold)[0]
-    plt.axhline(y=threshold, color='r', linestyle='--', label=f'Threshold: {threshold:.2f}')
-    plt.text(0.02, 0.98, f'Abrupt changes: {len(abrupt_change_indices)}, threshold: {threshold:.2f}',
-             transform=plt.gca().transAxes, verticalalignment='top',
+    abrupt_change_indices = np.where(diagonal_values >= peaks_threshold)[0]
+    ax1.axhline(y=peaks_threshold, color='r', linestyle='--', label=f'Threshold: {peaks_threshold:.2f}')
+    # ax2.axhline(y=peaks_threshold, color='r', linestyle='--', label=f'Threshold: {peaks_threshold:.2f}')
+    ax2.text(0.02, 0.98, f'Abrupt changes: {len(abrupt_change_indices)}, threshold: {peaks_threshold:.2f}',
+             transform=ax2.transAxes, verticalalignment='top',
              bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
     plt.show()
 
     # Use each section as a cluster endpoint, inclusive.
-    cluster_groups = np.concatenate([np.array([0]), abrupt_change_indices, np.array([-1])])
+    cluster_groups = np.concatenate([np.array([0]), abrupt_change_indices, np.array([len(all_cities)-2])])
     cluster_city_ids = []
     for idx in range(0,len(cluster_groups)-1):
         cg_start = cluster_groups[idx]
@@ -238,24 +255,24 @@ def test_fuzzy_c_means():
         ax.scatter(all_cities[i, 0], all_cities[i, 1],
                    c=[blended_color], s=50, alpha=0.7, edgecolors='black', linewidth=0.5)
 
-    # Plot cluster centers
-    ax.scatter(meth_c[:, 0], meth_c[:, 1],
-               c='black', s=300, marker='X', edgecolors='white', linewidth=2,
-               label='Cluster Centers')
-
 
     # Plot cluster city IDs with "*" markers
     for idx, cluster_ids in enumerate(cluster_city_ids):
         cluster_points = all_cities[cluster_ids]
         cluster_color = colors[idx % len(colors)]
         ax.scatter(cluster_points[:, 0], cluster_points[:, 1],
-                   marker='*', s=200, edgecolors=cluster_color, linewidths=2,
-                   facecolors='none')
+                   marker='*', s=200, edgecolors=cluster_color,
+                   facecolors='none', label=f'Cluster {idx}')
+
+    # Plot cluster centers
+    ax.scatter(meth_c[:, 0], meth_c[:, 1],
+               c='black', s=300, marker='X', edgecolors='white',
+               label='Cluster Centers')
 
     ax.set_title('Fuzzy C-Means Clustering with Membership-based Colors')
     ax.set_xlabel('X Coordinate')
     ax.set_ylabel('Y Coordinate')
-    ax.legend()
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.tight_layout()
     plt.savefig('fuzzy_c_means_membership.eps', format='eps', bbox_inches='tight')
     plt.show()

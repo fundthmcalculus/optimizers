@@ -31,7 +31,8 @@ CLUSTER_SPACING = 4 * CLUSTER_DIAMETER
 HALF_CIRCLE = False
 
 
-def random_cities(center_x, center_y, n_cities=-1) -> np.ndarray:
+def random_cities(center_x, center_y, n_cities: int=-1, cluster_diameter: int = -1) -> np.ndarray:
+    cluster_diameter = cluster_diameter if cluster_diameter > 0 else CLUSTER_DIAMETER
     if n_cities == -1:
         n_cities = N_CITIES_CLUSTER
     if n_cities == 1:
@@ -39,12 +40,13 @@ def random_cities(center_x, center_y, n_cities=-1) -> np.ndarray:
     # Randomly distribute cities in a uniform circle?
     theta = np.linspace(0, 2 * np.pi, n_cities + 1, dtype=np.float32)
     theta = theta[:-1]
-    city_x = np.cos(theta) * CLUSTER_DIAMETER / 2.0 + center_x
-    city_y = np.sin(theta) * CLUSTER_DIAMETER / 2.0 + center_y
+    city_x = np.cos(theta) * cluster_diameter / 2.0 + center_x
+    city_y = np.sin(theta) * cluster_diameter / 2.0 + center_y
     return np.c_[city_x, city_y]
 
 
-def circle_random_clusters(n_clusters=-1, n_cities=-1) -> np.ndarray:
+def circle_random_clusters(n_clusters: int=-1, n_cities: int=-1, cluster_diameter:int=-1, cluster_spacing: int=-1) -> np.ndarray:
+    cluster_spacing = cluster_spacing if cluster_spacing >0 else CLUSTER_SPACING
     if n_clusters == -1:
         n_clusters = N_CLUSTERS
     city_locations = np.zeros(shape=(0, 2), dtype=np.float32)
@@ -53,10 +55,10 @@ def circle_random_clusters(n_clusters=-1, n_cities=-1) -> np.ndarray:
             theta /= 2.0
         else:
             theta *= n_clusters / (n_clusters + 1)
-        cx = CLUSTER_SPACING * np.cos(theta)
-        cy = CLUSTER_SPACING * np.sin(theta)
+        cx = cluster_spacing * np.cos(theta)
+        cy = cluster_spacing * np.sin(theta)
         city_locations = np.concatenate(
-            (city_locations, random_cities(cx, cy, n_cities=n_cities)), axis=0
+            (city_locations, random_cities(cx, cy, n_cities=n_cities, cluster_diameter=cluster_diameter)), axis=0
         )
     return city_locations
 
