@@ -3,10 +3,13 @@ from numpy import ndarray
 from scipy.optimize import minimize
 
 
-def _j_w_c(x: np.ndarray, c: np.ndarray, m:float) -> float:
+def _j_w_c(x: np.ndarray, c: np.ndarray, m: float) -> float:
     """Compute the weighted sum of squared distances"""
     w_ij = _get_weights(c, m, x)
-    j_wc = np.sum(w_ij ** m * np.sum((x[:, np.newaxis, :] - c[np.newaxis, :, :]) ** 2.0, axis=2), axis=None)
+    j_wc = np.sum(
+        w_ij**m * np.sum((x[:, np.newaxis, :] - c[np.newaxis, :, :]) ** 2.0, axis=2),
+        axis=None,
+    )
 
     return j_wc
 
@@ -19,10 +22,12 @@ def _get_weights(c: ndarray, m: float, x: ndarray) -> ndarray:
     return w_ij
 
 
-def fuzzy_c_means(x: np.ndarray, n: int, m: float = 2.0) -> tuple[np.ndarray, np.ndarray]:
+def fuzzy_c_means(
+    x: np.ndarray, n: int, m: float = 2.0
+) -> tuple[np.ndarray, np.ndarray]:
     """Compute the fuzzy c-means"""
     # 1. Create the candidate centers
-    indices = np.random.choice(x.shape[0], size=n*2, replace=False)
+    indices = np.random.choice(x.shape[0], size=n * 2, replace=False)
     c = x[indices, :]
     # Combine every two rows into one so no cluster center exactly matches a data-point
     c = c.reshape(n, 2, x.shape[1]).mean(axis=1)
@@ -32,7 +37,7 @@ def fuzzy_c_means(x: np.ndarray, n: int, m: float = 2.0) -> tuple[np.ndarray, np
         c_reshaped = c_opt.reshape(n, x.shape[1])
         return _j_w_c(x, c_reshaped, m)
 
-    result = minimize(optim_j_w_c, c.flatten(), method='BFGS')
+    result = minimize(optim_j_w_c, c.flatten(), method="BFGS")
     c = result.x.reshape(n, x.shape[1])
 
     # Calculate membership matrix

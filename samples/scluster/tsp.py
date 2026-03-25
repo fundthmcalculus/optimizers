@@ -10,8 +10,8 @@ from cluster import compute_ivat
 from optimizers.combinatorial.aco import AntColonyTSP, AntColonyTSPConfig
 from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
 
-optim = "two-opt" # "aco"
-file_name = "burma14" # "att532"
+optim = "two-opt"  # "aco"
+file_name = "burma14"  # "att532"
 optimal_length = None
 with open(f"./{file_name}.txt") as f:
     lines = [l.strip() for l in f.readlines()]
@@ -63,8 +63,8 @@ print(f"Total time: {t1-t0}")
 print(f"Total distance: {total_distance:.0f}")
 
 loops = [normal_city_sequence]
-visited_cities = [False]*len(cities)
-for city_idx,city in enumerate(city_sequence):
+visited_cities = [False] * len(cities)
+for city_idx, city in enumerate(city_sequence):
     c0 = normal_city_sequence[city_idx]
     if visited_cities[c0]:
         continue
@@ -98,18 +98,28 @@ for idx, loop in enumerate(loops):
 
     ax = axes[idx]
     pos = nx.circular_layout(G)
-    nx.draw(G, pos, ax=ax, with_labels=True, node_color='lightblue',
-            node_size=500, font_size=10, font_weight='bold',
-            arrows=True, arrowsize=20, edge_color='gray',
-            connectionstyle='arc3,rad=0.1')
+    nx.draw(
+        G,
+        pos,
+        ax=ax,
+        with_labels=True,
+        node_color="lightblue",
+        node_size=500,
+        font_size=10,
+        font_weight="bold",
+        arrows=True,
+        arrowsize=20,
+        edge_color="gray",
+        connectionstyle="arc3,rad=0.1",
+    )
     if idx > 0:
-        ax.set_title(f'Loop {idx} (size={len(loop)})')
+        ax.set_title(f"Loop {idx} (size={len(loop)})")
     else:
-        ax.set_title(f'Original Loop (size={len(loop)})')
+        ax.set_title(f"Original Loop (size={len(loop)})")
 
 # Hide unused subplots
 for idx in range(num_loops, len(axes)):
-    axes[idx].axis('off')
+    axes[idx].axis("off")
 
 plt.tight_layout()
 plt.show()

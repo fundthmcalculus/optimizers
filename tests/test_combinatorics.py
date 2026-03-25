@@ -31,7 +31,9 @@ CLUSTER_SPACING = 4 * CLUSTER_DIAMETER
 HALF_CIRCLE = False
 
 
-def random_cities(center_x, center_y, n_cities: int=-1, cluster_diameter: int = -1) -> np.ndarray:
+def random_cities(
+    center_x, center_y, n_cities: int = -1, cluster_diameter: int = -1
+) -> np.ndarray:
     cluster_diameter = cluster_diameter if cluster_diameter > 0 else CLUSTER_DIAMETER
     if n_cities == -1:
         n_cities = N_CITIES_CLUSTER
@@ -41,14 +43,21 @@ def random_cities(center_x, center_y, n_cities: int=-1, cluster_diameter: int = 
     theta = np.linspace(0, 2 * np.pi, n_cities + 1, dtype=np.float32)
     theta = theta[:-1]
     # Add slight random scramble to locations
-    scramble = np.random.uniform(-cluster_diameter * 0.1, cluster_diameter * 0.1, size=(n_cities, 2))
+    scramble = np.random.uniform(
+        -cluster_diameter * 0.1, cluster_diameter * 0.1, size=(n_cities, 2)
+    )
     city_x = np.cos(theta) * cluster_diameter / 2.0 + center_x + scramble[:, 0]
     city_y = np.sin(theta) * cluster_diameter / 2.0 + center_y + scramble[:, 1]
     return np.c_[city_x, city_y]
 
 
-def circle_random_clusters(n_clusters: int=-1, n_cities: int=-1, cluster_diameter:int=-1, cluster_spacing: int=-1) -> np.ndarray:
-    cluster_spacing = cluster_spacing if cluster_spacing >0 else CLUSTER_SPACING
+def circle_random_clusters(
+    n_clusters: int = -1,
+    n_cities: int = -1,
+    cluster_diameter: int = -1,
+    cluster_spacing: int = -1,
+) -> np.ndarray:
+    cluster_spacing = cluster_spacing if cluster_spacing > 0 else CLUSTER_SPACING
     if n_clusters == -1:
         n_clusters = N_CLUSTERS
     city_locations = np.zeros(shape=(0, 2), dtype=np.float32)
@@ -60,7 +69,13 @@ def circle_random_clusters(n_clusters: int=-1, n_cities: int=-1, cluster_diamete
         cx = cluster_spacing * np.cos(theta)
         cy = cluster_spacing * np.sin(theta)
         city_locations = np.concatenate(
-            (city_locations, random_cities(cx, cy, n_cities=n_cities, cluster_diameter=cluster_diameter)), axis=0
+            (
+                city_locations,
+                random_cities(
+                    cx, cy, n_cities=n_cities, cluster_diameter=cluster_diameter
+                ),
+            ),
+            axis=0,
         )
     return city_locations
 

@@ -13,13 +13,15 @@ print("\n")
 def pairwise_distances2(data, dtype=np.float32) -> np.ndarray:
     dist_arr = np.zeros((data.shape[0], data.shape[0]), dtype=dtype)
     for i in tqdm(range(len(data))):
-        dist_arr[i, i + 1:] = np.linalg.norm(data[i] - data[i + 1:], axis=1)
-        dist_arr[i + 1:, i] = dist_arr[i, i + 1:]
+        dist_arr[i, i + 1 :] = np.linalg.norm(data[i] - data[i + 1 :], axis=1)
+        dist_arr[i + 1 :, i] = dist_arr[i, i + 1 :]
     return dist_arr
+
 
 def to_np_array(data: pd.DataFrame) -> np.ndarray:
     y = data.to_numpy(np.float32)
     return y
+
 
 # fetch dataset
 # 59 is letter recognition
@@ -43,7 +45,7 @@ print(f"Variable Information: {letter_recognition.variables}")
 matrix_of_pairwise_distance = np.log(pairwise_distances2(X) + 1).astype(np.float32)
 del X
 matrix_of_pairwise_distance = (
-        matrix_of_pairwise_distance / matrix_of_pairwise_distance.max()
+    matrix_of_pairwise_distance / matrix_of_pairwise_distance.max()
 )
 print(f"Pairwise distance matrix shape: {matrix_of_pairwise_distance.shape}")
 t0 = time.time()
