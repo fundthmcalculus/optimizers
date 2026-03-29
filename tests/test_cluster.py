@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 from pyclustertend.visual_assessment_of_tendency import compute_ordered_dis_njit
 from sklearn.metrics import pairwise_distances
 
+from kruskal import Graph
 from test_combinatorics import circle_random_clusters
 
 
@@ -184,6 +185,129 @@ def test_show_fibb_bin_heap():
     plt.title("Heap Time Complexity Comparison")
     plt.legend()
     plt.show()
+
+
+def test_kruskal():
+    n_clusters = 4
+    n_cities = 4
+    all_cities = circle_random_clusters(
+        n_clusters=n_clusters, n_cities=n_cities, cluster_spacing=5, cluster_diameter=0.5
+    )
+    scramble_order = np.random.permutation(len(all_cities))
+    matrix_of_pairwise_distance = pairwise_distances(all_cities)
+    # Scramble the order of the cities
+    matrix_of_pairwise_distance = matrix_of_pairwise_distance[scramble_order, :][:, scramble_order]
+    g = Graph(len(matrix_of_pairwise_distance))
+    for ij in range(len(matrix_of_pairwise_distance)):
+        for jk in range(ij+1,len(matrix_of_pairwise_distance)):
+            g.addEdge(ij, jk, matrix_of_pairwise_distance[ij, jk])
+            g.addEdge(jk, ij, matrix_of_pairwise_distance[jk, ij])
+
+    mst = g.KruskalMST()
+    ordered_idxs = []
+    mst.reverse()
+    for u, v, weight in mst:
+        if u not in ordered_idxs:
+            ordered_idxs.append(u)
+        if v not in ordered_idxs:
+            ordered_idxs.append(v)
+
+    print(f"Optimized order: {ordered_idxs}")
+
+    # Resort the matrix using the optimized order
+    reordered_matrix = matrix_of_pairwise_distance[ordered_idxs, :][:, ordered_idxs]
+
+    # Display both matrices
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(4, 10))
+
+    im1 = ax1.imshow(matrix_of_pairwise_distance, cmap='viridis')
+    ax1.set_title('Original Scrambled Matrix')
+    plt.colorbar(im1, ax=ax1)
+
+    im2 = ax2.imshow(reordered_matrix, cmap='viridis')
+    ax2.set_title('Reordered Matrix (MST Order)')
+    plt.colorbar(im2, ax=ax2)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def test_2d_merge_sort():
+    n_clusters = 4
+    n_cities = 2
+    all_cities = circle_random_clusters(
+        n_clusters=n_clusters, n_cities=n_cities, cluster_spacing=5, cluster_diameter=0.5
+    )
+    scramble_order = np.random.permutation(len(all_cities))
+    matrix_of_pairwise_distance = pairwise_distances(all_cities)
+    # Scramble the order of the cities
+    matrix_of_pairwise_distance = matrix_of_pairwise_distance[scramble_order, :][:, scramble_order]
+    a = matrix_of_pairwise_distance.copy()
+    b = matrix_of_pairwise_distance.copy()
+    a = top_down_merge_sort(a,b,len(a))
+
+    # Display arrays a and b as images
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(4, 8))
+
+    im1 = ax1.imshow(matrix_of_pairwise_distance, cmap='viridis')
+    ax1.set_title('Source Image')
+    plt.colorbar(im1, ax=ax1)
+
+    im2 = ax2.imshow(a, cmap='viridis')
+    ax2.set_title('Sorted Image')
+    plt.colorbar(im2, ax=ax2)
+
+    plt.tight_layout()
+    plt.show()
+
+
+# Copy a section of the array a into array b (from begin to end - 1)
+def copy_array(a, begin, end, b):
+    for k in range(begin, end):
+        b[k] = a[k]
+    return b
+
+
+# Merge two sorted halves (from b) into a single sorted run (into a)
+def top_down_merge(a, begin, middle, end, b):
+    i = begin
+    j = middle
+
+    # Merge the two sorted runs into b
+    for k in range(begin, end):
+        if i < middle and (j >= end or a[i,min(i+1,len(a)-1)] <= a[j,min(j+1,len(a)-1)]):
+            b[k] = a[i]  # Take element from the left run
+            i += 1
+        else:
+            b[k] = a[j]  # Take element from the right run
+            j += 1
+
+    return a, b
+
+
+# Split the array a into two halves, sort both halves into b,
+# and merge the sorted halves back into a
+def top_down_split_merge(a, begin, end, b):
+    if end - begin <= 1:
+        return a,b  # Base case: Run size is 1, so it's already sorted
+
+    middle = (begin + end) // 2  # Find the midpoint to split the array
+
+    # Recursively sort the left and right halves into b
+    a, b = top_down_split_merge(a, begin, middle, b)
+    a, b = top_down_split_merge(a, middle, end, b)
+
+    # Merge the sorted halves back into a
+    a, b = top_down_merge(b, begin, middle, end, a)
+    return a, b
+
+
+def top_down_merge_sort(a, b, n):
+    # Copy the entire array a into b initially
+    b = copy_array(a, 0, n, b)
+    # Recursively split and merge the array b into a
+    a,b = top_down_split_merge(a, 0, n, b)
+    return a
 
 
 def test_fuzzy_c_means():
