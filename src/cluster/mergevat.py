@@ -105,6 +105,102 @@ def _get_bit(bitmask, row, col):
 
 
 @njit(cache=True, nogil=True)
+def vat_prim_mst_split_merge(adj: np.ndarray, progress_bar: ProgressBar = None) -> np.ndarray:
+    N = len(adj)
+    if N < 2:
+        return vat_prim_mst_custom(adj, progress_bar)
+
+    # TODO - Handle recursive subdivision
+    n_chunks = 2
+    mid = N // n_chunks
+    # Upper left quadrant (Block 1)
+    adj1 = adj[:mid, :mid]
+    # Lower right quadrant (Block 2)
+    adj2 = adj[mid:, mid:]
+
+    # Compute VAT on each block (this is where it can be parallelized)
+    # Since these calls are independent, they could be executed in parallel threads.
+    # To do this in Numba, one could use concurrent execution or wrap this in a 
+    # parallel-friendly structure like joblib (if using Python) or task-based 
+    # parallelism if supported by the runtime.
+    h_seq1, p_seq1 = vat_prim_mst_custom(adj1, progress_bar)
+    h_seq2, p_seq2 = vat_prim_mst_custom(adj2, progress_bar)
+
+    # Map indices back to global
+    h_seq1_global = h_seq1
+    h_seq2_global = h_seq2 + mid
+
+    # Interleave the two halves together (insertion-sort like merge)
+    heap_seq = np.zeros(N, dtype=np.int32)
+    parent_seq = np.zeros(N, dtype=np.int32)
+    parent_vertex = np.full(N, -1, dtype=np.int32)
+
+    # Current indices in h_seq1 and h_seq2
+    idx1 = 0
+    idx2 = 0
+
+    in_merged_mst = np.zeros(N, dtype=np.bool_)
+    keys = np.full(N, np.inf, dtype=adj.dtype)
+
+    # Start with the first element of h_seq1
+    u = h_seq1_global[0]
+    heap_seq[0] = u
+    parent_vertex[u] = h_seq1_global[p_seq1[0]] if p_seq1[0] != -1 else -1
+    in_merged_mst[u] = True
+    idx1 = 1
+
+    # Initialize keys with distances from the first vertex
+    for i in range(N):
+        if not in_merged_mst[i]:
+            keys[i] = adj[u, i]
+            parent_vertex[i] = u
+
+    for k in range(1, N):
+        # Candidates are h_seq1_global[idx1] and h_seq2_global[idx2]
+        d1 = np.inf
+        if idx1 < len(h_seq1_global):
+            v1 = h_seq1_global[idx1]
+            d1 = keys[v1]
+
+        d2 = np.inf
+        if idx2 < len(h_seq2_global):
+            v2 = h_seq2_global[idx2]
+            d2 = keys[v2]
+
+        if d1 <= d2:
+            u = h_seq1_global[idx1]
+            idx1 += 1
+        else:
+            u = h_seq2_global[idx2]
+            idx2 += 1
+
+        heap_seq[k] = u
+        in_merged_mst[u] = True
+
+        # Update keys with distances from the newly added vertex u
+        for i in range(N):
+            if not in_merged_mst[i]:
+                if adj[u, i] < keys[i]:
+                    keys[i] = adj[u, i]
+                    parent_vertex[i] = u
+
+    # Build parent_seq (indices in heap_seq)
+    # We need a reverse mapping for heap_seq
+    rev_heap_seq = np.zeros(N, dtype=np.int32)
+    for i in range(N):
+        rev_heap_seq[heap_seq[i]] = i
+
+    for i in range(N):
+        pv = parent_vertex[heap_seq[i]]
+        if pv != -1:
+            parent_seq[i] = rev_heap_seq[pv]
+        else:
+            parent_seq[i] = i # Or 0, or -1? In original it seems it can be 0 if it's the root but parent_seq_idx was 0.
+
+    return heap_seq, parent_seq
+
+
+@njit(cache=True, nogil=True)
 def vat_prim_mst_custom(adj: np.ndarray, progress_bar: ProgressBar = None) -> np.ndarray:
     N = len(adj)
 

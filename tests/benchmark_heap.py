@@ -4,7 +4,7 @@ from src.cluster.mergevat import vat_prim_mst, vat_prim_mst_custom
 
 def benchmark_vat_mst():
     # Generate some synthetic data
-    N = 10000
+    N = 20000
     np.random.seed(42)
     data = np.random.rand(N, 2).astype(np.float32)
     
