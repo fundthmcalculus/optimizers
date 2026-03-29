@@ -126,13 +126,12 @@ def vat_prim_mst_custom(adj: np.ndarray, progress_bar: ProgressBar = None) -> np
     # Priority queue to store vertices that are being processed
     # Preallocate buffers for the heap (worst case: N*(N-1)/2, but realistically less)
     # Let's use a safe size for now.
-    heap_w = np.zeros(N * 4, dtype=np.float32)
-    heap_u = np.zeros(N * 4, dtype=np.int32)
-    heap_v = np.zeros(N * 4, dtype=np.int32)
+    # Single array structure for better cache locality: (W, U, V)
+    heap = np.empty((N * 4, 3), dtype=np.float32)
     heap_size = 0
 
     # Insert the source itself into the priority queue and initialize its key as 0
-    custom_heappush(heap_w, heap_u, heap_v, heap_size, np.float32(src_key), np.int32(src_j), np.int32(src_i))
+    custom_heappush(heap, heap_size, np.float32(src_key), np.int32(src_j), np.int32(src_i))
     heap_size += 1
     key[src_j] = src_key
 
@@ -152,10 +151,10 @@ def vat_prim_mst_custom(adj: np.ndarray, progress_bar: ProgressBar = None) -> np
         # The first vertex in the pair is the minimum key vertex
         # Extract it from the priority queue
         # The vertex label is stored in the second of the pair
-        w = heap_w[0]
-        u = heap_u[0]
-        v = heap_v[0]
-        custom_heappop(heap_w, heap_u, heap_v, heap_size)
+        w = heap[0, 0]
+        u = np.int32(heap[0, 1])
+        v = np.int32(heap[0, 2])
+        custom_heappop(heap, heap_size)
         heap_size -= 1
 
         # Different key values for the same vertex may exist in the priority queue.
@@ -176,21 +175,18 @@ def vat_prim_mst_custom(adj: np.ndarray, progress_bar: ProgressBar = None) -> np
 
         # Iterate through all adjacent vertices of a vertex
         # Parallel processing of adjacent vertices
-        mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
+        mask = ~in_mst & (key > adj[u])
         key[mask] = adj[u, mask]
         for v_idx in vertices[mask]:
-            # Ensure heap has space (extremely unlikely but good practice)
-            if heap_size >= len(heap_w):
+            # Ensure heap has space
+            if heap_size >= len(heap):
                 # Double the size of the heap arrays
-                new_w = np.zeros(len(heap_w) * 2, dtype=np.float32)
-                new_u = np.zeros(len(heap_u) * 2, dtype=np.int32)
-                new_v = np.zeros(len(heap_v) * 2, dtype=np.int32)
-                new_w[:len(heap_w)] = heap_w
-                new_u[:len(heap_u)] = heap_u
-                new_v[:len(heap_v)] = heap_v
-                heap_w, heap_u, heap_v = new_w, new_u, new_v
+                new_len = len(heap) * 2
+                new_heap = np.empty((new_len, 3), dtype=np.float32)
+                new_heap[:len(heap)] = heap
+                heap = new_heap
 
-            custom_heappush(heap_w, heap_u, heap_v, heap_size, np.float32(key[v_idx]), np.int32(v_idx), np.int32(heap_seq_idx))
+            custom_heappush(heap, heap_size, np.float32(key[v_idx]), np.int32(v_idx), np.int32(heap_seq_idx))
             heap_size += 1
             parent[v_idx] = u
 
