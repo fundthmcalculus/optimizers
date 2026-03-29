@@ -19,6 +19,7 @@ dependencies = [
     "contextlib2>=0.6.0",
     "kmodes>=0.12.2",
     "scikit-learn>=1.7.2",
+    "numba-progress",
     "scipy",
     "pandas>=2.0.0",
     "numba"

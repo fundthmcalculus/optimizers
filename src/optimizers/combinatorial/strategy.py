@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
+from numba import njit
 
 from ..core import IOptimizerConfig
 from .base import TSPBase, CombinatoricsResult, check_path_distance
@@ -19,6 +20,7 @@ class TwoOptTSPConfig(IOptimizerConfig):
     """Only check the next nodes, which makes this O(nk), but lower chance of finding crossovers"""
 
 
+@njit
 def _swap_segment(ij, jk, new_route):
     ij += 1
     while ij < jk:
@@ -29,6 +31,35 @@ def _swap_segment(ij, jk, new_route):
         jk -= 1
     return new_route
 
+
+@njit
+def _solve_2_opt(network_routes:np.ndarray, new_route: np.ndarray, nearest_neighbors: int = 0, num_iterations: int = -1,
+                 back_to_start: bool = True) -> tuple[np.ndarray, bool]:
+    no_moves = True
+    cur_iter = 0
+    n = len(new_route)
+    while cur_iter < num_iterations or num_iterations == -1:
+        cur_iter += 1
+        no_moves = True
+        for ij in range(-1 if back_to_start else 0, n - 2):
+            k_nn = n - 1
+            if nearest_neighbors > 0:
+                k_nn = min(k_nn, ij + nearest_neighbors)
+            for jk in range(ij + 2, k_nn):
+                d1 = (
+                        network_routes[new_route[ij], new_route[ij + 1]]
+                        + network_routes[new_route[jk], new_route[jk + 1]]
+                )
+                d2 = (
+                        network_routes[new_route[ij], new_route[jk]]
+                        + network_routes[new_route[ij + 1], new_route[jk + 1]]
+                )
+                if d1 > d2:
+                    new_route = _swap_segment(ij, jk, new_route)
+                    no_moves = False
+        if no_moves:
+            break
+    return new_route, no_moves
 
 class TwoOptTSP(TSPBase):
     def __init__(
@@ -45,30 +76,14 @@ class TwoOptTSP(TSPBase):
         self.initial_route = initial_route
 
     def solve(self) -> CombinatoricsResult:
-        N, new_route = self.setup_local_search()
-        no_moves = True
-        cur_iter = 0
-        while cur_iter < self.config.num_iterations or self.config.num_iterations == -1:
-            cur_iter += 1
-            no_moves = True
-            for ij in range(-1 if self.config.back_to_start else 0, N - 2):
-                k_nn = N - 1
-                if self.config.nearest_neighbors > 0:
-                    k_nn = min(k_nn, ij + self.config.nearest_neighbors)
-                for jk in range(ij + 2, k_nn):
-                    d1 = (
-                        self.network_routes[new_route[ij], new_route[ij + 1]]
-                        + self.network_routes[new_route[jk], new_route[jk + 1]]
-                    )
-                    d2 = (
-                        self.network_routes[new_route[ij], new_route[jk]]
-                        + self.network_routes[new_route[ij + 1], new_route[jk + 1]]
-                    )
-                    if d1 > d2:
-                        new_route = _swap_segment(ij, jk, new_route)
-                        no_moves = False
-            if no_moves:
-                break
+        new_route = self.setup_local_search()
+        new_route, no_moves = _solve_2_opt(
+            network_routes=self.network_routes,
+            new_route=new_route,
+            num_iterations=self.config.num_iterations,
+            back_to_start=self.config.back_to_start,
+            nearest_neighbors=self.config.nearest_neighbors,
+        )
 
         history = [
             check_path_distance(
@@ -83,7 +98,7 @@ class TwoOptTSP(TSPBase):
             stop_reason="no_improvement" if no_moves else "max_iterations",
         )
 
-    def setup_local_search(self) -> tuple[int, AF]:
+    def setup_local_search(self) -> AF:
         if self.initial_route is None or self.initial_value == None:
             # Use the nearest neighbor
             nn_config = NearestNeighborTSPConfig(
@@ -98,8 +113,7 @@ class TwoOptTSP(TSPBase):
             self.initial_route = solution.optimal_path
             self.initial_value = solution.optimal_value
         new_route = self.initial_route.copy()
-        N = self.network_routes.shape[0]
-        return N, new_route
+        return new_route
 
 
 class ThreeOptTSP(TwoOptTSP):

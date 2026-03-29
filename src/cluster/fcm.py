@@ -37,7 +37,7 @@ def fuzzy_c_means(
         c_reshaped = c_opt.reshape(n, x.shape[1])
         return _j_w_c(x, c_reshaped, m)
 
-    result = minimize(optim_j_w_c, c.flatten(), method="BFGS")
+    result = minimize(optim_j_w_c, c.flatten())
     c = result.x.reshape(n, x.shape[1])
 
     # Calculate membership matrix
