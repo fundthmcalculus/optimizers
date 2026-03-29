@@ -1,4 +1,5 @@
 import heapq
+from .heap import heappush as custom_heappush, heappop as custom_heappop
 
 from numba import njit, prange
 import numpy as np
@@ -41,7 +42,7 @@ def compute_ordered_dis_njit_merge(
         ordered_matrix: np.ndarray = np.zeros(
             matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype
         )
-    p, q = vat_prim_mst(matrix_of_pairwise_distance, progress_bar=progress_bar)
+    p, q = vat_prim_mst_custom(matrix_of_pairwise_distance, progress_bar=progress_bar)
     # Step 3 - since this is symmetric, we only have to do half
     n_bit_mask = int(np.ceil(N / 8))
     # Boolean is stored as a byte, so this is smaller
@@ -101,6 +102,99 @@ def _set_bit(bitmask, row, col):
 @njit(cache=True)
 def _get_bit(bitmask, row, col):
     return (bitmask[row, col // 8] >> (col % 8)) & 1
+
+
+@njit(cache=True, nogil=True)
+def vat_prim_mst_custom(adj: np.ndarray, progress_bar: ProgressBar = None) -> np.ndarray:
+    N = len(adj)
+
+    # Find the column of the maximum value.
+    max_adj = np.argmax(adj)
+    src_i = max_adj // N
+    src_j = max_adj % N
+    src_key = adj[src_i, src_j]
+
+    # Create a list for keys and initialize all keys as infinite (INF)
+    key: np.ndarray = np.full(N, float("inf"), dtype=adj.dtype)
+
+    # To store the parent array which, in turn, stores MST
+    parent: np.ndarray = np.full(N, -1, dtype=np.int32)
+
+    # To keep track of vertices included in MST
+    in_mst = np.full(N, False, dtype=np.bool_)
+
+    # Priority queue to store vertices that are being processed
+    # Preallocate buffers for the heap (worst case: N*(N-1)/2, but realistically less)
+    # Let's use a safe size for now.
+    heap_w = np.zeros(N * 4, dtype=np.float32)
+    heap_u = np.zeros(N * 4, dtype=np.int32)
+    heap_v = np.zeros(N * 4, dtype=np.int32)
+    heap_size = 0
+
+    # Insert the source itself into the priority queue and initialize its key as 0
+    custom_heappush(heap_w, heap_u, heap_v, heap_size, np.float32(src_key), np.int32(src_j), np.int32(src_i))
+    heap_size += 1
+    key[src_j] = src_key
+
+    # The final sequence of vertices in MST
+    heap_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    heap_seq_idx = 0
+
+    # Parent sequences of vertices in MST (for iVAT)
+    parent_seq: np.ndarray = np.zeros(N, dtype=np.int32)
+    parent_seq_idx = 0
+
+    # Preallocated
+    vertices = np.arange(N)
+
+    # Loop until the priority queue becomes empty
+    while heap_size > 0:
+        # The first vertex in the pair is the minimum key vertex
+        # Extract it from the priority queue
+        # The vertex label is stored in the second of the pair
+        w = heap_w[0]
+        u = heap_u[0]
+        v = heap_v[0]
+        custom_heappop(heap_w, heap_u, heap_v, heap_size)
+        heap_size -= 1
+
+        # Different key values for the same vertex may exist in the priority queue.
+        # The one with the least key value is always processed first.
+        # Therefore, ignore the rest.
+        if in_mst[u]:
+            continue
+
+        in_mst[u] = True  # Include the vertex in MST
+        heap_seq[heap_seq_idx] = u
+        heap_seq_idx += 1
+
+        parent_seq[parent_seq_idx] = v
+        parent_seq_idx += 1
+
+        if progress_bar is not None:
+            progress_bar.update(1)
+
+        # Iterate through all adjacent vertices of a vertex
+        # Parallel processing of adjacent vertices
+        mask = (vertices != u) & ~in_mst & (key[vertices] > adj[u, vertices])
+        key[mask] = adj[u, mask]
+        for v_idx in vertices[mask]:
+            # Ensure heap has space (extremely unlikely but good practice)
+            if heap_size >= len(heap_w):
+                # Double the size of the heap arrays
+                new_w = np.zeros(len(heap_w) * 2, dtype=np.float32)
+                new_u = np.zeros(len(heap_u) * 2, dtype=np.int32)
+                new_v = np.zeros(len(heap_v) * 2, dtype=np.int32)
+                new_w[:len(heap_w)] = heap_w
+                new_u[:len(heap_u)] = heap_u
+                new_v[:len(heap_v)] = heap_v
+                heap_w, heap_u, heap_v = new_w, new_u, new_v
+
+            custom_heappush(heap_w, heap_u, heap_v, heap_size, np.float32(key[v_idx]), np.int32(v_idx), np.int32(heap_seq_idx))
+            heap_size += 1
+            parent[v_idx] = u
+
+    return heap_seq, parent_seq
 
 
 @njit(cache=True)
@@ -249,3 +343,4 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
 def _get_dist(samples: np.ndarray, idx1: int, idx2: int) -> float:
     diff = samples[idx1, :] - samples[idx2, :]
     return np.sqrt(np.sum(np.square(diff)))
+
