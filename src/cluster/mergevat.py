@@ -6,6 +6,7 @@ from numba_progress import ProgressBar
 from numpy import ndarray
 
 
+@njit(cache=True)
 def compute_ivat(
     matrix_of_pairwise_distance: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -28,7 +29,7 @@ def compute_ivat(
     return d_p_star, d_star, argmin_seq, p_seq
 
 
-@njit(cache=True, parallel=True, nogil=True)
+@njit(cache=True)
 def compute_ordered_dis_njit_merge(
     matrix_of_pairwise_distance: np.ndarray,
     inplace: bool = False,
@@ -41,7 +42,7 @@ def compute_ordered_dis_njit_merge(
         ordered_matrix: np.ndarray = np.zeros(
             matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype
         )
-    p, q = vat_prim_mst(matrix_of_pairwise_distance, progress_bar=progress_bar)
+    p, q = var_prim_mst_multithread(matrix_of_pairwise_distance, progress_bar=progress_bar)
     # Step 3 - since this is symmetric, we only have to do half
     n_bit_mask = int(np.ceil(N / 8))
     # Boolean is stored as a byte, so this is smaller
@@ -101,6 +102,23 @@ def _set_bit(bitmask, row, col):
 @njit(cache=True)
 def _get_bit(bitmask, row, col):
     return (bitmask[row, col // 8] >> (col % 8)) & 1
+
+
+@njit(cache=True)
+def var_prim_mst_multithread(adj: np.ndarray, n_chunks: int = 2, progress_bar: ProgressBar = None) -> tuple[np.ndarray, np.ndarray]:
+    N = len(adj)
+    step_size = N // n_chunks
+    full_vat_order = np.full(N, -1, dtype=np.int32)
+    full_ivat_order = np.full(N, -1, dtype=np.int32)
+    for seg in range(n_chunks):
+        i_start = seg*step_size
+        i_end = (seg+1)*step_size
+        if seg == n_chunks-1:
+            i_end = N
+        small_vat_order, small_ivat_order = vat_prim_mst(adj[i_start:i_end, i_start:i_end], progress_bar=progress_bar)
+        full_vat_order[i_start:i_end] = small_vat_order + i_start
+        full_ivat_order[i_start:i_end] = small_ivat_order + i_start
+    return full_vat_order, full_ivat_order
 
 
 @njit(cache=True)
