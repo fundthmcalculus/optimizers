@@ -160,7 +160,7 @@ def plot_vat_ivat(ivat_mst, vat_mst):
 def test_plot_scaling():
     n = np.logspace(1, 5.1, 96)
     plt.plot(n, n**3, label="$N^3$")
-    plt.plot(n, n**2 * np.log(n), label="$N^2 \log N$")
+    plt.plot(n, n**2 * np.log(n), label="$N^2 log N$")
     plt.xlabel("Number of Elements")
     plt.ylabel("Time Complexity")
     plt.title("Scaling Time Complexity")
@@ -200,8 +200,14 @@ def test_fuzzy_c_means():
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
     # Plot it.
     plot_vat_ivat(ivat_mst, vat_mst)
-    abrupt_change_indices, cluster_city_ids, diagonal_values, max_diff_index, peaks_threshold, sorted_diagonal = identify_ivat_blocks(
-        all_cities, ivat_mst, vat_order)
+    (
+        abrupt_change_indices,
+        cluster_city_ids,
+        diagonal_values,
+        max_diff_index,
+        peaks_threshold,
+        sorted_diagonal,
+    ) = identify_ivat_blocks(all_cities, ivat_mst, vat_order)
 
     # Assert that every city has been allocated to a cluster
     all_allocated_cities = np.concatenate(cluster_city_ids)
@@ -252,7 +258,14 @@ def identify_ivat_blocks(all_cities, ivat_mst, vat_order):
         cg_end = cluster_groups[idx + 1]
         # Use the VAT order to pick out the cities in each cluster
         cluster_city_ids.append(vat_order[cg_start:cg_end])
-    return abrupt_change_indices, cluster_city_ids, diagonal_values, max_diff_index, peaks_threshold, sorted_diagonal
+    return (
+        abrupt_change_indices,
+        cluster_city_ids,
+        diagonal_values,
+        max_diff_index,
+        peaks_threshold,
+        sorted_diagonal,
+    )
 
 
 def plot_fcm_memberships(all_cities, cluster_city_ids, meth_c, w_c):

@@ -33,8 +33,13 @@ def _swap_segment(ij, jk, new_route):
 
 
 @njit
-def _solve_2_opt(network_routes:np.ndarray, new_route: np.ndarray, nearest_neighbors: int = 0, num_iterations: int = -1,
-                 back_to_start: bool = True) -> tuple[np.ndarray, bool]:
+def _solve_2_opt(
+    network_routes: np.ndarray,
+    new_route: np.ndarray,
+    nearest_neighbors: int = 0,
+    num_iterations: int = -1,
+    back_to_start: bool = True,
+) -> tuple[np.ndarray, bool]:
     no_moves = True
     cur_iter = 0
     n = len(new_route)
@@ -47,12 +52,12 @@ def _solve_2_opt(network_routes:np.ndarray, new_route: np.ndarray, nearest_neigh
                 k_nn = min(k_nn, ij + nearest_neighbors)
             for jk in range(ij + 2, k_nn):
                 d1 = (
-                        network_routes[new_route[ij], new_route[ij + 1]]
-                        + network_routes[new_route[jk], new_route[jk + 1]]
+                    network_routes[new_route[ij], new_route[ij + 1]]
+                    + network_routes[new_route[jk], new_route[jk + 1]]
                 )
                 d2 = (
-                        network_routes[new_route[ij], new_route[jk]]
-                        + network_routes[new_route[ij + 1], new_route[jk + 1]]
+                    network_routes[new_route[ij], new_route[jk]]
+                    + network_routes[new_route[ij + 1], new_route[jk + 1]]
                 )
                 if d1 > d2:
                     new_route = _swap_segment(ij, jk, new_route)
@@ -60,6 +65,7 @@ def _solve_2_opt(network_routes:np.ndarray, new_route: np.ndarray, nearest_neigh
         if no_moves:
             break
     return new_route, no_moves
+
 
 class TwoOptTSP(TSPBase):
     def __init__(
