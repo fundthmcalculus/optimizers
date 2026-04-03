@@ -7,12 +7,12 @@ from matplotlib import pyplot as plt
 from sklearn.metrics import pairwise_distances
 
 from cluster import compute_ivat
-from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP
+from optimizers.combinatorial.strategy import TwoOptTSPConfig, TwoOptTSP, ThreeOptTSP
 from test_cluster import identify_ivat_blocks
 from test_combinatorics import circle_random_clusters
 
-# n_clusters = 512
-# n_cities = 64
+# n_clusters = 32
+# n_cities = 32
 # total_points = n_clusters * n_cities
 # all_cities = circle_random_clusters(n_clusters=n_clusters, n_cities=n_cities, cluster_spacing=int(n_clusters/5), cluster_diameter=0.5)
 
@@ -87,7 +87,7 @@ def optimize_cluster(cluster_idx, cluster_cities):
     initial_route = list(range(len(cluster_cities)))
 
     # Initialize optimizer with cluster distances and initial route
-    two_opt_optimizer = TwoOptTSP(
+    two_opt_optimizer = ThreeOptTSP(
         two_opt_config,
         initial_route=initial_route,
         initial_value=np.sum(
