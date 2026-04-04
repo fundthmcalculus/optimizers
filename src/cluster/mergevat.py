@@ -35,14 +35,22 @@ def compute_ordered_dis_njit_merge(
     inplace: bool = False,
     progress_bar: ProgressBar = None,
 ) -> tuple[np.ndarray, list[int], list[int]]:
-    N = matrix_of_pairwise_distance.shape[0]
+    p, q = vat_prim_mst_custom(matrix_of_pairwise_distance, progress_bar=progress_bar)
+    ordered_matrix = shuffle_array(inplace, matrix_of_pairwise_distance, p, progress_bar)
+
+    # Step 4 - since this is symmetric, we only have to do half
+    return ordered_matrix, p, q
+
+
+@njit(cache=True, parallel=True, nogil=True)
+def shuffle_array(inplace: bool, matrix_of_pairwise_distance: ndarray, p: ndarray, progress_bar: ProgressBar = None) -> ndarray:
     if inplace:
         ordered_matrix = matrix_of_pairwise_distance
     else:
         ordered_matrix: np.ndarray = np.zeros(
             matrix_of_pairwise_distance.shape, dtype=matrix_of_pairwise_distance.dtype
         )
-    p, q = vat_prim_mst_custom(matrix_of_pairwise_distance, progress_bar=progress_bar)
+    N = matrix_of_pairwise_distance.shape[0]
     # Step 3 - since this is symmetric, we only have to do half
     n_bit_mask = int(np.ceil(N / 8))
     # Boolean is stored as a byte, so this is smaller
@@ -66,11 +74,9 @@ def compute_ordered_dis_njit_merge(
                 if progress_bar is not None:
                     progress_bar.update(1)
 
-    # Step 4 - since this is symmetric, we only have to do half
-    return ordered_matrix, p, q
+    return ordered_matrix
 
-
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def shuffle_ordered_column(
     N: int, ij: int, ordered_matrix: ndarray, p: ndarray, visited: ndarray
 ):

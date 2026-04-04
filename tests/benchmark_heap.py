@@ -2,6 +2,8 @@
 import matplotlib.pyplot as plt
 import time
 import numpy as np
+
+from cluster.mergevat import shuffle_array
 from src.cluster.mergevat import vat_prim_mst, vat_prim_mst_custom
 
 def benchmark_vat_mst():
@@ -46,12 +48,22 @@ def benchmark_vat_mst():
         print(f"Original vat_prim_mst (heapq) average time: {original_time:.3f} seconds")
 
         # Benchmark custom
+        ts= []
         start_time = time.time()
         for _ in range(n_passes):
+            t0 = time.time_ns()
             h_seq2, p_seq2 = vat_prim_mst_custom(adj)
+            t1 = time.time_ns()
+            shuffle_array(True, adj, p_seq2)
+            t2 = time.time_ns()
+            ts.append([t0, t1, t2])
         end_time = time.time()
         custom_time = (end_time - start_time) / n_passes
         print(f"Custom vat_prim_mst (binary heap) average time: {custom_time:.3f} seconds")
+        ts = np.array(ts)
+        dt = np.diff(ts, axis=1)
+        dt = np.mean(dt, axis=0)/1E9
+        print(f"Average vat_prim_mst: {dt[0]:.2f}, shuffle: {dt[1]:.2f}")
 
         speedup = original_time / custom_time
         print(f"Speedup: {speedup:.2f}x")
