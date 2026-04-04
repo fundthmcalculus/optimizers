@@ -289,7 +289,7 @@ def vat_prim_mst_custom(adj: np.ndarray, progress_bar: ProgressBar = None) -> np
     return heap_seq, parent_seq
 
 
-@njit(cache=True)
+@njit(cache=True, nogil=True)
 def vat_prim_mst(adj: np.ndarray, progress_bar: ProgressBar = None) -> np.ndarray:
     N = len(adj)
 
