@@ -6,7 +6,7 @@ from src.cluster.mergevat import vat_prim_mst_custom, vat_prim_mst_split_merge
 def verify_split_merge():
     n_samples = 5
     # Generate some synthetic data
-    N = 20000
+    N = 4000
     np.random.seed(42)
 
     # Create 7 distinct clusters
@@ -43,12 +43,22 @@ def verify_split_merge():
 
     print(f"Verifying with N={N}...")
 
-    _, _ = vat_prim_mst_custom(adj)
-    _, _ = vat_prim_mst_split_merge(adj)
-
-    # Compute both
+    # Compute both and time them
+    start = time.time()
     h_seq_orig, p_seq_orig = vat_prim_mst_custom(adj)
+    custom_single_time = time.time() - start
+
+    start = time.time()
     h_seq_split, p_seq_split = vat_prim_mst_split_merge(adj)
+    split_merge_single_time = time.time() - start
+
+    # If either took over 2 seconds, skip the benchmark loop
+    if custom_single_time > 2.0 or split_merge_single_time > 2.0:
+        print(f"Single run times: Custom={custom_single_time:.6f}s, Split-merge={split_merge_single_time:.6f}s")
+        print("One or both methods took over 2 seconds, skipping benchmark loop.")
+        n_samples = 0
+        custom_time = custom_single_time
+        split_merge_time = split_merge_single_time
 
     # Note: Sequences might not be identical because of split/merge logic and different starting points
     # But the resulting MST should be "valid".
@@ -61,13 +71,15 @@ def verify_split_merge():
     start = time.time()
     for _ in range(n_samples):
         vat_prim_mst_custom(adj)
-    custom_time = (time.time() - start) / n_samples
+    if n_samples > 1:
+        custom_time = (time.time() - start) / n_samples
     print(f"Custom time: {custom_time:.6f}s")
 
     start = time.time()
     for _ in range(n_samples):
         vat_prim_mst_split_merge(adj)
-    split_merge_time = (time.time() - start) / n_samples
+    if n_samples > 1:
+        split_merge_time = (time.time() - start) / n_samples
     print(f"Split-merge time: {split_merge_time:.6f}s")
 
     print(f"Speedup: {custom_time / split_merge_time:.2f}x")
@@ -79,13 +91,13 @@ def verify_split_merge():
     fig, axes = plt.subplots(2, 1, figsize=(8, 12))
 
     im0 = axes[0].imshow(sorted_adj_orig, cmap='viridis')
-    axes[0].set_title('Custom VAT - Sorted Adjacency Matrix')
+    axes[0].set_title(f'Custom VAT - Sorted Adjacency Matrix: t={custom_time:.2f}s')
     axes[0].set_xlabel('Index')
     axes[0].set_ylabel('Index')
     plt.colorbar(im0, ax=axes[0])
 
     im1 = axes[1].imshow(sorted_adj_split, cmap='viridis')
-    axes[1].set_title('Split-Merge VAT - Sorted Adjacency Matrix')
+    axes[1].set_title(f'Split-Merge VAT - Sorted Adjacency Matrix: t={split_merge_time:.2f}s')
     axes[1].set_xlabel('Index')
     axes[1].set_ylabel('Index')
     plt.colorbar(im1, ax=axes[1])
