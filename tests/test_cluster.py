@@ -160,9 +160,11 @@ def plot_vat_ivat(ivat_mst, vat_mst):
 
 
 def test_plot_scaling():
-    n = np.logspace(1, 5.1, 96)
-    plt.plot(n, n**3, label="$N^3$")
+    n = np.logspace(1, 5.1, 96) # 5.1
+    # plt.plot(n, n**3, label="$N^3$")
     plt.plot(n, n**2 * np.log(n), label="$N^2 \log N$")
+    plt.plot(n, n**2 * np.log(np.log(n)), label="$N^2 \log \log N$")
+    plt.plot(n, n * np.log(n)**2, label="$N \log ^2 N$")
     plt.xlabel("Number of Elements")
     plt.ylabel("Time Complexity")
     plt.title("Scaling Time Complexity")
