@@ -12,19 +12,19 @@ from ..core.types import AI, AF, F, i32, i16
 
 @dataclass
 class AntColonyTSPConfig(IOptimizerConfig):
-    rho: float = 0.451  # 0.5
+    rho: float = 0.2  # 0.451  # 0.5
     """Pheromone decay parameter"""
-    alpha: float = 1.88  # 1.0
+    alpha: float = 0.8  # 1.88  # 1.0
     """Pheromone deposit parameter"""
-    beta: float = 1.88  # 1.0
+    beta: float = 2  # 1.88  # 1.0
     """Pheromone evaporation parameter"""
-    q: float = 2.17  # 1.0
+    q: float = 1  # 2.17  # 1.0
     """Weighting parameter for selecting better ranked solutions"""
     back_to_start: bool = True
     """Whether to return to the start node"""
     local_optimize: bool = False
     """Local optimization using 2OPT method"""
-    hot_start: Optional[list[int]] = None
+    hot_start: Optional[np.ndarray] = None
     """Hot start solution"""
     hot_start_length: Optional[float] = None
     """Hot start length"""
@@ -48,7 +48,7 @@ class AntColonyTSP(TSPBase):
         # Pheromone matrix
         tau = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
-        optimal_city_order: Optional[list[int]] = None
+        optimal_city_order: Optional[np.ndarray] = None
         tour_lengths = []
         optimal_tour_length = np.inf
         if self.config.hot_start is not None:
@@ -158,8 +158,6 @@ def run_ant(
     cur_city = 0  # Offset by 1, so we start at city 1
     eta_shape_ = eta.shape[0]
     order_len = eta_shape_
-    if config.back_to_start:
-        order_len += 1
     # If fewer than 32,000 cities, we can use i16
     dtype = i32
     if order_len < 32000:
@@ -183,8 +181,7 @@ def run_ant(
                 total_length = np.inf
             # IF back-to-start, include that option
             if config.back_to_start:
-                city_order[-1] = 0
-                total_length += network_routes[city_order[-2], city_order[-1]]
+                total_length += network_routes[city_order[-1], city_order[0]]
             break
         # Choose the next city
         cur_city = np.random.choice(choice_indexes, p=p)

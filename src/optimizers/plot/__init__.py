@@ -23,7 +23,7 @@ def plot_convergence(
                 x=np.r_[0 : len(trace)],
                 y=trace,
                 mode="lines+markers",
-                name=trace_names[i_t] if trace_names else f"Tour Length-{i_t+1}",
+                name=trace_names[i_t] if trace_names else f"Run-{i_t+1}",
                 line=dict(width=2),
                 marker=dict(size=6),
             )
@@ -33,7 +33,7 @@ def plot_convergence(
     fig.update_layout(
         title="Convergence",
         xaxis_title="Generation",
-        yaxis_title="Tour Length",
+        yaxis_title="Output Value",
         template="plotly_white",
         hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
@@ -64,18 +64,37 @@ def plot_cities_and_route(
 
     # Plot route
     for ir, route in enumerate(route):
-        route_cities = np.vstack(
-            (cities[route], cities[route[0]])
-        )  # Connect back to start
-        fig.add_trace(
-            go.Scatter(
-                x=route_cities[:, 0],
-                y=route_cities[:, 1],
-                mode="lines",
-                name=trace_names[ir] if trace_names else f"Route-{ir+1}",
-                line=dict(width=2),
+        # If 1D, this is a tour, if 2D, this is a route
+        if route.ndim == 1:
+            route_cities = np.vstack(
+                (cities[route], cities[route[0]])
+            )  # Connect back to start
+            fig.add_trace(
+                go.Scatter(
+                    x=route_cities[:, 0],
+                    y=route_cities[:, 1],
+                    mode="lines",
+                    name=trace_names[ir] if trace_names else f"Route-{ir+1}",
+                    line=dict(width=2),
+                )
             )
-        )
+        elif route.ndim == 2:
+            x_route = list()
+            y_route = list()
+            for _, r in enumerate(route):
+                x_route.extend(cities[r, 0][:])
+                y_route.extend(cities[r, 1][:])
+                x_route.append(None)
+                y_route.append(None)
+            fig.add_trace(
+                go.Scatter(
+                    x=x_route,
+                    y=y_route,
+                    mode="lines",
+                    name=trace_names[ir] if trace_names else f"MST-{ir+1}",
+                    line=dict(width=2),
+                )
+            )
 
     fig.update_layout(
         title="TSP Route",
@@ -83,6 +102,7 @@ def plot_cities_and_route(
         yaxis_title="Y",
         showlegend=True,
         template="plotly_white",
+        yaxis=dict(scaleanchor="x", scaleratio=1),
     )
 
     fig.show()

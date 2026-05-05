@@ -17,14 +17,13 @@ from ..core.base import (
     JoblibPrefer,
     setup_for_generations,
     Phase,
+    InputArguments,
+    GoalFcn,
 )
 from ..core.types import AF, F
 from ..solution_deck import (
-    GoalFcn,
-    InputArguments,
     SolutionDeck,
     WrappedGoalFcn,
-    WrappedConstraintFcn,
 )
 
 
@@ -69,8 +68,6 @@ class IOptimizer(abc.ABC):
         variables: InputVariables,
         args: Optional[InputArguments] = None,
         existing_soln_deck: Optional[SolutionDeck] = None,
-        inequality_constraints: Optional[list[GoalFcn]] = None,
-        equality_constraints: Optional[list[GoalFcn]] = None,
     ):
         self.config: IOptimizerConfig = config
         self.variables: InputVariables = variables
@@ -113,35 +110,12 @@ class IOptimizer(abc.ABC):
 
             return __wrapped  # type: ignore[return-value]
 
-        def _wrap_constraint(func: GoalFcn) -> WrappedConstraintFcn:
-            takes_args = _accepts_args(func)
-
-            def __wrapped(x: AF, _f=func, _ap=self._arg_provider):
-                _ap.bump_eval()
-                if takes_args:
-                    return _f(x, _ap.current())
-                return _f(x)
-
-            return __wrapped  # type: ignore[return-value]
-
         # Wrap the goal function and constraint functions
         self.wrapped_fcn: WrappedGoalFcn = _wrap_goal(fcn)
 
-        wrapped_ineq: list[WrappedConstraintFcn] | None = None
-        wrapped_eq: list[WrappedConstraintFcn] | None = None
-        if inequality_constraints:
-            wrapped_ineq = [_wrap_constraint(g) for g in inequality_constraints]
-        if equality_constraints:
-            wrapped_eq = [_wrap_constraint(h) for h in equality_constraints]
-
-        # Save wrapped constraints for use by optimizers that don't use SolutionDeck internally
-        self.wrapped_ineq_constraints = wrapped_ineq or []
-        self.wrapped_eq_constraints = wrapped_eq or []
         self.soln_deck = existing_soln_deck or SolutionDeck(
             archive_size=config.solution_archive_size,
             num_vars=len(variables),
-            inequality_constraints=self.wrapped_ineq_constraints,
-            equality_constraints=self.wrapped_eq_constraints,
         )
 
     def _set_phase(self, phase: Phase) -> None:
@@ -165,13 +139,12 @@ class IOptimizer(abc.ABC):
 
     def initialize(
         self, preserve_percent: float
-    ) -> tuple[AF, tqdm.tqdm, int, int, int, joblib.Parallel, bool]:
+    ) -> tuple[list[F], tqdm.tqdm, int, int, int, joblib.Parallel, bool]:
         self.validate_config()
         self.soln_deck.initialize_solution_deck(
             self.variables, self.wrapped_fcn, preserve_percent
         )
         self.soln_deck.sort()
-        best_soln_history = np.zeros(self.config.num_generations)
 
         # Add the progress bar
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
@@ -180,7 +153,7 @@ class IOptimizer(abc.ABC):
         stopped_early = False
         generations_completed = 0
         return (
-            best_soln_history,
+            [],
             generation_pbar,
             generations_completed,
             individuals_per_job,
@@ -206,7 +179,7 @@ class IOptimizer(abc.ABC):
         Validate the configuration parameters.
         """
         # Validate joblib prefer value against allowed Literal options
-        ensure_literal_choice("joblib_prefer", self.config.joblib_prefer, JoblibPrefer)
+        ensure_literal_choice(self.config.joblib_prefer, JoblibPrefer)
         # Set the default values for the config
         if self.config.solution_archive_size < 0:
             self.config.solution_archive_size = len(self.variables) * 2
@@ -220,16 +193,16 @@ class IOptimizer(abc.ABC):
 
 
 def check_stop_early(
-    config: IOptimizerConfig, best_soln_history: AF, solution_values: AF
+    config: IOptimizerConfig, best_soln_history: list[F], solution_values: AF
 ) -> StopReason:
     if solution_values[0] <= config.target_score:
         print("Target score reached, terminating early.")
         return "target_score"
     # Check if the solution hasn't improved
+    if len(best_soln_history) < config.stop_after_iterations:
+        return "none"
     recent_history = best_soln_history[-config.stop_after_iterations :]
-    if np.allclose(recent_history, recent_history[0], rtol=1e-2, atol=1e-2) and np.all(
-        recent_history > 0
-    ):
+    if np.allclose(recent_history[-1], recent_history[0], rtol=1e-2, atol=1e-2):
         print(
             f"No improvement in last {config.stop_after_iterations} iterations. Stopping early."
         )

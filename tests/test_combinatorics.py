@@ -1,17 +1,12 @@
-import os.path
-from typing import List
-
 import numpy as np
-import plotly.graph_objects as go
 from sklearn.metrics import pairwise_distances
-import numpy as np
 
-from optimizers.combinatorial.ga import GeneticAlgorithmTSPConfig, GeneticAlgorithmTSP
-from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.aco import (
     AntColonyTSPConfig,
     AntColonyTSP,
 )
+from optimizers.combinatorial.ga import GeneticAlgorithmTSPConfig, GeneticAlgorithmTSP
+from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.combinatorial.strategy import (
     NearestNeighborTSPConfig,
     NearestNeighborTSP,
@@ -21,7 +16,7 @@ from optimizers.combinatorial.strategy import (
     ConvexHullTSPConfig,
     ConvexHullTSP,
 )
-from optimizers.core.types import AF, AI
+from optimizers.core.types import AF
 from optimizers.plot import plot_convergence, plot_cities_and_route
 
 N_CITIES_CLUSTER = 20
@@ -31,23 +26,38 @@ N_ANTS = 10 * N_CITIES_CLUSTER
 N_GENERATIONS = 5 * N_CLUSTERS
 
 CLUSTER_DIAMETER = 3
-CLUSTER_SPACING = 1 * CLUSTER_DIAMETER
+CLUSTER_SPACING = 4 * CLUSTER_DIAMETER
 
 HALF_CIRCLE = False
 
 
-def random_cities(center_x, center_y, n_cities=-1) -> np.ndarray:
+def random_cities(
+    center_x, center_y, n_cities: int = -1, cluster_diameter: int = -1
+) -> np.ndarray:
+    cluster_diameter = cluster_diameter if cluster_diameter > 0 else CLUSTER_DIAMETER
     if n_cities == -1:
         n_cities = N_CITIES_CLUSTER
+    if n_cities == 1:
+        return np.array([[center_x, center_y]])
     # Randomly distribute cities in a uniform circle?
     theta = np.linspace(0, 2 * np.pi, n_cities + 1, dtype=np.float32)
     theta = theta[:-1]
-    city_x = np.cos(theta) * CLUSTER_DIAMETER / 2.0 + center_x
-    city_y = np.sin(theta) * CLUSTER_DIAMETER / 2.0 + center_y
+    # Add slight random scramble to locations
+    scramble = np.random.uniform(
+        -cluster_diameter * 0.1, cluster_diameter * 0.1, size=(n_cities, 2)
+    )
+    city_x = np.cos(theta) * cluster_diameter / 2.0 + center_x + scramble[:, 0]
+    city_y = np.sin(theta) * cluster_diameter / 2.0 + center_y + scramble[:, 1]
     return np.c_[city_x, city_y]
 
 
-def circle_random_clusters(n_clusters=-1, n_cities=-1) -> np.ndarray:
+def circle_random_clusters(
+    n_clusters: int = -1,
+    n_cities: int = -1,
+    cluster_diameter: int = -1,
+    cluster_spacing: int = -1,
+) -> np.ndarray:
+    cluster_spacing = cluster_spacing if cluster_spacing > 0 else CLUSTER_SPACING
     if n_clusters == -1:
         n_clusters = N_CLUSTERS
     city_locations = np.zeros(shape=(0, 2), dtype=np.float32)
@@ -56,10 +66,16 @@ def circle_random_clusters(n_clusters=-1, n_cities=-1) -> np.ndarray:
             theta /= 2.0
         else:
             theta *= n_clusters / (n_clusters + 1)
-        cx = CLUSTER_SPACING * np.cos(theta)
-        cy = CLUSTER_SPACING * np.sin(theta)
+        cx = cluster_spacing * np.cos(theta)
+        cy = cluster_spacing * np.sin(theta)
         city_locations = np.concatenate(
-            (city_locations, random_cities(cx, cy, n_cities=n_cities)), axis=0
+            (
+                city_locations,
+                random_cities(
+                    cx, cy, n_cities=n_cities, cluster_diameter=cluster_diameter
+                ),
+            ),
+            axis=0,
         )
     return city_locations
 
@@ -67,6 +83,26 @@ def circle_random_clusters(n_clusters=-1, n_cities=-1) -> np.ndarray:
 def poly_perimeter(n_sides, r):
     # Compute perimeter of inscribed polygon in circle of radius, r.
     return n_sides * 2 * r * np.sin(2 * np.pi / (2 * n_sides))
+
+
+def test_aco_mst():
+    all_cities = circle_random_clusters()
+    # Compute all distances
+    distances: AF = pairwise_distances(all_cities)
+    # Compute TSP optimized distance
+    config = AntColonyTSPConfig(
+        name="Test TSP",
+        num_generations=N_GENERATIONS,
+        population_size=N_ANTS,
+        stop_after_iterations=5,
+        joblib_prefer="threads",
+    )
+    optimizer = AntColonyTSP(
+        config, network_routes=distances, city_locations=all_cities
+    )
+    result = optimizer.solve()
+    plot_convergence(result.value_history)
+    plot_cities_and_route(all_cities, result.optimal_path)
 
 
 def test_aco_tsp():

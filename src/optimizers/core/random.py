@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import os
 import random as pyrandom
 from typing import Optional
