@@ -45,9 +45,7 @@ def _init_worker(token: str, payload: Any) -> None:
     _FIXED[token] = payload
 
 
-def _call_with_fixed(
-    worker_fn: Callable, token: str, args: Sequence[Any]
-) -> Any:
+def _call_with_fixed(worker_fn: Callable, token: str, args: Sequence[Any]) -> Any:
     # Runs in the worker: resolve the once-shipped fixed payload and call through.
     return worker_fn(_FIXED[token], *args)
 
