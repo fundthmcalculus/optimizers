@@ -81,7 +81,9 @@ class AntColonyTSP(TSPBase):
                     results = []
                     for _ in range(individuals_per_job):
                         results.append(
-                            run_ant(self.network_routes, eta_beta, tau_alpha, self.config)
+                            run_ant(
+                                self.network_routes, eta_beta, tau_alpha, self.config
+                            )
                         )
                     return results
 

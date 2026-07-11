@@ -52,10 +52,7 @@ class InputVariable(ABC):
         override with a vectorized version.
         """
         return np.array(
-            [
-                self.perturb_value(cv, perturbation)
-                for cv in np.asarray(current_values)
-            ]
+            [self.perturb_value(cv, perturbation) for cv in np.asarray(current_values)]
         )
 
     @abstractmethod
