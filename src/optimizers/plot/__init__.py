@@ -1,118 +1,140 @@
+import os
 from typing import Any
 
-import numpy as np
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import matplotlib
 
-from ..core.types import AF, AI
+_TRUTHY = {"1", "true", "yes", "on"}
+
+
+def _env_no_show() -> bool:
+    """Whether the ``OPTIMIZERS_NO_SHOW`` environment variable disables display."""
+    return os.environ.get("OPTIMIZERS_NO_SHOW", "").strip().lower() in _TRUTHY
+
+
+# Select a non-interactive backend *before* pyplot is imported when display is
+# disabled, so that importing this module never tries to reach a screen/browser.
+# This is what makes the library safe for headless/agentic/CI runs.
+if _env_no_show():
+    matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+from matplotlib.figure import Figure  # noqa: E402
+
+from ..core.types import AF, AI  # noqa: E402
+
+# Global runtime toggle. Defaults to the env var, but can be flipped at runtime
+# via ``set_show_plots`` (e.g. from a pytest fixture) without touching the env.
+_show_plots = not _env_no_show()
+
+
+def set_show_plots(enabled: bool) -> None:
+    """Globally enable or disable interactive display of plots.
+
+    When disabled, plotting functions build and return the figure but do not
+    call ``plt.show()`` (the figure is closed to free memory). This is the
+    switch tests and agents use to run fully offline.
+    """
+    global _show_plots
+    _show_plots = enabled
+
+
+def show_plots_enabled() -> bool:
+    """Return whether plots are currently displayed when created."""
+    return _show_plots
+
+
+def _finish(fig: Figure) -> Figure:
+    """Show the figure if display is enabled, otherwise close it. Returns the figure."""
+    if _show_plots:
+        plt.show()
+    else:
+        plt.close(fig)
+    return fig
 
 
 def plot_convergence(
     tour_lengths: np.ndarray | list[np.ndarray], trace_names: list[str] | None = None
-) -> None:
-    # Create the figure
-    fig = go.Figure()
-
+) -> Figure:
     if not isinstance(tour_lengths, list):
         tour_lengths = tour_lengths.reshape(1, -1)
 
-    # Add the line trace
+    fig, ax = plt.subplots(figsize=(8, 5))
+
     for i_t, trace in enumerate(tour_lengths):
-        fig.add_trace(
-            go.Scatter(
-                x=np.r_[0 : len(trace)],
-                y=trace,
-                mode="lines+markers",
-                name=trace_names[i_t] if trace_names else f"Run-{i_t+1}",
-                line=dict(width=2),
-                marker=dict(size=6),
-            )
+        ax.plot(
+            np.arange(len(trace)),
+            trace,
+            marker="o",
+            markersize=4,
+            linewidth=2,
+            label=trace_names[i_t] if trace_names else f"Run-{i_t + 1}",
         )
 
-    # Update layout
-    fig.update_layout(
-        title="Convergence",
-        xaxis_title="Generation",
-        yaxis_title="Output Value",
-        template="plotly_white",
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
+    ax.set_title("Convergence")
+    ax.set_xlabel("Generation")
+    ax.set_ylabel("Output Value")
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper right")
+    fig.tight_layout()
 
-    # Show the figure
-    fig.show()
+    return _finish(fig)
 
 
 def plot_cities_and_route(
     cities: AF, route: AI | list[AI], trace_names: list[str] | None = None
-) -> None:
-    fig = go.Figure()
+) -> Figure:
+    fig, ax = plt.subplots(figsize=(8, 8))
 
     # Plot cities
-    fig.add_trace(
-        go.Scatter(
-            x=cities[:, 0],
-            y=cities[:, 1],
-            mode="markers",
-            name="Cities",
-            marker=dict(size=8, color="blue"),
-        )
-    )
+    ax.scatter(cities[:, 0], cities[:, 1], s=64, c="blue", label="Cities", zorder=3)
 
     if not isinstance(route, list):
         route = [route]
 
-    # Plot route
-    for ir, route in enumerate(route):
-        # If 1D, this is a tour, if 2D, this is a route
-        if route.ndim == 1:
-            route_cities = np.vstack(
-                (cities[route], cities[route[0]])
-            )  # Connect back to start
-            fig.add_trace(
-                go.Scatter(
-                    x=route_cities[:, 0],
-                    y=route_cities[:, 1],
-                    mode="lines",
-                    name=trace_names[ir] if trace_names else f"Route-{ir+1}",
-                    line=dict(width=2),
-                )
+    # Plot route(s)
+    for ir, r in enumerate(route):
+        # If 1D, this is a tour; if 2D, this is a route/MST.
+        if r.ndim == 1:
+            route_cities = np.vstack((cities[r], cities[r[0]]))  # Connect back to start
+            ax.plot(
+                route_cities[:, 0],
+                route_cities[:, 1],
+                linewidth=2,
+                label=trace_names[ir] if trace_names else f"Route-{ir + 1}",
             )
-        elif route.ndim == 2:
-            x_route = list()
-            y_route = list()
-            for _, r in enumerate(route):
-                x_route.extend(cities[r, 0][:])
-                y_route.extend(cities[r, 1][:])
-                x_route.append(None)
-                y_route.append(None)
-            fig.add_trace(
-                go.Scatter(
-                    x=x_route,
-                    y=y_route,
-                    mode="lines",
-                    name=trace_names[ir] if trace_names else f"MST-{ir+1}",
-                    line=dict(width=2),
-                )
+        elif r.ndim == 2:
+            x_route: list[float] = list()
+            y_route: list[float] = list()
+            for seg in r:
+                x_route.extend(cities[seg, 0][:])
+                y_route.extend(cities[seg, 1][:])
+                # NaN breaks the line between disjoint segments (matplotlib
+                # equivalent of plotly's ``None`` gap markers).
+                x_route.append(np.nan)
+                y_route.append(np.nan)
+            ax.plot(
+                x_route,
+                y_route,
+                linewidth=2,
+                label=trace_names[ir] if trace_names else f"MST-{ir + 1}",
             )
 
-    fig.update_layout(
-        title="TSP Route",
-        xaxis_title="X",
-        yaxis_title="Y",
-        showlegend=True,
-        template="plotly_white",
-        yaxis=dict(scaleanchor="x", scaleratio=1),
-    )
+    ax.set_title("TSP Route")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.legend(loc="best")
+    fig.tight_layout()
 
-    fig.show()
+    return _finish(fig)
 
 
 def plot_run_statistics(
     summary_or_scores: dict[str, Any] | np.ndarray | list[float],
     runtimes: np.ndarray | list[float] | None = None,
     title_prefix: str = "Run Statistics",
-) -> None:
+) -> Figure:
     """Render box-and-whisker plots for final scores and total runtimes across runs.
 
     Parameters
@@ -132,39 +154,19 @@ def plot_run_statistics(
         scores = np.asarray(summary_or_scores, dtype=float)
         rtimes = np.asarray(runtimes if runtimes is not None else [], dtype=float)
 
-    # Create two subplots vertically using specifications
-    fig = make_subplots(rows=1, cols=2, specs=[[{"type": "box"}, {"type": "box"}]])
+    fig, (ax_scores, ax_rtimes) = plt.subplots(1, 2, figsize=(10, 5))
 
-    # Box for Scores
-    fig.add_trace(
-        go.Box(
-            y=scores,
-            name="Final Score",
-            boxmean=True,
-            marker_color="#1f77b4",
-        ),
-        row=1,
-        col=1,
-    )
+    # Box for scores
+    if scores.size:
+        ax_scores.boxplot(scores, showmeans=True, tick_labels=["Final Score"])
+    ax_scores.set_ylabel("Final Score")
 
-    # Create a second independent y-axis for runtimes by adding as another trace with different x name
-    fig.add_trace(
-        go.Box(
-            y=rtimes,
-            name="Runtime (s)",
-            boxmean=True,
-            marker_color="#ff7f0e",
-        ),
-        row=1,
-        col=2,
-    )
+    # Box for runtimes (independent axis/scale)
+    if rtimes.size:
+        ax_rtimes.boxplot(rtimes, showmeans=True, tick_labels=["Runtime (s)"])
+    ax_rtimes.set_ylabel("Runtime (seconds)")
 
-    fig.update_layout(
-        title=f"{title_prefix}: Final Score and Runtime",
-        template="plotly_white",
-        showlegend=False,
-        yaxis_title="Final Score",
-        yaxis2_title="Runtime (seconds)",
-    )
+    fig.suptitle(f"{title_prefix}: Final Score and Runtime")
+    fig.tight_layout()
 
-    fig.show()
+    return _finish(fig)
