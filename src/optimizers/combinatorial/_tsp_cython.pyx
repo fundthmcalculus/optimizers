@@ -274,3 +274,185 @@ def check_path_distance(distances, route, bint back_to_start=True):
         if back_to_start and n >= 1:
             total += D[Rv[n - 1], 0]
     return total
+
+
+# --------------------------- Lin-Kernighan -----------------------------------
+# Mirrors strategy._lk_kernel move-for-move (candidate-list 2-opt + Or-opt of
+# length 1-3), so results are bit-identical to the numba kernel. Per-row scratch
+# (position map + rebuild buffer) is passed in so the inner loop stays ``nogil``
+# and the *_batch variant can run rows over OpenMP threads with no allocation.
+
+
+cdef void _lk_relocate(
+    Py_ssize_t[:, ::1] routes,
+    Py_ssize_t r,
+    Py_ssize_t[:, ::1] pos,
+    Py_ssize_t s,
+    Py_ssize_t seg_len,
+    Py_ssize_t anchor_pos,
+    bint reverse,
+    Py_ssize_t n,
+    Py_ssize_t[:, ::1] scratch,
+) noexcept nogil:
+    cdef Py_ssize_t seg[3]
+    cdef Py_ssize_t t, x, idx, anchor_city
+    for t in range(seg_len):
+        seg[t] = routes[r, s + seg_len - 1 - t] if reverse else routes[r, s + t]
+    anchor_city = routes[r, anchor_pos]
+    idx = 0
+    for x in range(n):
+        if s <= x <= s + seg_len - 1:
+            continue
+        scratch[r, idx] = routes[r, x]
+        idx += 1
+        if routes[r, x] == anchor_city:
+            for t in range(seg_len):
+                scratch[r, idx] = seg[t]
+                idx += 1
+    for x in range(n):
+        routes[r, x] = scratch[r, x]
+        pos[r, routes[r, x]] = x
+
+
+cdef long _lk_row(
+    double[:, ::1] D,
+    Py_ssize_t[:, ::1] routes,
+    Py_ssize_t r,
+    Py_ssize_t[:, ::1] pos,
+    Py_ssize_t[:, ::1] scratch,
+    Py_ssize_t[:, ::1] cand,
+    Py_ssize_t n,
+    Py_ssize_t k,
+    long max_passes,
+) noexcept nogil:
+    cdef double eps = 1e-9
+    cdef Py_ssize_t i, ci, a, b, c, d, j, lo, hi, p, q, tmp
+    cdef Py_ssize_t seg_len, s, s0, sl, prev, nxt, anchor, cnext, best_pos
+    cdef Py_ssize_t ddir, src
+    cdef double d_ab, d_ac, removed, base, gain_f, gain_r, best_gain
+    cdef bint improved, best_rev
+    cdef long total_moves = 0
+    cdef long _pass
+    for i in range(n):
+        pos[r, routes[r, i]] = i
+    for _pass in range(max_passes):
+        improved = False
+        # ---- candidate-list 2-opt (both directions) ----
+        for i in range(n):
+            a = routes[r, i]
+            for ddir in range(2):
+                b = routes[r, (i + 1) % n] if ddir == 0 else routes[r, (i - 1 + n) % n]
+                d_ab = D[a, b]
+                for ci in range(k):
+                    c = cand[a, ci]
+                    d_ac = D[a, c]
+                    if d_ac >= d_ab:
+                        break
+                    j = pos[r, c]
+                    d = routes[r, (j + 1) % n] if ddir == 0 else routes[r, (j - 1 + n) % n]
+                    if c == b or d == a:
+                        continue
+                    if d_ab + D[c, d] - d_ac - D[b, d] <= eps:
+                        continue
+                    lo = i if ddir == 0 else (i - 1 + n) % n
+                    hi = j if ddir == 0 else (j - 1 + n) % n
+                    p = (lo if lo < hi else hi) + 1
+                    q = hi if lo < hi else lo
+                    while p < q:
+                        tmp = routes[r, p]
+                        routes[r, p] = routes[r, q]
+                        routes[r, q] = tmp
+                        pos[r, routes[r, p]] = p
+                        pos[r, routes[r, q]] = q
+                        p += 1
+                        q -= 1
+                    improved = True
+                    total_moves += 1
+                    break
+        # ---- Or-opt: relocate length 1..3 segments ----
+        for seg_len in range(1, 4):
+            for s in range(0, n - seg_len):
+                s0 = routes[r, s]
+                sl = routes[r, s + seg_len - 1]
+                prev = routes[r, (s - 1 + n) % n]
+                nxt = routes[r, (s + seg_len) % n]
+                if prev == sl or nxt == s0:
+                    continue
+                removed = D[prev, s0] + D[sl, nxt] - D[prev, nxt]
+                best_gain = eps
+                best_pos = -1
+                best_rev = False
+                for src in range(2):
+                    anchor = s0 if src == 0 else sl
+                    for ci in range(k):
+                        c = cand[anchor, ci]
+                        p = pos[r, c]
+                        if s - 1 <= p <= s + seg_len - 1:
+                            continue
+                        cnext = routes[r, (p + 1) % n]
+                        if cnext == s0:
+                            continue
+                        base = D[c, cnext]
+                        gain_f = removed - (D[c, s0] + D[sl, cnext] - base)
+                        if gain_f > best_gain:
+                            best_gain = gain_f
+                            best_pos = p
+                            best_rev = False
+                        gain_r = removed - (D[c, sl] + D[s0, cnext] - base)
+                        if gain_r > best_gain:
+                            best_gain = gain_r
+                            best_pos = p
+                            best_rev = True
+                if best_pos >= 0:
+                    _lk_relocate(routes, r, pos, s, seg_len, best_pos, best_rev, n, scratch)
+                    improved = True
+                    total_moves += 1
+        if not improved:
+            break
+    return total_moves
+
+
+def lin_kernighan(distances, tour, cand, long max_passes=1000):
+    """Lin-Kernighan on a single cyclic tour. Returns ``(tour, n_moves)``.
+
+    Bit-identical to ``strategy._lk_kernel``. ``cand`` is the ``(N, k)`` nearest-
+    neighbour candidate array from ``strategy.candidate_lists``.
+    """
+    cdef double[:, ::1] D = np.ascontiguousarray(distances, dtype=np.float64)
+    R = np.ascontiguousarray(tour, dtype=np.intp).reshape(1, -1)
+    cdef Py_ssize_t[:, ::1] Rv = R
+    cdef Py_ssize_t[:, ::1] Cv = np.ascontiguousarray(cand, dtype=np.intp)
+    cdef Py_ssize_t n = Rv.shape[1]
+    cdef Py_ssize_t k = Cv.shape[1]
+    pos = np.empty((1, n), dtype=np.intp)
+    scratch = np.empty((1, n), dtype=np.intp)
+    cdef Py_ssize_t[:, ::1] Pv = pos
+    cdef Py_ssize_t[:, ::1] Sv = scratch
+    cdef long n_moves
+    with nogil:
+        n_moves = _lk_row(D, Rv, 0, Pv, Sv, Cv, n, k, max_passes)
+    return R[0], n_moves
+
+
+def lin_kernighan_batch(distances, tours, cand, long max_passes=1000):
+    """Lin-Kernighan on many equal-length cyclic tours in parallel (OpenMP).
+
+    ``tours`` is ``(m, N)``; each row is optimized independently and in place.
+    Returns the coerced ``(m, N)`` intp array.
+    """
+    cdef double[:, ::1] D = np.ascontiguousarray(distances, dtype=np.float64)
+    Rs = np.ascontiguousarray(tours, dtype=np.intp)
+    cdef Py_ssize_t[:, ::1] Rv = Rs
+    cdef Py_ssize_t[:, ::1] Cv = np.ascontiguousarray(cand, dtype=np.intp)
+    cdef Py_ssize_t m = Rv.shape[0]
+    cdef Py_ssize_t n = Rv.shape[1]
+    cdef Py_ssize_t k = Cv.shape[1]
+    pos = np.empty((m, n), dtype=np.intp)
+    scratch = np.empty((m, n), dtype=np.intp)
+    cdef Py_ssize_t[:, ::1] Pv = pos
+    cdef Py_ssize_t[:, ::1] Sv = scratch
+    cdef Py_ssize_t i
+    with nogil:
+        for i in prange(m, schedule="dynamic"):
+            _lk_row(D, Rv, i, Pv, Sv, Cv, n, k, max_passes)
+    return Rs

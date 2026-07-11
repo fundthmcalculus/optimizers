@@ -64,7 +64,9 @@ def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
     ThreeOptTSP(
         TwoOptTSPConfig(name="w", num_iterations=1, local_search_backend=backend), **kw
     ).solve()
-    LinKernighanTSP(LinKernighanTSPConfig(name="w"), **kw).solve()
+    LinKernighanTSP(
+        LinKernighanTSPConfig(name="w", local_search_backend=backend), **kw
+    ).solve()
 
 
 def compare_tsp_heuristics(
@@ -131,7 +133,10 @@ def compare_tsp_heuristics(
     r, dt = _timed(
         LinKernighanTSP,
         LinKernighanTSPConfig(
-            name="lk", back_to_start=back_to_start, candidate_k=candidate_k
+            name="lk",
+            back_to_start=back_to_start,
+            candidate_k=candidate_k,
+            local_search_backend=backend,
         ),
     )
     records.append(("Lin-Kernighan", r, dt))

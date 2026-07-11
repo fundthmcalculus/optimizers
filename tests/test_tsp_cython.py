@@ -18,9 +18,13 @@ from sklearn.metrics import pairwise_distances
 from optimizers.combinatorial.strategy import (
     _two_opt_kernel,
     _three_opt_kernel,
+    _lk_kernel,
+    candidate_lists,
     TwoOptTSP,
     ThreeOptTSP,
     TwoOptTSPConfig,
+    LinKernighanTSP,
+    LinKernighanTSPConfig,
     NearestNeighborTSP,
     NearestNeighborTSPConfig,
     HAS_CYTHON,
@@ -217,3 +221,101 @@ def test_batch_parallel_benchmark(capsys):
         )
     # never slower than ~1.5x the sequential time (catches a broken parallel build)
     assert t_batch < t_seq * 1.5
+
+
+# ------------------------------ Lin-Kernighan ------------------------------
+
+
+def _tour(n, seed=0):
+    return np.random.RandomState(seed + 1).permutation(n).astype(np.intp)
+
+
+@pytest.mark.parametrize("n", [60, 120, 200])
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_lin_kernighan_matches_numba(n, seed):
+    D = _distances(n, seed)
+    cand = candidate_lists(D, 8)
+    tour = _tour(n, seed)
+    r_nb = tour.copy().astype(np.int64)
+    m_nb = _lk_kernel(D, r_nb, cand, 1000)
+    r_cy, m_cy = cy.lin_kernighan(D, tour.copy(), cand, 1000)
+    assert np.array_equal(r_nb, r_cy)  # bit-identical to the numba kernel
+    assert m_nb == m_cy
+
+
+def test_lk_batch_matches_singles():
+    D = _distances(120, 0)
+    cand = candidate_lists(D, 8)
+    tours = np.stack([_tour(120, s) for s in range(16)])
+    batch = cy.lin_kernighan_batch(D, tours.copy(), cand, 1000)
+    singles = np.stack(
+        [cy.lin_kernighan(D, tours[i].copy(), cand, 1000)[0] for i in range(16)]
+    )
+    assert np.array_equal(batch, singles)
+
+
+def test_lk_solver_backend_parity():
+    D = _distances(150, seed=3)
+    nn = NearestNeighborTSP(
+        NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
+    ).solve()
+    kw = dict(
+        initial_route=nn.optimal_path.copy(),
+        initial_value=nn.optimal_value,
+        network_routes=D.copy(),
+    )
+    r_nb = LinKernighanTSP(
+        LinKernighanTSPConfig(name="lk", local_search_backend="numba"), **kw
+    ).solve()
+    r_cy = LinKernighanTSP(
+        LinKernighanTSPConfig(name="lk", local_search_backend="cython"), **kw
+    ).solve()
+    assert np.array_equal(r_nb.optimal_path, r_cy.optimal_path)
+    assert np.isclose(r_nb.optimal_value, r_cy.optimal_value)
+
+
+def test_lk_cython_vs_numba_benchmark(capsys):
+    Dw = _distances(20)
+    _lk_kernel(Dw, np.arange(20).astype(np.int64), candidate_lists(Dw, 3), 1000)
+    with capsys.disabled():
+        print("\n[LK cython vs warm numba]")
+        for n in (200, 500, 1000):
+            D = _distances(n)
+            cand = candidate_lists(D, 8)
+            base = _tour(n)
+            t_nb = _best_time(
+                lambda: _lk_kernel(D, base.copy().astype(np.int64), cand, 1000)
+            )
+            t_cy = _best_time(lambda: cy.lin_kernighan(D, base.copy(), cand, 1000))
+            r_nb = base.copy().astype(np.int64)
+            _lk_kernel(D, r_nb, cand, 1000)
+            r_cy = cy.lin_kernighan(D, base.copy(), cand, 1000)[0]
+            assert np.array_equal(r_nb, r_cy)  # parity is the hard guarantee
+            print(
+                f"  N={n:4d}  numba={t_nb*1e3:8.2f}ms  cython={t_cy*1e3:8.2f}ms"
+                f"  speedup={t_nb/t_cy:.2f}x"
+            )
+
+
+def test_lk_batch_parallel_benchmark(capsys):
+    D = _distances(300)
+    cand = candidate_lists(D, 8)
+    tours = np.stack([_tour(300, s) for s in range(64)])
+    t_seq = _best_time(
+        lambda: [cy.lin_kernighan(D, tours[i].copy(), cand, 1000) for i in range(64)],
+        reps=2,
+    )
+    t_batch = _best_time(
+        lambda: cy.lin_kernighan_batch(D, tours.copy(), cand, 1000), reps=2
+    )
+    batch = cy.lin_kernighan_batch(D, tours.copy(), cand, 1000)
+    singles = np.stack(
+        [cy.lin_kernighan(D, tours[i].copy(), cand, 1000)[0] for i in range(64)]
+    )
+    assert np.array_equal(batch, singles)
+    with capsys.disabled():
+        print(
+            f"\n[LK batch 64x N=300] sequential={t_seq*1e3:.1f}ms  "
+            f"parallel={t_batch*1e3:.1f}ms  speedup={t_seq/t_batch:.2f}x"
+        )
+    assert t_batch < t_seq * 1.5  # never meaningfully slower than sequential

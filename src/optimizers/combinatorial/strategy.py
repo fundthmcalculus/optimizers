@@ -514,7 +514,13 @@ class LinKernighanTSP(TwoOptTSP):
             if self.config.num_iterations > 0
             else self.config.max_passes
         )
-        n_moves = _lk_kernel(distances, tour, cand, max_passes)
+        if (
+            getattr(self.config, "local_search_backend", "numba") == "cython"
+            and HAS_CYTHON
+        ):
+            tour, n_moves = _tsp_cython.lin_kernighan(distances, tour, cand, max_passes)
+        else:
+            n_moves = _lk_kernel(distances, tour, cand, max_passes)
 
         out = tour
         if self.config.back_to_start:
