@@ -1,0 +1,17 @@
+"""Solution archives — the swappable "parent memory" behind every solver.
+
+``Archive`` is the shared interface (see :mod:`optimizers.archive.base`).
+``ScalarArchive`` is the classic single-objective, best-first deck (today's
+:class:`~optimizers.solution_deck.SolutionDeck`) and remains the default. The
+quality-diversity / multi-objective implementations (``GridArchive`` for
+MAP-Elites, ``ParetoArchive``) land in later phases of ``QD_PARETO_PLAN.md``.
+"""
+
+from .base import Archive
+from ..solution_deck import SolutionDeck
+
+# The current scalar deck IS the scalar archive; alias it under the forward-
+# looking name so callers can migrate without a rename churn.
+ScalarArchive = SolutionDeck
+
+__all__ = ["Archive", "ScalarArchive", "SolutionDeck"]
