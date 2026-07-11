@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import numpy as np
 from typing import Optional, List
 from .types import af64
+from .random import rng as global_rng
 
 
 class InputVariable(ABC):
@@ -61,6 +62,14 @@ class InputVariable(ABC):
     def initial_random_value(self, perturbation: float = 0.1) -> float:
         pass
 
+    def initial_random_values(
+        self, n: int, perturbation: float = 0.1, rng=None
+    ) -> af64:
+        """Vectorized ``initial_random_value`` — draw ``n`` fresh values. Base
+        implementation loops; numeric subclasses override.
+        """
+        return np.array([self.initial_random_value(perturbation) for _ in range(n)])
+
     @abstractmethod
     def range_value(self, p: float) -> float:
         pass
@@ -81,7 +90,13 @@ class InputVariable(ABC):
 
     def initial_random_velocity(self) -> float:
         # NOTE - This doesn't mean as much for discrete variables, so we should probably ignore them?
-        return np.random.uniform(-self.domain, self.domain)
+        return global_rng().uniform(-self.domain, self.domain)
+
+    def initial_random_velocities(self, n: int, rng=None) -> af64:
+        """Vectorized ``initial_random_velocity`` — draw ``n`` velocities."""
+        if rng is None:
+            rng = global_rng()
+        return rng.uniform(-self.domain, self.domain, size=n)
 
 
 # Type hinting
