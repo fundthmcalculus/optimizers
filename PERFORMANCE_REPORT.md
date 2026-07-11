@@ -40,6 +40,21 @@ Each item is scored on **Impact** (how much wall-clock it saves), **Effort** (de
 
 ---
 
+## Implementation status (2026-07-10)
+
+**All in-scope items are landed.** Every optimizer change (#1–#7, #10–#15) has been implemented across a series of PRs (#67–#74) against `main`; each detailed section below is annotated **✅ IMPLEMENTED** with its measured result. The only remaining items are the clustering ones — **#8 (FCM)** and **#9 (iVAT)** — which are **explicitly out of scope** because the `src/cluster/` package is being split into a separate library.
+
+| PR | Items |
+|----|-------|
+| #68 | #1 truncnorm, #4 RNG reuse, #14 eval-metadata overhead |
+| #69 | #3 bound archive, #12 sort/dedup once |
+| #70 | #5 vectorize ACO `run_ants`, #15 discrete sampling |
+| #71 / #72 | GA / PSO vectorization (mirror of #5) |
+| #73 | #2 ship fixed data once, #11 threads/processes guidance |
+| #74 | #6 hoist ACO powers, #7 GA archive, #10 vectorize distance/deposit, #13 njit local search |
+
+---
+
 ## The changes in detail
 
 ### 1. Kill per-sample `truncnorm` object creation — the big one
