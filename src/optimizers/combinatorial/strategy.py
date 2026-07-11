@@ -12,7 +12,10 @@ from ..core.types import AI, F, AF
 # (see CYTHON_ANALYSIS.md); if it isn't compiled, the numba kernels are used, so
 # a plain source checkout still runs without a build step.
 try:
-    from . import _tsp_cython
+    # Compiled extension: no source/stub for mypy to read (built ahead-of-time),
+    # so the submodule attribute is invisible to static analysis whether or not
+    # the .so is present — silence just this optional-backend import.
+    from . import _tsp_cython  # type: ignore[attr-defined]
 
     HAS_CYTHON = True
 except ImportError:  # pragma: no cover - exercised only in unbuilt checkouts
