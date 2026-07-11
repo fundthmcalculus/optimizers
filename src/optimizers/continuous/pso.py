@@ -83,7 +83,11 @@ def run_particles(
             s, v = apply_local_optimization(fcn, local_optim, children[k], variables)
             positions[k] = s
             values[k] = v
-        return OptimizerRun(population_values=values, population_solutions=positions)
+        return OptimizerRun(
+            population_values=values,
+            population_solutions=positions,
+            eval_count=arg_provider.eval_delta,
+        )
 
     # Native PSO path: global best is the archive's top entry (best-first).
     global_best_position = solution_archive[0, :]
@@ -136,7 +140,11 @@ def run_particles(
             swarm_best_val = new_vals[iter_best]
             swarm_best_pos = p_pos[iter_best, :].copy()
     # Return the positions and values
-    return OptimizerRun(population_values=p_best_val, population_solutions=p_best_pos)
+    return OptimizerRun(
+        population_values=p_best_val,
+        population_solutions=p_best_pos,
+        eval_count=arg_provider.eval_delta,
+    )
 
 
 class ParticleSwarmOptimizer(IOptimizer):

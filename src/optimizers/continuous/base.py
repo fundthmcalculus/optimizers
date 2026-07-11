@@ -36,23 +36,52 @@ class _ArgProvider:
 
     This object is intentionally lightweight and picklable so wrapped callables
     can be serialized for parallel workers while still carrying the current metadata.
+
+    Evaluation counting is a **true global count** across the whole run — the
+    number the goal function reads as ``eval_count`` reflects every evaluation the
+    run has done so far, not a per-worker tally. Two fields make this work across
+    both parallel backends:
+
+    * ``eval_base`` — evaluations completed *before* the current counting context
+      (previous generations, plus the parent's initialization pass).
+    * ``_local`` — evaluations since the last :meth:`reset_local`.
+
+    The value exposed to the goal function is always ``eval_base + _local``. Under
+    the ``threads`` backend workers share the parent's provider, so ``_local``
+    simply accumulates globally. Under ``processes`` each worker holds an
+    independent copy, so the parent ships the authoritative ``eval_base`` each
+    generation (:meth:`reset_local`), the worker counts its own evaluations up
+    from it, and the parent folds the per-worker deltas back in (:meth:`commit`) —
+    see ``IOptimizer.live_meta`` / ``sync_worker_meta`` /
+    ``IOptimizer._accumulate_eval_count``.
     """
 
     def __init__(self, base_args: Optional[InputArguments] = None):
         self.base_args: InputArguments = dict(base_args or {})
         self.meta: InputArguments = {}
-        self._eval_count: int = 0
+        # Evaluations done before the current counting context, and within it.
+        self.eval_base: int = 0
+        self._local: int = 0
 
     def current(self) -> InputArguments:
         # merge without mutating user-provided dicts
         merged = {**self.base_args, **self.meta}
         return merged
 
+    @property
+    def eval_count(self) -> int:
+        """Global running evaluation count (``eval_base + _local``)."""
+        return self.eval_base + self._local
+
+    @property
+    def eval_delta(self) -> int:
+        """Evaluations in the current context (this generation, per worker)."""
+        return self._local
+
     def bump_eval(self) -> None:
-        # local to the process where the function executes
-        self._eval_count += 1
+        self._local += 1
         now = time.time()
-        self.meta["eval_count"] = self._eval_count
+        self.meta["eval_count"] = self.eval_base + self._local
         self.meta["now"] = now
         # Elapsed seconds since run start
         start = self.meta.get("start_time", now)
@@ -60,6 +89,26 @@ class _ArgProvider:
             self.meta["elapsed_time"] = float(now - start)
         except Exception:
             self.meta["elapsed_time"] = 0.0
+
+    def reset_local(self, base: int) -> None:
+        """Begin a fresh counting context from ``base`` (process-worker copies).
+
+        Called on each worker at the start of a generation so its evaluations are
+        offset by the authoritative global base shipped from the parent.
+        """
+        self.eval_base = int(base)
+        self._local = 0
+        self.meta["eval_count"] = self.eval_base
+
+    def commit(self, delta: int) -> None:
+        """Fold ``delta`` completed evaluations into the global base (parent side).
+
+        Used to (a) close out the parent's initialization pass and (b) absorb the
+        summed per-worker deltas after each generation under the processes backend.
+        """
+        self.eval_base += int(delta)
+        self._local = 0
+        self.meta["eval_count"] = self.eval_base
 
 
 class IOptimizer(abc.ABC):
@@ -206,7 +255,19 @@ class IOptimizer(abc.ABC):
         fields need to be re-synced to worker processes each generation.
         """
         meta = self._arg_provider.meta
-        return {"generation": meta.get("generation"), "phase": meta.get("phase")}
+        live: InputArguments = {
+            "generation": meta.get("generation"),
+            "phase": meta.get("phase"),
+        }
+        if self.config.joblib_prefer == "processes":
+            # Each process worker holds an independent copy of the arg provider,
+            # so hand it the authoritative global evaluation base to count this
+            # generation up from; the per-worker deltas are folded back in on the
+            # parent (see ``_accumulate_eval_count``). Under threads the workers
+            # share the parent's provider, whose counter is already global, so no
+            # base is shipped and no reset happens.
+            live["_eval_base"] = self._arg_provider.eval_count
+        return live
 
     def _set_phase(self, phase: Phase) -> None:
         # Validate at runtime for extra safety in non-type-checked contexts
@@ -241,6 +302,12 @@ class IOptimizer(abc.ABC):
             self.soln_deck.set_all_outputs(
                 self._evaluate_outputs(self.soln_deck.solution_archive)
             )
+
+        # The initialization pass above evaluated the goal function in the parent
+        # process; fold those evaluations into the global base so the first
+        # generation's ``eval_count`` continues from them (and process workers are
+        # shipped the correct starting base). See ``_ArgProvider``.
+        self._arg_provider.commit(self._arg_provider.eval_delta)
 
         # Add the progress bar
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
@@ -303,11 +370,26 @@ class IOptimizer(abc.ABC):
             report.hypervolume = hypervolume(objs, ref)
         return report
 
+    def _accumulate_eval_count(self, job_output: list[OptimizerRun]) -> None:
+        """Fold this generation's per-worker evaluation deltas into the global count.
+
+        Only the ``processes`` backend needs this: each worker counted its own
+        evaluations from the shipped global base, so the parent sums the deltas
+        reported on each ``OptimizerRun`` and advances the authoritative base.
+        Under ``threads`` the workers share the parent's provider, whose counter is
+        already global, so there is nothing to fold (doing so would double-count).
+        """
+        if self.config.joblib_prefer != "processes":
+            return
+        delta = sum(int(getattr(o, "eval_count", 0) or 0) for o in job_output)
+        self._arg_provider.commit(delta)
+
     def update_solution_deck(
         self, generation_pbar: tqdm.tqdm, job_output: list[OptimizerRun]
     ) -> None:
         if not job_output:
             return
+        self._accumulate_eval_count(job_output)
         # Merge all worker outputs in a single batch, then deduplicate/sort and
         # truncate back to archive_size ONCE per generation. Previously this
         # looped per-output calling append + deduplicate (which sorts), so the
@@ -361,10 +443,17 @@ def sync_worker_meta(
     In the ``processes`` backend each worker holds its own copy of the arg
     provider (shipped once with the goal function), so the optimizer passes the
     small live-metadata dict each generation and the worker merges it here before
-    evaluating the goal function.
+    evaluating the goal function. That dict also carries ``_eval_base`` — the
+    authoritative global evaluation count — so the worker restarts its local
+    counter offset by it, keeping ``eval_count`` a true global running total (see
+    ``_ArgProvider``). Threads share the parent's provider and ship no base.
     """
-    if arg_provider is not None and meta:
-        arg_provider.meta.update(meta)
+    if arg_provider is None or not meta:
+        return
+    base = meta.pop("_eval_base", None)
+    arg_provider.meta.update(meta)
+    if base is not None:
+        arg_provider.reset_local(base)
 
 
 def check_stop_early(

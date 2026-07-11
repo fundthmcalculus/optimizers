@@ -61,7 +61,9 @@ def run_ants(
             ant_solutions[ant] = new_solution
             ant_values[ant] = new_value
         return OptimizerRun(
-            population_values=ant_values, population_solutions=ant_solutions
+            population_values=ant_values,
+            population_solutions=ant_solutions,
+            eval_count=arg_provider.eval_delta,
         )
 
     # Each ant picks a single base solution from the archive via the rank CDF
@@ -91,7 +93,9 @@ def run_ants(
         ant_solutions[ant] = new_solution
         ant_values[ant] = new_value
     return OptimizerRun(
-        population_values=ant_values, population_solutions=ant_solutions
+        population_values=ant_values,
+        population_solutions=ant_solutions,
+        eval_count=arg_provider.eval_delta,
     )
 
 

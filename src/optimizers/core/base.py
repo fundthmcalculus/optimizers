@@ -110,6 +110,7 @@ class OptimizerRun:
     population_values: AF  # (N_generations x N_vars)
     population_solutions: AF  # (1 x N_vars)
     population_outputs: AF | None = None  # (N x n_outputs) tracked outputs, QD add-on
+    eval_count: int = 0  # objective evaluations this worker did this generation
 
 
 @dataclass

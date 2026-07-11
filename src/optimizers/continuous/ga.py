@@ -134,6 +134,7 @@ def run_ga(
         return OptimizerRun(
             population_solutions=new_population,
             population_values=new_population_fitness,
+            eval_count=arg_provider.eval_delta,
         )
 
     # Vectorize the genetic operators across the whole batch of offspring; only
@@ -161,7 +162,9 @@ def run_ga(
             new_population[row, :] = c2
             new_population_fitness[row] = f2
     return OptimizerRun(
-        population_solutions=new_population, population_values=new_population_fitness
+        population_solutions=new_population,
+        population_values=new_population_fitness,
+        eval_count=arg_provider.eval_delta,
     )
 
 
