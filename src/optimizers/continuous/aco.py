@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -32,7 +33,7 @@ class AntColonyOptimizerConfig(IOptimizerConfig):
 
 
 def run_ants(
-    fixed: tuple,
+    fixed: tuple[Any, ...],
     meta: InputArguments,
     solution_archive: af64,
     cp_j: af64,

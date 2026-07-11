@@ -59,7 +59,13 @@ def _swap_segment(ij: int, jk: int, new_route: AI) -> AI:
 
 
 @njit(cache=True)
-def _two_opt_kernel(distances, route, num_iterations, nearest_neighbors, back_to_start):
+def _two_opt_kernel(
+    distances: AF,
+    route: AI,
+    num_iterations: int,
+    nearest_neighbors: int,
+    back_to_start: bool,
+) -> bool:
     # N is the city count (distance-matrix side), NOT the route length: a route
     # with back_to_start appends a return-to-depot node the loops must not touch.
     N = distances.shape[0]
@@ -99,7 +105,9 @@ def _two_opt_kernel(distances, route, num_iterations, nearest_neighbors, back_to
 
 
 @njit(cache=True)
-def _three_opt_kernel(distances, route, num_iterations, nearest_neighbors):
+def _three_opt_kernel(
+    distances: AF, route: AI, num_iterations: int, nearest_neighbors: int
+) -> bool:
     # N is the city count (see _two_opt_kernel), not the route length.
     N = distances.shape[0]
     # kl+1 must stay in-bounds. The old Python loop used ``l_nn = N`` and only
@@ -628,11 +636,11 @@ class ConvexHullTSP(TSPBase):
         visited.add(current_node)
         start_theta = 0.0
 
-        def atan2pos(v):
+        def atan2pos(v: AF) -> float:
             t = np.arctan2(v[1], v[0])
             if t < 0:
                 t += 2 * np.pi
-            return t
+            return float(t)
 
         assert self.city_locations is not None  # ConvexHull requires coordinates
         restarted = False

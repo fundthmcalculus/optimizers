@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from numpy.random import Generator
@@ -97,7 +98,7 @@ def _mutate_batch(
 
 
 def run_ga(
-    fixed: tuple,
+    fixed: tuple[Any, ...],
     meta: InputArguments,
     solution_values: AF | AI,
     solution_archive: AF,

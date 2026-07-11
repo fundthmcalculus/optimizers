@@ -53,7 +53,7 @@ class AntColonyMST(TSPBase):
                 # Pheromone raised to alpha once per generation (report item #6).
                 tau_alpha = np.power(tau, self.config.alpha)
 
-                def parallel_ant(local_ant):
+                def parallel_ant(local_ant: int) -> list[tuple[AI, F]]:
                     results = []
                     for _ in range(individuals_per_job):
                         results.append(

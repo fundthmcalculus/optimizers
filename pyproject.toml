@@ -54,6 +54,10 @@ max-line-length = 120
 exclude = ".git,__pycache__,build,dist,.eggs,.tox,.venv,venv"
 include = "./src,./tests"
 extend-ignore = ["E203"]
+# Complexity ceiling set at the current worst (_three_opt_kernel's 8-way
+# reconnection switch = 24). It only guards against regressions; ratchet it
+# down over time as complex functions are simplified.
+max-complexity = 24
 
 [tool.mypy]
 python_version = "3.10"
@@ -61,7 +65,19 @@ mypy_path = "src"
 ignore_missing_imports = true       # joblib / sklearn / kmodes ship no stubs
 warn_unused_ignores = true          # ratchet: flags an ignore once its error is fixed
 warn_redundant_casts = true
+warn_unused_configs = true
 show_error_codes = true
+# Ratchet 2: stricter definition/return checks. Bodies of untyped functions are
+# now checked; every function must be fully annotated; returning Any where a
+# concrete type is declared is an error. Numpy-dtype-driven return-Any is
+# baselined per-module below (same AF/AI-alias root cause as ratchet 1).
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_calls = true
+disallow_any_generics = true
+strict_equality = true
+warn_return_any = true
 
 # --- Ratchet baseline -------------------------------------------------------
 # The modules below still carry numpy dtype-union errors: the AF/AI aliases are
@@ -69,8 +85,11 @@ show_error_codes = true
 # the concrete dtypes the numpy stubs infer. They are silenced *per error-code*
 # so every OTHER class of error — and any brand-new error type — is still caught
 # in these files. In particular `union-attr` stays ON here so genuine None-safety
-# bugs are not masked. Tighten this list down over successive ratchets; the goal
-# is to delete it entirely once the AF/AI aliases are reworked.
+# bugs are not masked. `no-any-return` (ratchet 2) is included because numpy's
+# ufunc/reduction stubs are largely untyped, so functions declared to return a
+# concrete AF/AI/F type routinely "return Any" through no fault of the code.
+# Tighten this list down over successive ratchets; the goal is to delete it
+# entirely once the AF/AI aliases are reworked.
 [[tool.mypy.overrides]]
 module = [
     "optimizers.checkpoint",
@@ -95,6 +114,7 @@ disable_error_code = [
     "index",
     "list-item",
     "misc",
+    "no-any-return",
     "operator",
     "override",
     "return-value",
@@ -107,7 +127,19 @@ module = ["optimizers.combinatorial.aco_mst"]
 disable_error_code = [
     "arg-type",
     "assignment",
+    "no-any-return",
     "operator",
     "return-value",
     "union-attr",
 ]
+
+# Modules whose only baselined issue is `no-any-return` from numpy's untyped
+# stubs (ratchet 2). Kept separate so their other checks stay fully strict.
+[[tool.mypy.overrides]]
+module = [
+    "optimizers.core.parallel",
+    "optimizers.solution_deck",
+    "optimizers.archive.descriptor",
+    "optimizers.archive.variation",
+]
+disable_error_code = ["no-any-return"]
