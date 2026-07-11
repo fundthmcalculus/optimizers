@@ -169,13 +169,27 @@ class IOptimizer(abc.ABC):
     def update_solution_deck(
         self, generation_pbar: tqdm, job_output: list[OptimizerRun]
     ):
-        for output in job_output:
-            self.soln_deck.append(
-                solutions=output.population_solutions,
-                values=output.population_values,
-                local_optima=self.config.local_grad_optim != "none",
-            )
-            self.soln_deck.deduplicate()
+        if not job_output:
+            return
+        # Merge all worker outputs in a single batch, then deduplicate/sort and
+        # truncate back to archive_size ONCE per generation. Previously this
+        # looped per-output calling append + deduplicate (which sorts), so the
+        # ever-growing archive was re-sorted n_jobs times every generation and
+        # never bounded. See PERFORMANCE_REPORT.md items #12 (sort/dedup once)
+        # and #3 (bound growth).
+        all_solutions = np.vstack(
+            [output.population_solutions for output in job_output]
+        )
+        all_values = np.concatenate(
+            [np.atleast_1d(output.population_values) for output in job_output]
+        )
+        self.soln_deck.append(
+            solutions=all_solutions,
+            values=all_values,
+            local_optima=self.config.local_grad_optim != "none",
+        )
+        self.soln_deck.deduplicate()
+        self.soln_deck.truncate(self.soln_deck.archive_size)
         generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
     def validate_config(self) -> None:

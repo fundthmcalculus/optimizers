@@ -143,6 +143,23 @@ class SolutionDeck:
         self.solution_value = self.solution_value[idx]
         self.is_local_optima = self.is_local_optima[idx]
 
+    def truncate(self, size: int = -1) -> None:
+        """Keep only the best ``size`` entries, dropping the rest.
+
+        Assumes the deck is already sorted best-first (``sort``/``deduplicate``
+        leave it sorted). Without this the archive grows by ~``population_size``
+        every generation forever, so every subsequent sort/dedup/CDF runs over an
+        ever-larger array. Bounding it to ``archive_size`` restores the intended
+        fixed-size elitist archive. See PERFORMANCE_REPORT.md item #3.
+        """
+        if size < 0:
+            size = self.archive_size
+        if size <= 0 or self.solution_archive.shape[0] <= size:
+            return
+        self.solution_archive = self.solution_archive[:size]
+        self.solution_value = self.solution_value[:size]
+        self.is_local_optima = self.is_local_optima[:size]
+
     def __len__(self) -> int:
         return self.solution_archive.shape[0]
 
