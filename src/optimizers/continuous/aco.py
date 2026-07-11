@@ -12,7 +12,8 @@ from ..core.base import (
     GoalFcn,
     InputArguments,
 )
-from ..continuous.base import check_stop_early, cdf
+from ..continuous.base import check_stop_early, cdf, sync_worker_meta
+from ..core.parallel import GenerationRunner
 from ..core.types import af64
 from ..solution_deck import (
     SolutionDeck,
@@ -33,20 +34,15 @@ class AntColonyOptimizerConfig(IOptimizerConfig):
 
 
 def run_ants(
-    n_ants: int,
-    q_weight: float,
-    learning_rate: float,
-    local_optim: LocalOptimType,
+    fixed: tuple,
+    meta: dict,
     solution_archive: af64,
-    variables: InputVariables,
-    fcn: WrappedGoalFcn,
-    cp_j: af64 | None = None,
+    cp_j: af64,
 ) -> OptimizerRun:
-    # The rank CDF depends only on q and the (bounded) archive length, so it is
-    # computed once per generation in solve() and passed in; recompute only as a
-    # fallback. See report item #5.
-    if cp_j is None:
-        cp_j = cdf(q_weight, len(solution_archive))
+    # ``fixed`` is the run-constant payload shipped to each worker once (see
+    # core.parallel); ``meta`` is the small per-generation live metadata.
+    arg_provider, variables, fcn, learning_rate, local_optim, n_ants = fixed
+    sync_worker_meta(arg_provider, meta)
     n_vars = len(variables)
     rng = global_rng()
 
@@ -111,36 +107,41 @@ class AntColonyOptimizer(IOptimizer):
             parallel,
             stopped_early,
         ) = self.initialize(preserve_percent)
-        for generations_completed in generation_pbar:
-            # Update runtime metadata for this generation
-            self._set_phase("evolve")
-            self._set_generation(generations_completed)
+        # Fixed data (variables, wrapped goal fn, hyper-parameters) is shipped to
+        # each worker exactly once; only the archive + CDF vary per generation.
+        fixed = (
+            self._arg_provider,
+            self.variables,
+            self.wrapped_fcn,
+            self.config.learning_rate,
+            self.config.local_grad_optim,
+            individuals_per_job,
+        )
+        runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
+        try:
+            for generations_completed in generation_pbar:
+                # Update runtime metadata for this generation
+                self._set_phase("evolve")
+                self._set_generation(generations_completed)
 
-            stopped_early = check_stop_early(
-                self.config, best_soln_history, self.soln_deck.solution_value
-            )
-            if stopped_early != "none":
-                break
-
-            # Compute the rank CDF once per generation (not once per worker).
-            cp_j = cdf(self.config.q, len(self.soln_deck.solution_archive))
-            job_output: list[OptimizerRun] = parallel(
-                joblib.delayed(run_ants)(
-                    individuals_per_job,
-                    self.config.q,
-                    self.config.learning_rate,
-                    self.config.local_grad_optim,
-                    self.soln_deck.solution_archive,
-                    self.variables,
-                    self.wrapped_fcn,
-                    cp_j,
+                stopped_early = check_stop_early(
+                    self.config, best_soln_history, self.soln_deck.solution_value
                 )
-                for _ in range(n_jobs)
-            )
+                if stopped_early != "none":
+                    break
 
-            # Merge candidates into the archive
-            self.update_solution_deck(generation_pbar, job_output)
-            best_soln_history.append(self.soln_deck.get_best()[1])
+                # Compute the rank CDF once per generation (not once per worker).
+                cp_j = cdf(self.config.q, len(self.soln_deck.solution_archive))
+                job_output: list[OptimizerRun] = runner.run(
+                    run_ants,
+                    (self.live_meta(), self.soln_deck.solution_archive, cp_j),
+                )
+
+                # Merge candidates into the archive
+                self.update_solution_deck(generation_pbar, job_output)
+                best_soln_history.append(self.soln_deck.get_best()[1])
+        finally:
+            runner.close()
         # Mark finalize phase
         self._set_phase("finalize")
         stopped_early = stopped_early if stopped_early != "none" else "max_iterations"

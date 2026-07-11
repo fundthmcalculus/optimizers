@@ -122,6 +122,16 @@ class IOptimizer(abc.ABC):
             num_vars=len(variables),
         )
 
+    def live_meta(self) -> InputArguments:
+        """The per-generation runtime metadata that changes during the run.
+
+        The rest of the metadata (run_id, max_generation, population_size, ...)
+        is constant and ships with the goal function once, so only these live
+        fields need to be re-synced to worker processes each generation.
+        """
+        meta = self._arg_provider.meta
+        return {"generation": meta.get("generation"), "phase": meta.get("phase")}
+
     def _set_phase(self, phase: Phase) -> None:
         # Validate at runtime for extra safety in non-type-checked contexts
         try:
@@ -208,6 +218,18 @@ class IOptimizer(abc.ABC):
 
     def __str__(self):
         return f"Solver(name={self.config.name})"
+
+
+def sync_worker_meta(arg_provider, meta: Optional[InputArguments]) -> None:
+    """Apply the parent's live metadata snapshot to a worker's arg provider.
+
+    In the ``processes`` backend each worker holds its own copy of the arg
+    provider (shipped once with the goal function), so the optimizer passes the
+    small live-metadata dict each generation and the worker merges it here before
+    evaluating the goal function.
+    """
+    if arg_provider is not None and meta:
+        arg_provider.meta.update(meta)
 
 
 def check_stop_early(
