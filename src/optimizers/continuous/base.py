@@ -5,7 +5,7 @@ import numpy as np
 import time
 import uuid
 import inspect
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 
 from ..core import InputVariables
 from ..core.base import (
@@ -120,7 +120,11 @@ class IOptimizer(abc.ABC):
         def _wrap_goal(func: GoalFcn) -> WrappedGoalFcn:
             takes_args = _accepts_args(func)
 
-            def __wrapped(x: AF, _f=func, _ap=self._arg_provider):
+            def __wrapped(
+                x: AF,
+                _f: Callable[..., F] = func,
+                _ap: "_ArgProvider" = self._arg_provider,
+            ) -> F:
                 # Only pay the runtime-metadata bookkeeping (a time.time() call
                 # plus dict writes, per evaluation) when the goal function
                 # actually consumes args. For plain ``f(x)`` objectives nothing
@@ -146,7 +150,12 @@ class IOptimizer(abc.ABC):
         # workers so it costs nothing extra.
         _takes_args = _accepts_args(fcn)
 
-        def _eval_full(x: AF, _f=fcn, _ap=self._arg_provider, _ta=_takes_args):
+        def _eval_full(
+            x: AF,
+            _f: Callable[..., F] = fcn,
+            _ap: "_ArgProvider" = self._arg_provider,
+            _ta: bool = _takes_args,
+        ) -> F:
             return _f(x, _ap.current()) if _ta else _f(x)
 
         self._eval_full = _eval_full
@@ -220,7 +229,7 @@ class IOptimizer(abc.ABC):
 
     def initialize(
         self, preserve_percent: float
-    ) -> tuple[list[F], tqdm.tqdm, int, int, int, joblib.Parallel, bool]:
+    ) -> tuple[list[F], tqdm.tqdm, int, int, int, joblib.Parallel, StopReason]:
         self.validate_config()
         self.soln_deck.initialize_solution_deck(
             self.variables, self.wrapped_fcn, preserve_percent
@@ -237,7 +246,7 @@ class IOptimizer(abc.ABC):
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
             self.config
         )
-        stopped_early = False
+        stopped_early: StopReason = "none"
         generations_completed = 0
         return (
             [],

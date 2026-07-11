@@ -137,7 +137,7 @@ class CVTArchive:
         self.add_generation(batch, values)
 
     # ---- diverse parent sampling (uniform over occupied cells) ----
-    def parents(self, n: int, rng) -> af64:
+    def parents(self, n: int, rng: np.random.Generator) -> af64:
         occ = np.flatnonzero(self._cell_occupied)
         if occ.size == 0:
             raise RuntimeError("archive is empty; nothing to select parents from")

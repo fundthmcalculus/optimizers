@@ -73,7 +73,7 @@ class GeneticAlgorithmTSP(TSPBase):
         with parallel:
             for generations_completed in generation_pbar:
 
-                def parallel_ga(local_ant):
+                def parallel_ga(local_ant: int) -> list[tuple[AI, F]]:
                     results = []
                     for _ in range(individuals_per_job):
                         results.append(

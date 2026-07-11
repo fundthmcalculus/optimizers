@@ -21,7 +21,7 @@ from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from .pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
 from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
 from .gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
-from ..core.types import AF
+from ..core.types import AF, F
 
 OptimizationType = Literal["aco", "pso", "ga", "gd"]
 
@@ -193,7 +193,7 @@ class GroupedVariableOptimizer(IOptimizer):
             for group in self.config.groups:
                 group_vars = [v for v in self.variables if v.name in group.variables]
 
-                def new_fcn(x):
+                def new_fcn(x: AF) -> F:
                     y = np.array(default_values)
                     y = self.interleave_variables(group, x, y)
                     return self.wrapped_fcn(y)

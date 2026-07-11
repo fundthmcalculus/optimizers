@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -35,7 +36,7 @@ class ParticleSwarmOptimizerConfig(IOptimizerConfig):
 
 
 def run_particles(
-    fixed: tuple,
+    fixed: tuple[Any, ...],
     meta: InputArguments,
     global_best_position: AF,
     global_best_value: F,

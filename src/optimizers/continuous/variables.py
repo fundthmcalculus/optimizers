@@ -20,10 +20,10 @@ class InputDiscreteVariable(InputVariable):
         self.values = values
         self.initial_value = initial_value or self.random_value()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"DV:{self.name} in {self.values}"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
     def perturb_value(self, current_value: F | I, perturbation: float = 0.1) -> F | I:
@@ -105,7 +105,7 @@ class InputDiscreteVariable(InputVariable):
     def upper_bound(self) -> float:
         return max(self.values)
 
-    def get_nearest_value(self, x1):
+    def get_nearest_value(self, x1: float) -> F:
         return self.values[np.argmin(np.abs(self.values - x1))]
 
 
@@ -132,10 +132,10 @@ class InputContinuousVariable(InputVariable):
                 ),
             )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"CV:{self.name} in [{self.lower_bound}, {self.upper_bound}]"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
     def perturb_value(self, current_value: float, perturbation: float = 0.1) -> float:
@@ -163,10 +163,10 @@ class InputContinuousVariable(InputVariable):
 
     def __get_truncated_normal(
         self,
-        mean=0.0,
-        stdev=1.0,
-        low=0.0,
-        high=10.0,
+        mean: float = 0.0,
+        stdev: float = 1.0,
+        low: float = 0.0,
+        high: float = 10.0,
         rng: Generator | None = None,
     ) -> float:
         # Inverse-CDF (Gaussian) sampling of a truncated normal. This avoids
@@ -194,7 +194,7 @@ class InputContinuousVariable(InputVariable):
         current_value: float = np.nan,
         other_values: Optional[AF] = None,
         learning_rate: float = 0.7,
-    ):
+    ) -> float:
         rng = global_rng()
         if other_values is not None:
             # TODO - Other than Manhattan distance, what other distance metrics can be used?

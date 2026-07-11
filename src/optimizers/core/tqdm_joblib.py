@@ -1,15 +1,16 @@
 # FROM: https://stackoverflow.com/a/58936697
 import contextlib
+from typing import Any, Iterator
 
 import joblib
 
 
 @contextlib.contextmanager
-def tqdm_joblib(tqdm_object):
+def tqdm_joblib(tqdm_object: Any) -> Iterator[Any]:
     """Context manager to patch joblib to report into tqdm progress bar given as an argument"""
 
     class TqdmBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
-        def __call__(self, *args, **kwargs):
+        def __call__(self, *args: Any, **kwargs: Any) -> Any:
             tqdm_object.update(n=self.batch_size)
             return super().__call__(*args, **kwargs)
 

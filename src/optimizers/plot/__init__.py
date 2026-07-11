@@ -243,7 +243,7 @@ def plot_pareto_front(
     return _finish(fig)
 
 
-def plot_map_elites(archive, objective_name: str = "fitness") -> Figure:
+def plot_map_elites(archive: Any, objective_name: str = "fitness") -> Figure:
     """Scatter a CVT MAP-Elites archive's cells in 2-D, colored by elite fitness.
 
     Occupied cells are colored by their elite's value (lower=better); empty cells
