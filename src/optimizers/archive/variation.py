@@ -54,3 +54,33 @@ def iso_line_dd(
     line = rng.standard_normal((n, 1)) * line_sigma
     children = a + iso + line * (b - a)
     return np.clip(children, lower, upper)
+
+
+def iso_line_offspring(
+    archive: AF,
+    n: int,
+    iso_sigma: float,
+    line_sigma: float,
+    lower: AF,
+    upper: AF,
+    rng: Generator,
+    tournament_k: int = 3,
+) -> AF:
+    """Generate ``n`` Iso+LineDD children from a **best-first sorted** archive.
+
+    Solver-agnostic so GA/ACO/PSO produce offspring identically in map-elites
+    ``qd_variation="iso_line"`` mode (fair for cross-solver comparison). The
+    *base* parent is a rank tournament — the min index of ``tournament_k`` uniform
+    picks, which favours the front because the archive is sorted best-first, so it
+    adds convergence pressure without needing the fitness values. The *direction*
+    parent is uniform over the whole archive (diversity). See QD_PARETO_PLAN.md
+    §4.3.
+    """
+    archive = np.asarray(archive, dtype=float)
+    N = archive.shape[0]
+    k = min(tournament_k, N)
+    base_idx = np.min(rng.integers(0, N, size=(n, k)), axis=1)  # rank tournament
+    dir_idx = rng.integers(0, N, size=n)  # uniform direction
+    return iso_line_dd(
+        archive[base_idx], archive[dir_idx], iso_sigma, line_sigma, lower, upper, rng
+    )
