@@ -1,3 +1,4 @@
+import os
 from typing import Literal, Optional, TypeVar, get_args, Callable, Union, Any
 from dataclasses import dataclass, fields
 import numpy as np
@@ -5,6 +6,28 @@ from joblib import cpu_count, Parallel
 from tqdm import trange, tqdm
 
 from .types import AF, F
+
+_TRUTHY = {"1", "true", "yes", "on"}
+
+# Fast-tests caps. Applied to every optimizer config when ``OPTIMIZERS_FAST`` is
+# set, so the CI/agentic pipeline finishes in a reasonable timeline instead of
+# running the full-fidelity workloads. The caps are deliberately at (not below)
+# the values the correctness-threshold tests rely on (e.g. the map-elites
+# coverage checks run 15 generations over a population of 40), so only the heavy
+# long-running configs are shrunk while every assertion keeps holding.
+_FAST_MAX_GENERATIONS = 15
+_FAST_MAX_POPULATION = 40
+
+
+def fast_tests_enabled() -> bool:
+    """Whether the ``OPTIMIZERS_FAST`` environment variable caps optimizer workloads.
+
+    This is the runtime analogue of ``OPTIMIZERS_NO_SHOW`` (which forces headless
+    plotting): a single global switch that keeps the test/CI pipeline fast. It is
+    off by default, so ordinary runs use the full configured workloads.
+    """
+    return os.environ.get("OPTIMIZERS_FAST", "").strip().lower() in _TRUTHY
+
 
 JoblibPrefer = Literal["threads", "processes"]
 StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
@@ -145,6 +168,20 @@ class IOptimizerConfig:
     """Iso+LineDD isotropic std-dev, as a fraction of each variable's domain."""
     line_sigma: float = 0.2
     """Iso+LineDD directional (line) std-dev (dimensionless)."""
+
+    def __post_init__(self) -> None:
+        # When fast mode is on, cap the dominant runtime drivers so the pipeline
+        # stays quick. ``min`` never *raises* a value, so small configs (e.g. the
+        # map-elites tests) are left untouched. Forcing the joblib backend to
+        # threads avoids re-spawning worker *processes* every generation (which
+        # re-imports numpy/numba/matplotlib and dominates the wall-clock — ~8x
+        # slower here); the per-individual computation, and therefore every
+        # assertion, is identical either way. Subclasses that add their own
+        # ``__post_init__`` should call ``super().__post_init__()``.
+        if fast_tests_enabled():
+            self.num_generations = min(self.num_generations, _FAST_MAX_GENERATIONS)
+            self.population_size = min(self.population_size, _FAST_MAX_POPULATION)
+            self.joblib_prefer = "threads"
 
 
 @dataclass
