@@ -16,8 +16,12 @@ jobs:
           pip install .[dev]
       - name: Build compiled extensions in place
         # so the src-layout tests (PYTHONPATH=./src) import the compiled
-        # _tsp_cython kernels rather than skipping them
-        run: python setup.py build_ext --inplace
+        # _tsp_cython kernels rather than skipping them. setuptools is no longer
+        # bundled with Python >=3.12, and pip's build isolation for the step
+        # above doesn't leave the build deps importable, so install them here.
+        run: |
+          pip install "setuptools>=42" wheel "Cython>=3.0"
+          python setup.py build_ext --inplace
       - name: Check code formatting with black
         run: |
           pip install black
