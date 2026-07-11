@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+
+from optimizers.plot import show_plots_enabled
 import numpy as np
 import pytest
 
@@ -273,4 +275,7 @@ def plot_solution_spiral(n_dim: int, points: AF):
     ax.set_ylim(bottom=-0.1, top=1.1)
     plt.title("Solution Distribution")
     plt.grid(True)
-    plt.show()
+    if show_plots_enabled():
+        plt.show()
+    else:
+        plt.close(ax.figure)
