@@ -7,6 +7,8 @@ from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
     OptimizerRun,
+    GoalFcn,
+    InputArguments,
 )
 from ..core.types import AF
 from ..solution_deck import (
@@ -17,8 +19,6 @@ from .base import (
     IOptimizer,
     check_stop_early,
     sync_worker_meta,
-    GoalFcn,
-    InputArguments,
 )
 from ..core.random import rng as global_rng
 from ..core.parallel import GenerationRunner

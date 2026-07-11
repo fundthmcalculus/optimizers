@@ -78,9 +78,13 @@ disallow_untyped_calls = true
 disallow_any_generics = true
 strict_equality = true
 warn_return_any = true
-# Ratchet 3: additional strictness
-warn_unused_variables = true
-warn_unreachable = true
+# Ratchet 3: additional strictness. Two options from the initial ratchet are
+# dropped: ``warn_unused_variables`` is not a real mypy option (mypy rejects it
+# as "Unrecognized option", failing the run under ``warn_unused_configs``), and
+# ``warn_unreachable`` fights this codebase's defensive style — it flags the
+# ``else: raise`` guards that follow ``ensure_literal_choice`` runtime checks and
+# the ``assert`` narrowing guards, plus false positives from the AF/AI dtype
+# aliases. The remaining two are kept.
 no_implicit_reexport = true
 strict_optional = true
 

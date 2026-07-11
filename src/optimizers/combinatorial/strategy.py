@@ -105,7 +105,7 @@ def _two_opt_kernel(
 
 
 @njit(cache=True)
-def _three_opt_kernel(
+def _three_opt_kernel(  # noqa: C901
     distances: AF, route: AI, num_iterations: int, nearest_neighbors: int
 ) -> bool:
     # N is the city count (see _two_opt_kernel), not the route length.
@@ -227,7 +227,15 @@ def candidate_lists(distances: AF, k: int) -> AI:
 
 
 @njit(cache=True)
-def _lk_relocate(tour, pos, s, seg_len, anchor_pos, reverse, n):
+def _lk_relocate(
+    tour: AI,
+    pos: AI,
+    s: int,
+    seg_len: int,
+    anchor_pos: int,
+    reverse: bool,
+    n: int,
+) -> None:
     # Move the (non-wrapping) segment tour[s .. s+seg_len-1] to sit immediately
     # after the city currently at ``anchor_pos``, optionally reversed. Rebuilds
     # the tour array in order (O(n)); only ever called on an improving move.
@@ -252,7 +260,7 @@ def _lk_relocate(tour, pos, s, seg_len, anchor_pos, reverse, n):
 
 
 @njit(cache=True)
-def _lk_kernel(distances, tour, cand, max_passes):
+def _lk_kernel(distances: AF, tour: AI, cand: AI, max_passes: int) -> int:  # noqa: C901
     """Lin-Kernighan-style local search on a cyclic tour (mutated in place).
 
     A variable-neighbourhood descent over two move families, both restricted to

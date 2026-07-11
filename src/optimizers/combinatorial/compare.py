@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 from sklearn.metrics import pairwise_distances
@@ -109,7 +109,7 @@ def compare_tsp_heuristics(
 
     seed_route, seed_val = nn.optimal_path, nn.optimal_value
 
-    def _timed(cls, config) -> tuple[CombinatoricsResult, float]:
+    def _timed(cls: Any, config: Any) -> tuple[CombinatoricsResult, float]:
         t = time.perf_counter()
         result = cls(
             config,
