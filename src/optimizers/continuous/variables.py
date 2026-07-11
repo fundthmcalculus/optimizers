@@ -5,7 +5,7 @@ from numpy.random import Generator
 from scipy.special import ndtr, ndtri
 
 from ..core.types import AF, AI, F, I
-from ..core.variables import InputVariable
+from ..core.variables import InputVariable as InputVariable  # re-exported
 from ..core.random import rng as global_rng
 
 

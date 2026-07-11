@@ -7,10 +7,8 @@ from optimizers.continuous.ga import (
     GeneticAlgorithmOptimizer,
     GeneticAlgorithmOptimizerConfig,
 )
-from optimizers.continuous.optimizer_strategy import (
-    MultiTypeOptimizer,
-    IOptimizerConfig,
-)
+from optimizers.continuous.optimizer_strategy import MultiTypeOptimizer
+from optimizers.core.base import IOptimizerConfig
 from optimizers.continuous.pso import (
     ParticleSwarmOptimizer,
     ParticleSwarmOptimizerConfig,

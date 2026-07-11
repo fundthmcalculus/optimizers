@@ -201,10 +201,13 @@ class IOptimizer(abc.ABC):
 
         def _eval_full(
             x: AF,
-            _f: Callable[..., F] = fcn,
+            _f: Callable[..., Any] = fcn,
             _ap: "_ArgProvider" = self._arg_provider,
             _ta: bool = _takes_args,
-        ) -> F:
+        ) -> Any:
+            # Returns the goal function's raw result: a scalar in the default
+            # path, or ``(fitness, outputs)`` in multi-output mode. Typed ``Any``
+            # so ``_evaluate_outputs`` can unpack the tuple form (see there).
             return _f(x, _ap.current()) if _ta else _f(x)
 
         self._eval_full = _eval_full

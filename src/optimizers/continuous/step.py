@@ -3,10 +3,10 @@ from dataclasses import dataclass
 import numpy as np
 from tqdm import tqdm
 
-from .base import IOptimizerConfig, IOptimizer
+from .base import IOptimizer
 from .local import local_perturb_optim
 from ..core import InputVariables, OptimizerResult
-from ..core.base import GoalFcn, InputArguments
+from ..core.base import GoalFcn, InputArguments, IOptimizerConfig
 from ..core.types import F
 from ..solution_deck import SolutionDeck
 
