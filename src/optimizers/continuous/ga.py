@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import joblib
 import numpy as np
 from numpy.random import Generator
 
@@ -10,7 +9,6 @@ from ..core.base import (
     OptimizerResult,
     IOptimizerConfig,
     OptimizerRun,
-    LocalOptimType,
     GoalFcn,
     InputArguments,
 )
@@ -25,7 +23,6 @@ from .base import IOptimizer
 
 from ..solution_deck import (
     SolutionDeck,
-    WrappedGoalFcn,
 )
 
 
@@ -95,7 +92,7 @@ def _mutate_batch(
         if col_mask.any():
             perturbed = variable.perturb_values(out[:, ij], rng=rng)
             out[col_mask, ij] = perturbed[col_mask]
-    return out
+    return out  # type: ignore[return-value]  # np.copy loses dtype param
 
 
 def run_ga(

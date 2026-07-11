@@ -198,7 +198,7 @@ class GroupedVariableOptimizer(IOptimizer):
                     return self.wrapped_fcn(y)
 
                 config = config_to_type(self.config, group.optimizer_type)
-                optimizer: IOptimizer
+                optim: IOptimizer
                 if group.optimizer_type == "aco":
                     optim = AntColonyOptimizer(config, new_fcn, group_vars)
                 elif group.optimizer_type == "pso":

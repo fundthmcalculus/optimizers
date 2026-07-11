@@ -15,7 +15,6 @@ from ..solution_deck import SolutionDeck
 class StepWiseOptimizerConfig(IOptimizerConfig):
     optimize_whole_solution_deck: bool = False
     max_perturbation: float = 0.1  # Fraction of domain
-    pass
 
 
 class StepWiseOptimizer(IOptimizer):

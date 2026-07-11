@@ -1,4 +1,3 @@
-import heapq
 from dataclasses import dataclass
 from typing import Optional
 
@@ -229,7 +228,7 @@ class TwoOptTSP(TSPBase):
         )
 
     def setup_local_search(self) -> tuple[int, AI]:
-        if self.initial_route is None or self.initial_value == None:
+        if self.initial_route is None or self.initial_value is None:
             # Use the nearest neighbor
             nn_config = NearestNeighborTSPConfig(
                 back_to_start=self.config.back_to_start, name=self.config.name

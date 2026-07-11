@@ -1,4 +1,3 @@
-import time
 import numpy as np
 import pytest
 
@@ -37,7 +36,6 @@ def test_phase_literal_definition():
 def test_metadata_injection_into_goal_and_constraints(tiny_ga_cfg):
     # Record snapshots of metadata seen inside the functions
     seen_goal = []
-    seen_cons = []
 
     user_args = {"note": "hello", "generation": -123}  # collision: metadata should win
 

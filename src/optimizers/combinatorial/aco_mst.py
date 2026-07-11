@@ -1,13 +1,11 @@
-from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
 from joblib import delayed
 
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
-from .strategy import TwoOptTSPConfig, TwoOptTSP
-from ..core.base import IOptimizerConfig, setup_for_generations
-from ..core.types import AI, AF, F, ab8, i32, i16
+from ..core.base import setup_for_generations
+from ..core.types import AI, AF, ab8, i32, i16
 from .aco import AntColonyTSPConfig
 
 # NOTE - MST is the same as TSP parameters, except the "back to start" is ignored.
@@ -132,7 +130,7 @@ def run_ant_mst(
     tau_alpha: AF,
     config: AntColonyTSPConfig,
     start_idx: int,
-) -> tuple[AI, F]:
+) -> tuple[AI, float]:
     cur_city = start_idx
     order_len = eta_beta.shape[0]
     # If fewer than 32,000 cities, we can use i16
