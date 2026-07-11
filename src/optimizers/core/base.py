@@ -121,6 +121,25 @@ class IOptimizerConfig:
     n_outputs: int = 1
     """Number of tracked outputs per solution when ``objective_mode`` is not
     ``"scalar"``. Used to validate the goal function's returned output vector."""
+    descriptor_source: Literal["projection", "outputs"] = "projection"
+    """MAP-Elites descriptor source. ``"projection"`` (default) derives the
+    descriptor from a fixed random projection of the decision vector (works for
+    any dimension, scalar objective). ``"outputs"`` uses columns of the goal
+    function's returned outputs (requires ``(fitness, outputs)`` returns)."""
+    descriptor_dim: int = 2
+    """Dimensionality of the MAP-Elites descriptor / projection target."""
+    archive_cells: int = 256
+    """Number of MAP-Elites (CVT) cells — the archive capacity in map-elites mode."""
+    qd_variation: Literal["ga", "iso_line"] = "ga"
+    """MAP-Elites variation operator. ``"ga"`` (default) keeps the solver's own
+    crossover/mutation but sources parents from the diverse CVT archive — this
+    preserves convergence while the archive curbs premature convergence.
+    ``"iso_line"`` uses the Iso+LineDD operator (more explorative; can lag on
+    smooth, well-structured objectives)."""
+    iso_sigma: float = 0.01
+    """Iso+LineDD isotropic std-dev, as a fraction of each variable's domain."""
+    line_sigma: float = 0.2
+    """Iso+LineDD directional (line) std-dev (dimensionless)."""
 
 
 @dataclass

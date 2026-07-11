@@ -56,28 +56,18 @@ def test_scalar_mode_tracks_nothing():
     assert opt.soln_deck.solution_outputs is None
 
 
-def test_multi_output_records_aligned_outputs():
-    set_seed(1)
-    cfg = GeneticAlgorithmOptimizerConfig(
-        name="t",
-        num_generations=5,
-        population_size=16,
-        n_jobs=2,
-        joblib_prefer="threads",
-        solution_archive_size=20,
-        objective_mode="map-elites",
-        n_outputs=2,
-    )
-    opt = GeneticAlgorithmOptimizer(cfg, _sphere_mo, _vars(), args={})
-    opt.solve()
-    deck = opt.soln_deck
-    outs = deck.solution_outputs
-    assert outs is not None
-    assert outs.shape == (deck.solution_archive.shape[0], 2)
-    assert not np.isnan(outs).any()
-    # outputs are (x0, x1) by construction → must stay row-aligned with solutions
-    assert np.allclose(outs[:, 0], deck.solution_archive[:, 0])
-    assert np.allclose(outs[:, 1], deck.solution_archive[:, 1])
+def test_solution_deck_outputs_tracked_via_add_generation():
+    """The scalar deck's output tracking (used by later phases) survives the
+    unified add_generation seam."""
+    deck = SolutionDeck(archive_size=4, num_vars=2, n_outputs=2)
+    deck.solution_archive = np.zeros((4, 2))
+    deck.solution_value = np.zeros(4)
+    deck.is_local_optima = np.zeros(4, dtype=bool)
+    deck.set_all_outputs(np.zeros((4, 2)))
+    new = np.array([[1.0, 1.0], [2.0, 2.0]])
+    deck.add_generation(new, np.array([-1.0, -2.0]), outputs=new * 3.0)
+    assert deck.solution_outputs is not None
+    assert deck.solution_outputs.shape[0] == deck.solution_archive.shape[0]
 
 
 def test_scalar_mode_bit_identical_to_untracked_config():

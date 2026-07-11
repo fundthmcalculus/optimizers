@@ -185,6 +185,29 @@ class SolutionDeck:
         self.n_outputs = outputs.shape[1]
         self.solution_outputs = np.asarray(outputs, dtype=f64)
 
+    def add_generation(
+        self,
+        solutions: af64,
+        values: af64,
+        outputs: af64 | None = None,
+        local_optima: bool = False,
+    ) -> None:
+        """Insert one generation of candidates (the classic elitist path).
+
+        Unified ``Archive`` seam: the scalar deck appends, deduplicates and
+        truncates back to ``archive_size`` (identical to the previous inline
+        logic in ``update_solution_deck``); MAP-Elites/Pareto archives override
+        this with their own insertion rule.
+        """
+        self.append(
+            solutions=solutions,
+            values=values,
+            local_optima=local_optima,
+            outputs=outputs,
+        )
+        self.deduplicate()
+        self.truncate(self.archive_size)
+
     def truncate(self, size: int = -1) -> None:
         """Keep only the best ``size`` entries, dropping the rest.
 

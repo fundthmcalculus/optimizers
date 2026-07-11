@@ -21,10 +21,13 @@ from ..core.base import (
     GoalFcn,
 )
 from ..core.types import AF, F
+from ..core.random import get_seed
 from ..solution_deck import (
     SolutionDeck,
     WrappedGoalFcn,
 )
+from ..archive.cvt import CVTArchive
+from ..archive.descriptor import RandomProjectionDescriptor
 
 
 class _ArgProvider:
@@ -105,8 +108,14 @@ class IOptimizer(abc.ABC):
         # is untouched; the extra outputs are collected parent-side and tracked on
         # the deck. Default ``"scalar"`` mode is byte-identical to before.
         self._objective_mode = getattr(config, "objective_mode", "scalar")
+        self._descriptor_source = getattr(config, "descriptor_source", "projection")
         self._n_outputs = int(getattr(config, "n_outputs", 1))
-        multi_output = self._objective_mode != "scalar"
+        # The goal fn returns (fitness, outputs) only when a descriptor is built
+        # from outputs; the default projection descriptor works from a plain
+        # scalar objective, so nothing is unwrapped in that (primary) path.
+        self._returns_outputs = (
+            self._objective_mode != "scalar" and self._descriptor_source == "outputs"
+        )
 
         def _wrap_goal(func: GoalFcn) -> WrappedGoalFcn:
             takes_args = _accepts_args(func)
@@ -123,7 +132,7 @@ class IOptimizer(abc.ABC):
                     result = _f(x)
                 # Multi-output goal fns return (fitness, outputs); solvers only
                 # ever need the scalar fitness.
-                return result[0] if multi_output else result
+                return result[0] if self._returns_outputs else result
 
             return __wrapped  # type: ignore[return-value]
 
@@ -142,10 +151,42 @@ class IOptimizer(abc.ABC):
 
         self._eval_full = _eval_full
 
-        self.soln_deck = existing_soln_deck or SolutionDeck(
-            archive_size=config.solution_archive_size,
+        if existing_soln_deck is not None:
+            self.soln_deck = existing_soln_deck
+        elif self._objective_mode == "map-elites":
+            self.soln_deck = self._build_mapelites_archive(config, variables)
+        else:
+            self.soln_deck = SolutionDeck(
+                archive_size=config.solution_archive_size,
+                num_vars=len(variables),
+                n_outputs=self._n_outputs if self._returns_outputs else 0,
+            )
+
+    def _build_mapelites_archive(
+        self, config: IOptimizerConfig, variables: InputVariables
+    ) -> CVTArchive:
+        """Construct the CVT MAP-Elites archive (Phase 2, QD_PARETO_PLAN.md §4.1)."""
+        lower = np.array([v.lower_bound for v in variables], dtype=float)
+        upper = np.array([v.upper_bound for v in variables], dtype=float)
+        seed = get_seed()
+        if self._descriptor_source == "outputs":
+            raise NotImplementedError(
+                "descriptor_source='outputs' lands in a later phase; use the "
+                "default 'projection' descriptor for now."
+            )
+        ddim = int(config.descriptor_dim)
+        descriptor_fn = RandomProjectionDescriptor(
+            len(variables), ddim, lower, upper, seed=seed or 0
+        )
+        return CVTArchive(
             num_vars=len(variables),
-            n_outputs=self._n_outputs if multi_output else 0,
+            lower=lower,
+            upper=upper,
+            descriptor_fn=descriptor_fn,
+            descriptor_dim=ddim,
+            n_cells=int(config.archive_cells),
+            descriptor_source=self._descriptor_source,
+            seed=seed,
         )
 
     def live_meta(self) -> InputArguments:
@@ -187,10 +228,7 @@ class IOptimizer(abc.ABC):
         self.soln_deck.sort()
         # QD add-on: seed tracked outputs for the initial archive so the deck's
         # solution_outputs stays row-aligned from generation zero.
-        if (
-            self._objective_mode != "scalar"
-            and self.soln_deck.solution_outputs is not None
-        ):
+        if self._returns_outputs and self.soln_deck.solution_outputs is not None:
             self.soln_deck.set_all_outputs(
                 self._evaluate_outputs(self.soln_deck.solution_archive)
             )
@@ -242,18 +280,19 @@ class IOptimizer(abc.ABC):
         all_values = np.concatenate(
             [np.atleast_1d(output.population_values) for output in job_output]
         )
-        # QD add-on: record the tracked outputs for this generation's solutions.
+        # QD add-on: record the tracked outputs (only when the descriptor / report
+        # is built from goal-function outputs; the projection descriptor needs
+        # none). The archive's ``add_generation`` owns the insertion rule — elitist
+        # truncation for the scalar deck, cell replacement for MAP-Elites.
         all_outputs = None
-        if self._objective_mode != "scalar":
+        if self._returns_outputs:
             all_outputs = self._evaluate_outputs(all_solutions)
-        self.soln_deck.append(
-            solutions=all_solutions,
-            values=all_values,
-            local_optima=self.config.local_grad_optim != "none",
+        self.soln_deck.add_generation(
+            all_solutions,
+            all_values,
             outputs=all_outputs,
+            local_optima=self.config.local_grad_optim != "none",
         )
-        self.soln_deck.deduplicate()
-        self.soln_deck.truncate(self.soln_deck.archive_size)
         generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
     def validate_config(self) -> None:

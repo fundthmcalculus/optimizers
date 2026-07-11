@@ -8,10 +8,21 @@ MAP-Elites, ``ParetoArchive``) land in later phases of ``QD_PARETO_PLAN.md``.
 """
 
 from .base import Archive
+from .cvt import CVTArchive
+from .descriptor import RandomProjectionDescriptor, OutputsDescriptor
+from .variation import iso_line_dd
 from ..solution_deck import SolutionDeck
 
 # The current scalar deck IS the scalar archive; alias it under the forward-
 # looking name so callers can migrate without a rename churn.
 ScalarArchive = SolutionDeck
 
-__all__ = ["Archive", "ScalarArchive", "SolutionDeck"]
+__all__ = [
+    "Archive",
+    "ScalarArchive",
+    "SolutionDeck",
+    "CVTArchive",
+    "RandomProjectionDescriptor",
+    "OutputsDescriptor",
+    "iso_line_dd",
+]
