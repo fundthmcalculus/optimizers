@@ -64,8 +64,12 @@ def full_grad_optim(
     # Configure a continuous only gradient optimizer around this (ACO handles the discrete variable searching already)
     # Don't fire this off on another process, to prevent overloading the OS.
     result, _ = solve_gd_from_x0(new_solution, variables, fcn)
-    new_value = result.solution_score
     new_solution = result.solution_vector
+    # Re-evaluate at the returned vector so the stored score is exactly the
+    # objective at the stored solution. scipy's res.fun can differ from
+    # fcn(res.x) by ~1e-10 near an optimum (line-search artifact), which would
+    # otherwise leave the archive holding an inconsistent (vector, value) pair.
+    new_value = fcn(new_solution)
     return new_solution, new_value
 
 
@@ -77,6 +81,8 @@ def single_var_grad_optim(
         if isinstance(variable, InputDiscreteVariable):
             continue
         result = solve_gd_for_1var(new_solution, variables, var_idx, fcn)
-        new_value = result.solution_score
         new_solution = result.solution_vector
+    # Re-evaluate once at the final vector so the stored (vector, value) pair is
+    # exactly consistent (see full_grad_optim for the rationale).
+    new_value = fcn(new_solution)
     return new_solution, new_value
