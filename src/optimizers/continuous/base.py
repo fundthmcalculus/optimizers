@@ -99,6 +99,15 @@ class IOptimizer(abc.ABC):
             except (ValueError, TypeError):
                 return True  # assume safe to pass args
 
+        # Quality-diversity add-on (QD_PARETO_PLAN.md §1). In a non-scalar
+        # ``objective_mode`` the goal function returns ``(fitness, outputs)``. The
+        # wrapped fitness callable still yields a scalar, so every existing solver
+        # is untouched; the extra outputs are collected parent-side and tracked on
+        # the deck. Default ``"scalar"`` mode is byte-identical to before.
+        self._objective_mode = getattr(config, "objective_mode", "scalar")
+        self._n_outputs = int(getattr(config, "n_outputs", 1))
+        multi_output = self._objective_mode != "scalar"
+
         def _wrap_goal(func: GoalFcn) -> WrappedGoalFcn:
             takes_args = _accepts_args(func)
 
@@ -109,17 +118,34 @@ class IOptimizer(abc.ABC):
                 # reads the metadata, so skip it entirely. See report item #14.
                 if takes_args:
                     _ap.bump_eval()
-                    return _f(x, _ap.current())
-                return _f(x)
+                    result = _f(x, _ap.current())
+                else:
+                    result = _f(x)
+                # Multi-output goal fns return (fitness, outputs); solvers only
+                # ever need the scalar fitness.
+                return result[0] if multi_output else result
 
             return __wrapped  # type: ignore[return-value]
 
         # Wrap the goal function and constraint functions
         self.wrapped_fcn: WrappedGoalFcn = _wrap_goal(fcn)
 
+        # Parent-side full evaluator, used only in multi-output mode to gather the
+        # tracked outputs for archived solutions. It is a *recording* pass (no eval
+        # bookkeeping), not a search evaluation. NOTE (Phase 1): this re-evaluates
+        # the objective in the parent; Phase 2 moves output capture into the
+        # workers so it costs nothing extra.
+        _takes_args = _accepts_args(fcn)
+
+        def _eval_full(x: AF, _f=fcn, _ap=self._arg_provider, _ta=_takes_args):
+            return _f(x, _ap.current()) if _ta else _f(x)
+
+        self._eval_full = _eval_full
+
         self.soln_deck = existing_soln_deck or SolutionDeck(
             archive_size=config.solution_archive_size,
             num_vars=len(variables),
+            n_outputs=self._n_outputs if multi_output else 0,
         )
 
     def live_meta(self) -> InputArguments:
@@ -159,6 +185,15 @@ class IOptimizer(abc.ABC):
             self.variables, self.wrapped_fcn, preserve_percent
         )
         self.soln_deck.sort()
+        # QD add-on: seed tracked outputs for the initial archive so the deck's
+        # solution_outputs stays row-aligned from generation zero.
+        if (
+            self._objective_mode != "scalar"
+            and self.soln_deck.solution_outputs is not None
+        ):
+            self.soln_deck.set_all_outputs(
+                self._evaluate_outputs(self.soln_deck.solution_archive)
+            )
 
         # Add the progress bar
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
@@ -175,6 +210,20 @@ class IOptimizer(abc.ABC):
             parallel,
             stopped_early,
         )
+
+    def _evaluate_outputs(self, solutions: AF) -> AF:
+        """Collect the tracked-outputs vector for each solution (multi-output mode).
+
+        A recording pass that keeps the deck's ``solution_outputs`` populated; it
+        does not influence search (Phase 1). Expects the goal function to return
+        ``(fitness, outputs)`` with ``outputs`` of length ``n_outputs``.
+        """
+        solutions = np.atleast_2d(solutions)
+        outs = np.empty((solutions.shape[0], self._n_outputs), dtype=float)
+        for i in range(solutions.shape[0]):
+            _, outputs = self._eval_full(solutions[i])
+            outs[i, :] = np.asarray(outputs, dtype=float).ravel()
+        return outs
 
     def update_solution_deck(
         self, generation_pbar: tqdm.tqdm, job_output: list[OptimizerRun]
@@ -193,10 +242,15 @@ class IOptimizer(abc.ABC):
         all_values = np.concatenate(
             [np.atleast_1d(output.population_values) for output in job_output]
         )
+        # QD add-on: record the tracked outputs for this generation's solutions.
+        all_outputs = None
+        if self._objective_mode != "scalar":
+            all_outputs = self._evaluate_outputs(all_solutions)
         self.soln_deck.append(
             solutions=all_solutions,
             values=all_values,
             local_optima=self.config.local_grad_optim != "none",
+            outputs=all_outputs,
         )
         self.soln_deck.deduplicate()
         self.soln_deck.truncate(self.soln_deck.archive_size)
