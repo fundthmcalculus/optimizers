@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import joblib
 import numpy as np
 
 from .local import apply_local_optimization
@@ -8,7 +7,6 @@ from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
     OptimizerRun,
-    LocalOptimType,
     GoalFcn,
     InputArguments,
 )
@@ -17,7 +15,6 @@ from ..core.parallel import GenerationRunner
 from ..core.types import af64
 from ..solution_deck import (
     SolutionDeck,
-    WrappedGoalFcn,
 )
 from ..core.random import rng as global_rng
 from ..archive.variation import iso_line_offspring

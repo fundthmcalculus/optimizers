@@ -26,5 +26,9 @@ jobs:
         run: |
           pip install black
           black --check .
+      - name: Lint with flake8
+        run: flake8 ./src ./tests
+      - name: Type-check with mypy
+        run: MYPYPATH=src mypy -p optimizers
       - name: Run tests
         run: PYTHONPATH=./src pytest tests/

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import joblib
 import numpy as np
 from numpy.random import Generator
 
@@ -10,7 +9,6 @@ from ..core.base import (
     OptimizerResult,
     IOptimizerConfig,
     OptimizerRun,
-    LocalOptimType,
     GoalFcn,
     InputArguments,
 )
@@ -26,7 +24,6 @@ from .base import IOptimizer
 
 from ..solution_deck import (
     SolutionDeck,
-    WrappedGoalFcn,
 )
 
 

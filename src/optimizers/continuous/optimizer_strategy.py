@@ -188,6 +188,7 @@ class GroupedVariableOptimizer(IOptimizer):
         # TODO - Pass in previous best solution deck
         # TODO - Support for check-pointing!
         default_values = [var.initial_value for var in self.variables]
+        assert self.config.groups is not None  # validated in __init__
         for cur_round in range(self.config.num_rounds):
             for group in self.config.groups:
                 group_vars = [v for v in self.variables if v.name in group.variables]
@@ -198,7 +199,7 @@ class GroupedVariableOptimizer(IOptimizer):
                     return self.wrapped_fcn(y)
 
                 config = config_to_type(self.config, group.optimizer_type)
-                optimizer: IOptimizer
+                optim: IOptimizer
                 if group.optimizer_type == "aco":
                     optim = AntColonyOptimizer(config, new_fcn, group_vars)
                 elif group.optimizer_type == "pso":

@@ -28,6 +28,7 @@ dependencies = [
 dev = [
     "pytest>=6.0",
     "black>=24.0",
+    "mypy>=1.8",
     "flake8",
     "Flake8-pyproject",
     "optuna>=4.3.0",
@@ -53,3 +54,60 @@ max-line-length = 120
 exclude = ".git,__pycache__,build,dist,.eggs,.tox,.venv,venv"
 include = "./src,./tests"
 extend-ignore = ["E203"]
+
+[tool.mypy]
+python_version = "3.10"
+mypy_path = "src"
+ignore_missing_imports = true       # joblib / sklearn / kmodes ship no stubs
+warn_unused_ignores = true          # ratchet: flags an ignore once its error is fixed
+warn_redundant_casts = true
+show_error_codes = true
+
+# --- Ratchet baseline -------------------------------------------------------
+# The modules below still carry numpy dtype-union errors: the AF/AI aliases are
+# unions of float64/32/16 (and int64/32/16), which mypy cannot reconcile with
+# the concrete dtypes the numpy stubs infer. They are silenced *per error-code*
+# so every OTHER class of error — and any brand-new error type — is still caught
+# in these files. In particular `union-attr` stays ON here so genuine None-safety
+# bugs are not masked. Tighten this list down over successive ratchets; the goal
+# is to delete it entirely once the AF/AI aliases are reworked.
+[[tool.mypy.overrides]]
+module = [
+    "optimizers.checkpoint",
+    "optimizers.core.base",
+    "optimizers.combinatorial.base",
+    "optimizers.combinatorial.aco",
+    "optimizers.combinatorial.ga",
+    "optimizers.combinatorial.mtsp",
+    "optimizers.combinatorial.strategy",
+    "optimizers.continuous.aco",
+    "optimizers.continuous.base",
+    "optimizers.continuous.ga",
+    "optimizers.continuous.gd",
+    "optimizers.continuous.pso",
+    "optimizers.continuous.step",
+    "optimizers.continuous.variables",
+    "optimizers.continuous.optimizer_strategy",
+]
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "index",
+    "list-item",
+    "misc",
+    "operator",
+    "override",
+    "return-value",
+]
+
+# aco_mst additionally has a dtype-union `union-attr` (an int|ndarray branch),
+# so it gets its own block rather than weakening union-attr everywhere else.
+[[tool.mypy.overrides]]
+module = ["optimizers.combinatorial.aco_mst"]
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "operator",
+    "return-value",
+    "union-attr",
+]

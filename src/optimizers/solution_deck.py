@@ -7,7 +7,7 @@ from kmodes.kmodes import KModes
 
 from .core.base import ensure_literal_choice, WrappedGoalFcn
 from .core.random import get_seed
-from .core.types import f64, af64, ab8, b8, i64
+from .core.types import f64, af64, ab8, b8
 from .core.variables import InputVariables
 
 # Some type hinting
@@ -311,7 +311,7 @@ def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> af64:
     points = np.sort(np.random.random(size=(n, k)), axis=0)
 
     for step in range(n_steps):
-        labels = kmeans.fit_predict(points)
+        kmeans.fit_predict(points)
         centers = kmeans.cluster_centers_
         centers = np.sort(centers, axis=0)
         # Early stopping if converged
@@ -356,8 +356,7 @@ def fibonacci_sphere_points(n: int, k: int) -> af64:
         points[:, j] *= np.cos(theta[:, j])
         points[:, (j + 1) :] *= np.sin(theta[:, j])[:, np.newaxis]
 
-    r = np.logspace(-1.0, 0.0, n)
-    # points = points * r[:, np.newaxis]
+    # points = points * np.logspace(-1.0, 0.0, n)[:, np.newaxis]
 
     # Inscribe the unit-ball in the unit hyper-cube
     points /= np.max(np.linalg.norm(points, axis=1))
@@ -381,13 +380,14 @@ def inv_elliptic2(s: f64, m: f64) -> f64:
             alpha_min = alpha_mid
         else:
             alpha_max = alpha_mid
-    return alpha_mid
+    return f64(alpha_mid)
 
 
 @lru_cache(maxsize=16)
 def spiral_points(n: int, k: int) -> af64:
     """
-    Generates N points in a k-dimensional space using rotation matrices. Source: https://www.fujipress.jp/jaciii/jc/jacii001500081116/
+    Generates N points in a k-dimensional space using rotation matrices.
+    Source: https://www.fujipress.jp/jaciii/jc/jacii001500081116/
 
     Args:
         n (int): Number of points.

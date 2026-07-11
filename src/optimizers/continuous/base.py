@@ -5,7 +5,7 @@ import numpy as np
 import time
 import uuid
 import inspect
-from typing import Optional, Callable, Any, Literal
+from typing import Optional, Any
 
 from ..core import InputVariables
 from ..core.base import (
@@ -134,7 +134,7 @@ class IOptimizer(abc.ABC):
                 # ever need the scalar fitness.
                 return result[0] if self._returns_outputs else result
 
-            return __wrapped  # type: ignore[return-value]
+            return __wrapped
 
         # Wrap the goal function and constraint functions
         self.wrapped_fcn: WrappedGoalFcn = _wrap_goal(fcn)

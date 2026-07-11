@@ -44,7 +44,6 @@ def rng() -> np.random.Generator:
     fresh entropy so default behavior remains non-deterministic unless the
     caller opted in via set_seed(...).
     """
-    global _global_rng
     if _global_rng is None:
         set_seed(None)
     assert _global_rng is not None

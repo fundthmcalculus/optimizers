@@ -117,6 +117,7 @@ class GenerationRunner:
         """
         n = self.n_jobs if count is None else count
         if self.prefer == "processes":
+            assert self._executor is not None
             futures = [
                 self._executor.submit(
                     _call_with_fixed, worker_fn, self._token, varying_args
@@ -124,6 +125,7 @@ class GenerationRunner:
                 for _ in range(n)
             ]
             return [f.result() for f in futures]
+        assert self._parallel is not None
         return self._parallel(
             joblib.delayed(worker_fn)(self._fixed, *varying_args) for _ in range(n)
         )
