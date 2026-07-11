@@ -20,6 +20,7 @@ from .base import (
 from ..core.variables import InputVariables
 from ..core.random import rng as global_rng
 from ..core.parallel import GenerationRunner
+from ..archive.variation import iso_line_dd
 from .base import IOptimizer
 
 from ..solution_deck import (
@@ -107,9 +108,47 @@ def run_ga(
         crossover_rate,
         local_optim,
         n_steps,
+        qd,
     ) = fixed
+    map_elites, variation, iso_sigma, line_sigma, lower, upper = qd
     sync_worker_meta(arg_provider, meta)
     rng = global_rng()
+
+    if map_elites and variation == "iso_line":
+        # MAP-Elites variation (QD_PARETO_PLAN.md §4.3), tuned for exploration
+        # *and* convergence: the **base** parent is chosen by tournament (fitness
+        # pressure → drives the global best down), while the **direction** parent
+        # is drawn uniformly across the archive's occupied cells (structural
+        # diversity → escapes local optima). Iso+LineDD then steps the fit base
+        # along the diverse inter-elite direction — far more effective than
+        # isotropic mutation in high dimensions. The CVT archive keeps the pool
+        # diverse (one elite per cell), so tournament here is not the premature-
+        # convergence trap it is on a scalar deck of near-duplicates.
+        base = _tournament_selection_batch(
+            solution_archive, solution_values, n_steps, rng=rng
+        )
+        n = solution_archive.shape[0]
+        direction = solution_archive[rng.integers(0, n, size=n_steps)]
+        children = iso_line_dd(
+            base,
+            direction,
+            iso_sigma,
+            line_sigma,
+            lower,
+            upper,
+            rng,
+        )
+        new_population = np.empty((n_steps, len(variables)))
+        new_population_fitness = np.empty(n_steps)
+        for row in range(n_steps):
+            c, f = apply_local_optimization(fcn, local_optim, children[row], variables)
+            new_population[row, :] = c
+            new_population_fitness[row] = f
+        return OptimizerRun(
+            population_solutions=new_population,
+            population_values=new_population_fitness,
+        )
+
     # Vectorize the genetic operators across the whole batch of offspring; only
     # evaluation / local search stays per-individual (scalar goal function).
     parents1 = _tournament_selection_batch(
@@ -170,7 +209,16 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             stopped_early,
         ) = self.initialize(preserve_percent)
         # Ship fixed data (variables, goal fn, GA hyper-parameters) to each
-        # worker once; only the archive + fitness vary per generation.
+        # worker once; only the archive + fitness vary per generation. The ``qd``
+        # payload carries the MAP-Elites variation settings (QD add-on, Phase 2).
+        qd = (
+            self._objective_mode == "map-elites",
+            self.config.qd_variation,
+            self.config.iso_sigma,
+            self.config.line_sigma,
+            np.array([v.lower_bound for v in self.variables], dtype=float),
+            np.array([v.upper_bound for v in self.variables], dtype=float),
+        )
         fixed = (
             self._arg_provider,
             self.variables,
@@ -179,6 +227,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             self.config.crossover_rate,
             self.config.local_grad_optim,
             individuals_per_job,
+            qd,
         )
         runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
         try:
