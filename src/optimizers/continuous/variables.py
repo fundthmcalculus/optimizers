@@ -81,6 +81,13 @@ class InputDiscreteVariable(InputVariable):
         rng = global_rng()
         return rng.choice(self.values)
 
+    def initial_random_values(
+        self, n: int, perturbation: float = 0.1, rng: Generator | None = None
+    ) -> AF:
+        if rng is None:
+            rng = global_rng()
+        return rng.choice(self.values, size=n)
+
     def range_value(self, p: float) -> F | I:
         # Map p in [0,1] to the discrete values
         idx = int(p * len(self.values))
@@ -233,6 +240,13 @@ class InputContinuousVariable(InputVariable):
         if rng is None:
             rng = global_rng()
         return rng.uniform(self.lower_bound, self.upper_bound)
+
+    def initial_random_values(
+        self, n: int, perturbation: float = 0.1, rng: Generator | None = None
+    ) -> AF:
+        if rng is None:
+            rng = global_rng()
+        return rng.uniform(self.lower_bound, self.upper_bound, size=n)
 
     def range_value(self, p: float) -> float:
         # Map p in [0,1] to the variable range

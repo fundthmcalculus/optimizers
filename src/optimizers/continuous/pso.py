@@ -15,6 +15,7 @@ from ..solution_deck import (
     SolutionDeck,
 )
 from .base import IOptimizer, check_stop_early, GoalFcn, InputArguments
+from ..core.random import rng as global_rng
 
 
 @dataclass
@@ -48,50 +49,55 @@ def run_particles(
     solutions (p-best from archive, g-best as current best) with velocity clamping.
     """
     # Lifted from: https://en.wikipedia.org/wiki/Particle_swarm_optimization#Algorithm
-    # Precompute the initial vector for each particle
-    p_best_pos = np.zeros((n_particles, len(variables)))  # Best Position
-    p_pos = np.zeros((n_particles, len(variables)))  # Current Position
-    p_vel = np.zeros((n_particles, len(variables)))  # Current Velocity
-    p_best_val = np.zeros(n_particles)  # Particle best value
-    # Swarm best position
-    for k in range(n_particles):
-        for d, v in enumerate(variables):
-            p_pos[k, d] = p_best_pos[k, d] = v.initial_random_value()
-            p_vel[k, d] = v.initial_random_velocity()
-        p_best_val[k] = fcn(p_best_pos[k, :])
+    rng = global_rng()
+    n_vars = len(variables)
+    # Per-variable domains, used to clamp velocity (constant across the run).
+    domains = np.array([v.domain for v in variables])
+
+    # Vectorized initialization: fill each variable's column for all particles at
+    # once (loop over the few variables, not the many particles). See report #5.
+    p_best_pos = np.empty((n_particles, n_vars))  # Best Position
+    p_vel = np.empty((n_particles, n_vars))  # Current Velocity
+    for d, v in enumerate(variables):
+        p_best_pos[:, d] = v.initial_random_values(n_particles, rng=rng)
+        p_vel[:, d] = v.initial_random_velocities(n_particles, rng=rng)
+    p_pos = p_best_pos.copy()  # Current Position starts at the initial best
+    p_best_val = np.array([fcn(p_best_pos[k, :]) for k in range(n_particles)])
+
     # Get the best position
     best_idx = np.argmin(p_best_val)
-    swarm_best_pos = p_best_pos[best_idx, :]
+    swarm_best_pos = p_best_pos[best_idx, :].copy()
     swarm_best_val = p_best_val[best_idx]
     if global_best_value < swarm_best_val:
         swarm_best_val = global_best_value
-        swarm_best_pos = global_best_position
+        swarm_best_pos = np.asarray(global_best_position).copy()
 
     n_iterations = 10
     for cur_iter in range(n_iterations):
-        for d, v in enumerate(variables):
-            r_p, r_g = np.random.rand(), np.random.rand()
-            # Update velocity
-            p_vel[:, d] = (
-                inertia * p_vel[:, d]
-                + r_p * cognitive * (p_best_pos[:, d] - p_pos[:, d])
-                + social * r_g * (swarm_best_pos[d] - p_pos[:, d])
-            )
-            # Clamp the velocity
-            p_vel[:, d] *= np.minimum(
-                np.maximum(p_vel[:, d] / v.domain, -velocity_clamp), velocity_clamp
-            )
+        # One (r_p, r_g) per dimension (matching the original), applied across
+        # all particles at once via broadcasting.
+        r_p = rng.random(n_vars)
+        r_g = rng.random(n_vars)
+        p_vel = (
+            inertia * p_vel
+            + r_p * cognitive * (p_best_pos - p_pos)
+            + social * r_g * (swarm_best_pos[None, :] - p_pos)
+        )
+        # Clamp the velocity (same per-dimension ratio clamp as before).
+        p_vel *= np.minimum(
+            np.maximum(p_vel / domains, -velocity_clamp), velocity_clamp
+        )
         # Update the particle position for this time step.
         p_pos += p_vel
-        # Do the best position for each particle
-        for k in range(n_particles):
-            new_val = fcn(p_pos[k, :])
-            if new_val < p_best_val[k]:
-                p_best_val[k] = new_val
-                p_best_pos[k, :] = p_pos[k, :]
-            if new_val < swarm_best_val:
-                swarm_best_val = new_val
-                swarm_best_pos = p_pos[k, :]
+        # Evaluate all particles, then update personal/swarm bests vectorized.
+        new_vals = np.array([fcn(p_pos[k, :]) for k in range(n_particles)])
+        improved = new_vals < p_best_val
+        p_best_val = np.where(improved, new_vals, p_best_val)
+        p_best_pos[improved] = p_pos[improved]
+        iter_best = int(np.argmin(new_vals))
+        if new_vals[iter_best] < swarm_best_val:
+            swarm_best_val = new_vals[iter_best]
+            swarm_best_pos = p_pos[iter_best, :].copy()
     # Return the positions and values
     return OptimizerRun(population_values=p_best_val, population_solutions=p_best_pos)
 
