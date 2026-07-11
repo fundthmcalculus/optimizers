@@ -17,6 +17,7 @@ from .base import (
     check_stop_early,
 )
 from ..core.variables import InputVariables
+from ..core.random import rng as global_rng
 from .base import IOptimizer
 
 from ..solution_deck import (
@@ -33,43 +34,59 @@ class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
     """Probability of crossover"""
 
 
-def _tournament_selection(
+def _tournament_selection_batch(
     population_deck: AF | AI,
     population_fitness: AF,
+    n: int,
     tournament_size: int = 3,
+    rng=None,
 ) -> AF | AI:
-    # Randomly sample row
-    row_idxs = np.random.choice(
-        len(population_deck), size=tournament_size, replace=False
-    )
-    # Take the optimal row from the option
-    row_idx_sort = np.argsort(population_fitness[row_idxs])
-    return population_deck[row_idxs[row_idx_sort[0]], :]
+    # Select ``n`` winners at once. Each winner is the best of ``tournament_size``
+    # distinct random rows; distinctness comes from argsort-of-random-keys, which
+    # vectorizes the per-selection np.random.choice(replace=False). See report #5.
+    if rng is None:
+        rng = global_rng()
+    deck_len = len(population_deck)
+    k = min(tournament_size, deck_len)
+    candidates = np.argsort(rng.random((n, deck_len)), axis=1)[:, :k]  # (n, k)
+    candidate_fitness = population_fitness[candidates]  # (n, k)
+    winners = candidates[np.arange(n), np.argmin(candidate_fitness, axis=1)]
+    return population_deck[winners]  # (n, n_vars)
 
 
-def _crossover(
-    parent1: AF | AI, parent2: AF | AI, crossover_rate: float
+def _crossover_batch(
+    parents1: AF | AI, parents2: AF | AI, crossover_rate: float, rng=None
 ) -> tuple[AF | AI, AF | AI]:
-    # Randomly pick a point in the array that the swap starts
-    if np.random.rand() < crossover_rate:
-        crossover_idx = np.random.choice(len(parent1))
-        child1 = np.concatenate(
-            [parent1[:crossover_idx], parent2[crossover_idx:]], axis=0
-        )
-        child2 = np.concatenate(
-            [parent2[:crossover_idx], parent1[crossover_idx:]], axis=0
-        )
-        return child1, child2
-    else:
-        return parent1, parent2
+    # Single-point crossover for every pair at once. Rows where crossover does
+    # not fire pass the parents through unchanged (matching the scalar version).
+    if rng is None:
+        rng = global_rng()
+    n, n_vars = parents1.shape
+    do_cross = rng.random(n) < crossover_rate
+    point = rng.integers(0, n_vars, size=n)  # crossover index in [0, n_vars)
+    cols = np.arange(n_vars)[None, :]
+    swap = do_cross[:, None] & (cols >= point[:, None])  # (n, n_vars)
+    child1 = np.where(swap, parents2, parents1)
+    child2 = np.where(swap, parents1, parents2)
+    return child1, child2
 
 
-def _mutate(child: AF | AI, mutation_rate: float, variables: InputVariables) -> AF | AI:
-    mutant_child: AF | AI = np.copy(child)
+def _mutate_batch(
+    children: AF | AI, mutation_rate: float, variables: InputVariables, rng=None
+) -> AF | AI:
+    # Mutate a whole batch of children. For each variable (few), decide which
+    # rows mutate and perturb those entries with one vectorized call.
+    if rng is None:
+        rng = global_rng()
+    out = np.copy(children)
+    n = out.shape[0]
+    mask = rng.random((n, len(variables))) < mutation_rate
     for ij, variable in enumerate(variables):
-        if np.random.random() < mutation_rate:
-            mutant_child[ij] = variable.perturb_value(mutant_child[ij])
-    return mutant_child
+        col_mask = mask[:, ij]
+        if col_mask.any():
+            perturbed = variable.perturb_values(out[:, ij], rng=rng)
+            out[col_mask, ij] = perturbed[col_mask]
+    return out
 
 
 def run_ga(
@@ -82,29 +99,31 @@ def run_ga(
     variables: InputVariables,
     fcn: WrappedGoalFcn,
 ) -> OptimizerRun:
-    new_population = np.zeros((n_steps, len(variables)))
-    new_population_fitness = np.zeros(n_steps)
+    rng = global_rng()
+    # Vectorize the genetic operators across the whole batch of offspring; only
+    # evaluation / local search stays per-individual (scalar goal function).
+    parents1 = _tournament_selection_batch(
+        solution_archive, solution_values, n_steps, rng=rng
+    )
+    parents2 = _tournament_selection_batch(
+        solution_archive, solution_values, n_steps, rng=rng
+    )
+    child1, child2 = _crossover_batch(parents1, parents2, crossover_rate, rng=rng)
+    child1 = _mutate_batch(child1, mutation_rate, variables, rng=rng)
+    child2 = _mutate_batch(child2, mutation_rate, variables, rng=rng)
+
+    new_population = np.empty((n_steps, len(variables)))
+    new_population_fitness = np.empty(n_steps)
     for row in range(n_steps):
-        # Take two parents
-        parent_1 = _tournament_selection(solution_archive, solution_values)
-        parent_2 = _tournament_selection(solution_archive, solution_values)
-        # Perform genetic operations.
-        child_1, child_2 = _crossover(parent_1, parent_2, crossover_rate)
-        child_1 = _mutate(child_1, mutation_rate, variables)
-        child_2 = _mutate(child_2, mutation_rate, variables)
         # Optimize child-1, because firstborn rights.
-        child_1, child_1_fitness = apply_local_optimization(
-            fcn, local_optim, child_1, variables
-        )
-        child_2, child_2_fitness = apply_local_optimization(
-            fcn, local_optim, child_2, variables
-        )
-        if child_1_fitness < child_2_fitness:
-            new_population[row, :] = child_1
-            new_population_fitness[row] = child_1_fitness
+        c1, f1 = apply_local_optimization(fcn, local_optim, child1[row], variables)
+        c2, f2 = apply_local_optimization(fcn, local_optim, child2[row], variables)
+        if f1 < f2:
+            new_population[row, :] = c1
+            new_population_fitness[row] = f1
         else:
-            new_population[row, :] = child_2
-            new_population_fitness[row] = child_2_fitness
+            new_population[row, :] = c2
+            new_population_fitness[row] = f2
     return OptimizerRun(
         population_solutions=new_population, population_values=new_population_fitness
     )

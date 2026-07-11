@@ -43,6 +43,20 @@ class InputVariable(ABC):
     def perturb_value(self, current_value: float, perturbation: float = 0.1) -> float:
         pass
 
+    def perturb_values(
+        self, current_values: af64, perturbation: float = 0.1, rng=None
+    ) -> af64:
+        """Vectorized ``perturb_value`` — perturb each entry of
+        ``current_values``. Base implementation loops; numeric subclasses
+        override with a vectorized version.
+        """
+        return np.array(
+            [
+                self.perturb_value(cv, perturbation)
+                for cv in np.asarray(current_values)
+            ]
+        )
+
     @abstractmethod
     def initial_random_value(self, perturbation: float = 0.1) -> float:
         pass
