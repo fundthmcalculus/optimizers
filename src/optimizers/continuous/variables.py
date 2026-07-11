@@ -30,6 +30,16 @@ class InputDiscreteVariable(InputVariable):
         # Just randomly tweak to another choice.
         return self.initial_random_value()
 
+    def perturb_values(
+        self, current_values: AF, perturbation: float = 0.1, rng: Generator | None = None
+    ) -> AF:
+        # Perturbing a discrete variable just re-draws a random choice, so draw
+        # the whole population at once.
+        if rng is None:
+            rng = global_rng()
+        n = np.asarray(current_values).shape[0]
+        return rng.choice(self.values, size=n)
+
     def random_value(
         self,
         current_value: F | I = np.nan,
@@ -123,6 +133,20 @@ class InputContinuousVariable(InputVariable):
         sigma = self.domain * perturbation
         new_value = current_value + sigma * global_rng().normal()
         return max(min(self.upper_bound, new_value), self.lower_bound)
+
+    def perturb_values(
+        self, current_values: AF, perturbation: float = 0.1, rng: Generator | None = None
+    ) -> AF:
+        # Vectorized gaussian perturbation for a whole population at once.
+        if rng is None:
+            rng = global_rng()
+        cv = np.asarray(current_values, dtype=float)
+        sigma = self.domain * perturbation
+        return np.clip(
+            cv + sigma * rng.normal(size=cv.shape),
+            self.lower_bound,
+            self.upper_bound,
+        )
 
     def __get_truncated_normal(
         self,
