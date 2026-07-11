@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any
 
 import numpy as np
 import plotly.graph_objects as go
@@ -9,7 +9,7 @@ from ..core.types import AF, AI
 
 def plot_convergence(
     tour_lengths: np.ndarray | list[np.ndarray], trace_names: list[str] | None = None
-):
+) -> None:
     # Create the figure
     fig = go.Figure()
 
@@ -44,8 +44,8 @@ def plot_convergence(
 
 
 def plot_cities_and_route(
-    cities: AF, route: AI | List[AI], trace_names: list[str] | None = None
-):
+    cities: AF, route: AI | list[AI], trace_names: list[str] | None = None
+) -> None:
     fig = go.Figure()
 
     # Plot cities
@@ -109,10 +109,10 @@ def plot_cities_and_route(
 
 
 def plot_run_statistics(
-    summary_or_scores,
+    summary_or_scores: dict[str, Any] | np.ndarray | list[float],
     runtimes: np.ndarray | list[float] | None = None,
     title_prefix: str = "Run Statistics",
-):
+) -> None:
     """Render box-and-whisker plots for final scores and total runtimes across runs.
 
     Parameters

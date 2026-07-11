@@ -31,7 +31,10 @@ class InputDiscreteVariable(InputVariable):
         return self.initial_random_value()
 
     def perturb_values(
-        self, current_values: AF, perturbation: float = 0.1, rng: Generator | None = None
+        self,
+        current_values: AF,
+        perturbation: float = 0.1,
+        rng: Generator | None = None,
     ) -> AF:
         # Perturbing a discrete variable just re-draws a random choice, so draw
         # the whole population at once.
@@ -142,7 +145,10 @@ class InputContinuousVariable(InputVariable):
         return max(min(self.upper_bound, new_value), self.lower_bound)
 
     def perturb_values(
-        self, current_values: AF, perturbation: float = 0.1, rng: Generator | None = None
+        self,
+        current_values: AF,
+        perturbation: float = 0.1,
+        rng: Generator | None = None,
     ) -> AF:
         # Vectorized gaussian perturbation for a whole population at once.
         if rng is None:

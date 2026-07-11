@@ -177,8 +177,8 @@ class IOptimizer(abc.ABC):
         )
 
     def update_solution_deck(
-        self, generation_pbar: tqdm, job_output: list[OptimizerRun]
-    ):
+        self, generation_pbar: tqdm.tqdm, job_output: list[OptimizerRun]
+    ) -> None:
         if not job_output:
             return
         # Merge all worker outputs in a single batch, then deduplicate/sort and
@@ -216,11 +216,13 @@ class IOptimizer(abc.ABC):
         if self.config.n_jobs < 0:
             self.config.n_jobs = joblib.cpu_count() - 1
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Solver(name={self.config.name})"
 
 
-def sync_worker_meta(arg_provider, meta: Optional[InputArguments]) -> None:
+def sync_worker_meta(
+    arg_provider: "_ArgProvider | None", meta: Optional[InputArguments]
+) -> None:
     """Apply the parent's live metadata snapshot to a worker's arg provider.
 
     In the ``processes`` backend each worker holds its own copy of the arg

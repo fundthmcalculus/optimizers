@@ -7,7 +7,7 @@ from joblib import delayed
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, setup_for_generations
-from ..core.types import AI, AF, F, i32, i16
+from ..core.types import AI, AF, F, ab8, i32, i16
 from .aco import AntColonyTSPConfig
 
 # NOTE - MST is the same as TSP parameters, except the "back to start" is ignored.
@@ -107,12 +107,12 @@ class AntColonyMST(TSPBase):
             )
 
 
-def pheromone_update(tau_xy, delta_tau_xy, rho):
+def pheromone_update(tau_xy: AF, delta_tau_xy: AF, rho: float) -> AF:
     new_tau_xy = (1 - rho) * tau_xy + delta_tau_xy
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_beta_xy, tau_alpha_xy, allowed_y):
+def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8) -> AF | int:
     # ``eta_beta``/``tau_alpha`` are pre-raised to beta/alpha upstream (#6).
     p = tau_alpha_xy[~allowed_y, :] * eta_beta_xy[~allowed_y, :]
     # Remove negative probabilities, those are not allowed

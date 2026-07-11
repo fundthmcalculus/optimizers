@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, NoReturn
 
 import numpy as np
 from sklearn.cluster import KMeans, SpectralClustering
@@ -33,7 +33,7 @@ class AntColonyMTSP:
         else:
             return self.solve_clustering()
 
-    def solve_tsp(self):
+    def solve_tsp(self) -> NoReturn:
         # Create n_cities DiscreteVariable with the options being each cluster
         cluster_ids = np.arange(self.config.n_clusters)
         variables = [
@@ -43,7 +43,8 @@ class AntColonyMTSP:
         solver_config = create_from_dict(self.config.__dict__, AntColonyOptimizerConfig)
         tsp_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
         # Because this is a multi-level optimization, don't parallelize here.
-        solver_config.joblib_num_procs = 1
+        # (was ``joblib_num_procs``, a no-op typo — the config field is ``n_jobs``.)
+        solver_config.n_jobs = 1
 
         def goal_fcn(x: AF) -> float:
             x = np.int32(x)
