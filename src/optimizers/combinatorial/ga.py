@@ -118,8 +118,12 @@ class GeneticAlgorithmTSP(TSPBase):
                     break
 
         if self.config.local_optimize:
-            # TODO - Better parameters?
-            two_opt_config = TwoOptTSPConfig()
+            # Propagate back_to_start so the 2-opt refinement optimizes (and
+            # reports) for the same open/closed objective as the GA run; a bare
+            # TwoOptTSPConfig() would silently force back_to_start=True.
+            two_opt_config = TwoOptTSPConfig(
+                back_to_start=self.config.back_to_start, name=self.config.name
+            )
             two_opt_optimize = TwoOptTSP(
                 two_opt_config,
                 initial_route=genome[0, :],
