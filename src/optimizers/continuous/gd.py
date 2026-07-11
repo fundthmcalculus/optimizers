@@ -114,6 +114,7 @@ class GradientDescentOptimizer(IOptimizer):
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
+        nested: bool = False,
     ):
         super().__init__(
             config,
@@ -124,6 +125,14 @@ class GradientDescentOptimizer(IOptimizer):
         self.config: GradientDescentOptimizerConfig = GradientDescentOptimizerConfig(
             **{**config.__dict__}
         )
+        # Gradient descent is a local-optimality search. When another optimization
+        # system drives it as an inner/nested solve (see MultiTypeOptimizer and
+        # GroupedVariableOptimizer), that outer system owns the parallelism — one
+        # GD per restart, per variable group, or per candidate. Parallelizing the
+        # discrete search inside each of those would spawn nested joblib pools and
+        # oversubscribe the CPU, so run GD serially in that case.
+        if nested:
+            self.config.n_jobs = 1
 
     def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
         """Solve the optimization problem using gradient descent.
