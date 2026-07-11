@@ -45,6 +45,11 @@ class AntColonyTSP(TSPBase):
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes
         eta[eta == -1] = 0
+        # Desirability is constant for the whole run, so raise it to ``beta``
+        # exactly once here instead of billions of times inside ``p_xy`` (report
+        # item #6). ``tau ** alpha`` still changes each generation and is hoisted
+        # to once-per-generation below.
+        eta_beta = np.power(eta, self.config.beta)
         # Pheromone matrix
         tau = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
@@ -67,12 +72,16 @@ class AntColonyTSP(TSPBase):
             for generations_completed in generation_pbar:
                 # Compute the change in pheromone!
                 delta_tau = np.zeros(tau.shape)
+                # ``tau`` only changes once per generation, so raise it to
+                # ``alpha`` here and hand the workers the precomputed matrix
+                # (report item #6) instead of recomputing it per ant per step.
+                tau_alpha = np.power(tau, self.config.alpha)
 
                 def parallel_ant(local_ant):
                     results = []
                     for _ in range(individuals_per_job):
                         results.append(
-                            run_ant(self.network_routes, eta, tau, self.config)
+                            run_ant(self.network_routes, eta_beta, tau_alpha, self.config)
                         )
                     return results
 
@@ -89,14 +98,16 @@ class AntColonyTSP(TSPBase):
                         if tour_length <= optimal_tour_length:
                             optimal_tour_length = tour_length
                             optimal_city_order = city_order
-                        for i in range(len(city_order) - 1):
-                            delta_tau[city_order[i], city_order[i + 1]] += (
-                                self.config.q / tour_length
-                            )
+                        # Deposit q/tour_length on every traversed edge at once
+                        # (report item #10) instead of a per-edge Python loop.
+                        deposit = self.config.q / tour_length
+                        np.add.at(
+                            delta_tau,
+                            (city_order[:-1], city_order[1:]),
+                            deposit,
+                        )
                         if self.config.back_to_start:
-                            delta_tau[city_order[-1], city_order[0]] += (
-                                self.config.q / tour_length
-                            )
+                            delta_tau[city_order[-1], city_order[0]] += deposit
                 tour_lengths.append(optimal_tour_length)
                 generation_pbar.set_postfix(best_value=optimal_tour_length)
                 # Once all ants are done, update the pheromone
@@ -139,24 +150,27 @@ def pheromone_update(tau_xy, delta_tau_xy, rho):
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_xy, tau_xy, allowed_y, alpha, beta, x):
-    p = np.power(tau_xy[x, :], alpha) * np.power(eta_xy[x, :], beta)
-    # Remove negative probabilities, those are not allowed
+def p_xy(eta_beta_xy, tau_alpha_xy, allowed_y, x):
+    # ``eta_beta``/``tau_alpha`` are already raised to beta/alpha upstream
+    # (report item #6), so this is a single elementwise product per step.
+    p = tau_alpha_xy[x, :] * eta_beta_xy[x, :]
+    # Remove disallowed / negative probabilities, those are not allowed
     p[~allowed_y] = 0
     p[p < 0] = 0
     # Normalize the probabilities
-    if np.sum(p) == 0.0:
+    total = p.sum()
+    if total == 0.0:
         return 0
-    p = p / np.sum(p)
+    p /= total
     return p
 
 
 def run_ant(
-    network_routes: AF, eta: AF, tau_xy: AF, config: AntColonyTSPConfig
+    network_routes: AF, eta_beta: AF, tau_alpha: AF, config: AntColonyTSPConfig
 ) -> tuple[AI, F]:
     # Start at city 1, and visit each city exactly once
     cur_city = 0  # Offset by 1, so we start at city 1
-    eta_shape_ = eta.shape[0]
+    eta_shape_ = eta_beta.shape[0]
     order_len = eta_shape_
     # If fewer than 32,000 cities, we can use i16
     dtype = i32
@@ -166,13 +180,12 @@ def run_ant(
     idx = 0
     total_length = 0
     allowed_cities = np.ones(eta_shape_, dtype=bool)
-    choice_indexes = np.arange(eta_shape_)
     while np.any(allowed_cities):
         # Mark off the current city
         allowed_cities[cur_city] = False
         city_order[idx] = cur_city
         # Compute the probability of each city
-        p = p_xy(eta, tau_xy, allowed_cities, config.alpha, config.beta, cur_city)
+        p = p_xy(eta_beta, tau_alpha, allowed_cities, cur_city)
         # If the probability is zero, we're stuck, this is a dead end!
         if np.sum(p) == 0 or np.any(np.isnan(p)):
             # If we have hit every city, we're done! We don't need to go back to the start, since we solved in reverse.
@@ -183,8 +196,12 @@ def run_ant(
             if config.back_to_start:
                 total_length += network_routes[city_order[-1], city_order[0]]
             break
-        # Choose the next city
-        cur_city = np.random.choice(choice_indexes, p=p)
+        # Choose the next city via inverse-CDF sampling (report item #10):
+        # cheaper than np.random.choice(..., p=p), which re-validates and
+        # re-cumsums p on every call and takes a global lock.
+        cur_city = int(np.searchsorted(np.cumsum(p), np.random.random()))
+        if cur_city >= eta_shape_:
+            cur_city = eta_shape_ - 1
         total_length += network_routes[city_order[idx], cur_city]
         idx += 1
 

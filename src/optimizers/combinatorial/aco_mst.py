@@ -28,6 +28,8 @@ class AntColonyMST(TSPBase):
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes
         eta[eta == -1] = 0
+        # Constant desirability raised to beta once (report item #6).
+        eta_beta = np.power(eta, self.config.beta)
         # Pheromone matrix
         tau = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
@@ -50,13 +52,19 @@ class AntColonyMST(TSPBase):
             for generations_completed in generation_pbar:
                 # Compute the change in pheromone!
                 delta_tau = np.zeros(tau.shape)
+                # Pheromone raised to alpha once per generation (report item #6).
+                tau_alpha = np.power(tau, self.config.alpha)
 
                 def parallel_ant(local_ant):
                     results = []
                     for _ in range(individuals_per_job):
                         results.append(
                             run_ant_mst(
-                                self.network_routes, eta, tau, self.config, start_idx
+                                self.network_routes,
+                                eta_beta,
+                                tau_alpha,
+                                self.config,
+                                start_idx,
                             )
                         )
                     return results
@@ -104,23 +112,29 @@ def pheromone_update(tau_xy, delta_tau_xy, rho):
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_xy, tau_xy, allowed_y, alpha, beta):
-    p = np.power(tau_xy[~allowed_y, :], alpha) * np.power(eta_xy[~allowed_y, :], beta)
+def p_xy(eta_beta_xy, tau_alpha_xy, allowed_y):
+    # ``eta_beta``/``tau_alpha`` are pre-raised to beta/alpha upstream (#6).
+    p = tau_alpha_xy[~allowed_y, :] * eta_beta_xy[~allowed_y, :]
     # Remove negative probabilities, those are not allowed
     p[:, ~allowed_y] = 0
     p[p < 0] = 0
     # Normalize the probabilities
-    if np.sum(p) == 0.0:
+    total = p.sum()
+    if total == 0.0:
         return 0
-    p = p / np.sum(p)
+    p /= total
     return p
 
 
 def run_ant_mst(
-    network_routes: AF, eta: AF, tau_xy: AF, config: AntColonyTSPConfig, start_idx: int
+    network_routes: AF,
+    eta_beta: AF,
+    tau_alpha: AF,
+    config: AntColonyTSPConfig,
+    start_idx: int,
 ) -> tuple[AI, F]:
     cur_city = start_idx
-    order_len = eta.shape[0]
+    order_len = eta_beta.shape[0]
     # If fewer than 32,000 cities, we can use i16
     dtype = i32
     if order_len < 32000:
@@ -140,7 +154,7 @@ def run_ant_mst(
 
     while np.any(allowed_cities):
         # Compute the probability of each city
-        p = p_xy(eta, tau_xy, allowed_cities, config.alpha, config.beta)
+        p = p_xy(eta_beta, tau_alpha, allowed_cities)
         # If the probability is zero, we're stuck, this is a dead end!
         if np.sum(p) == 0 or np.any(np.isnan(p)):
             # If we have hit every city, we're done! We don't need to go back to the start, since we solved in reverse.
