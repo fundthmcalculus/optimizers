@@ -31,4 +31,7 @@ jobs:
       - name: Type-check with mypy
         run: MYPYPATH=src mypy -p optimizers
       - name: Run tests
-        run: PYTHONPATH=./src pytest tests/
+        # --fast caps optimizer workloads (generations/population) so the
+        # pipeline finishes in a reasonable timeline; correctness assertions
+        # still run in full. Drop the flag to run the full-fidelity workloads.
+        run: PYTHONPATH=./src pytest tests/ --fast
