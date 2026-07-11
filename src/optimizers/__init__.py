@@ -21,7 +21,12 @@ from optimizers.checkpoint import (
     load_checkpoint,
     run_multiple,
 )
-from optimizers.plot import plot_convergence, plot_run_statistics
+from optimizers.plot import (
+    plot_convergence,
+    plot_run_statistics,
+    set_show_plots,
+    show_plots_enabled,
+)
 from optimizers.core.random import set_seed, get_seed
 
 __all__ = [
@@ -41,6 +46,8 @@ __all__ = [
     "run_multiple",
     "plot_convergence",
     "plot_run_statistics",
+    "set_show_plots",
+    "show_plots_enabled",
     "set_seed",
     "get_seed",
 ]

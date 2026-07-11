@@ -13,7 +13,7 @@ requires-python = ">=3.10,<3.15"
 keywords = ["optimization", "GA", "PSO", "ACO", "GD"]
 dependencies = [
     "numpy>=1.21",
-    "plotly>=6.0.0",
+    "matplotlib>=3.10",
     "tqdm>=4.60",
     "joblib>=1.0",
     "contextlib2>=0.6.0",
@@ -28,7 +28,6 @@ dependencies = [
 dev = [
     "pytest>=6.0",
     "black>=24.0",
-    "matplotlib>=3.10",
     "flake8",
     "Flake8-pyproject",
     "optuna>=4.3.0",

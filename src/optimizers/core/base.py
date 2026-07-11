@@ -77,12 +77,16 @@ def setup_for_generations(
     return generation_pbar, individuals_per_job, n_jobs, parallel
 
 
+ObjectiveMode = Literal["scalar", "map-elites", "pareto"]
+
+
 @dataclass
 class OptimizerRun:
     """Structured return values from a given optimizer run: PSO, ACO, etc"""
 
     population_values: AF  # (N_generations x N_vars)
     population_solutions: AF  # (1 x N_vars)
+    population_outputs: AF | None = None  # (N x n_outputs) tracked outputs, QD add-on
 
 
 @dataclass
@@ -107,6 +111,35 @@ class IOptimizerConfig:
     """The preferred execution mode for joblib."""
     local_grad_optim: LocalOptimType = "none"
     """Preferred local gradient optimization, ignored by the gradient descent method for obvious reasons"""
+    objective_mode: "ObjectiveMode" = "scalar"
+    """Objective tracking mode (quality-diversity add-on). ``"scalar"`` (default)
+    is the classic single-objective behaviour. ``"map-elites"`` / ``"pareto"``
+    tell the optimizer the goal function returns ``(fitness, outputs)`` and that
+    the extra outputs should be tracked on each archived solution. See
+    QD_PARETO_PLAN.md. Phase 1 wires the tracking only; it does not yet change
+    how search selects parents."""
+    n_outputs: int = 1
+    """Number of tracked outputs per solution when ``objective_mode`` is not
+    ``"scalar"``. Used to validate the goal function's returned output vector."""
+    descriptor_source: Literal["projection", "outputs"] = "projection"
+    """MAP-Elites descriptor source. ``"projection"`` (default) derives the
+    descriptor from a fixed random projection of the decision vector (works for
+    any dimension, scalar objective). ``"outputs"`` uses columns of the goal
+    function's returned outputs (requires ``(fitness, outputs)`` returns)."""
+    descriptor_dim: int = 2
+    """Dimensionality of the MAP-Elites descriptor / projection target."""
+    archive_cells: int = 256
+    """Number of MAP-Elites (CVT) cells — the archive capacity in map-elites mode."""
+    qd_variation: Literal["ga", "iso_line"] = "ga"
+    """MAP-Elites variation operator. ``"ga"`` (default) keeps the solver's own
+    crossover/mutation but sources parents from the diverse CVT archive — this
+    preserves convergence while the archive curbs premature convergence.
+    ``"iso_line"`` uses the Iso+LineDD operator (more explorative; can lag on
+    smooth, well-structured objectives)."""
+    iso_sigma: float = 0.01
+    """Iso+LineDD isotropic std-dev, as a fraction of each variable's domain."""
+    line_sigma: float = 0.2
+    """Iso+LineDD directional (line) std-dev (dimensionless)."""
 
 
 @dataclass
