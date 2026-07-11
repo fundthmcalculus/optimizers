@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from sklearn.metrics import pairwise_distances
-from typing import Optional
 
 from ..core.types import AF, AI, F
 from ..core.base import StopReason, IOptimizerConfig
@@ -17,7 +16,9 @@ class CombinatoricsResult:
     stop_reason: StopReason
 
 
-def check_path_distance(distances: AF, order_path: AI, return_to_start=False) -> F:
+def check_path_distance(
+    distances: AF, order_path: AI, return_to_start: bool = False
+) -> F:
     # Sum every consecutive edge in one fancy-indexed gather instead of a scalar
     # Python loop (report item #10). Equivalent to the old loop: the closing edge
     # returns to city 0 (order_path[0] is always the depot in these solvers).
@@ -31,7 +32,7 @@ def check_path_distance(distances: AF, order_path: AI, return_to_start=False) ->
     return total_dist
 
 
-def _check_stop_early(config: IOptimizerConfig, soln_history) -> StopReason:
+def _check_stop_early(config: IOptimizerConfig, soln_history: list[F]) -> StopReason:
     if len(soln_history) < config.stop_after_iterations:
         return "none"
     if np.allclose(
@@ -47,16 +48,16 @@ def _check_stop_early(config: IOptimizerConfig, soln_history) -> StopReason:
 class TSPBase(ABC):
     def __init__(
         self,
-        network_routes: Optional[AF] = None,
-        city_locations: Optional[AF] = None,
+        network_routes: AF | None = None,
+        city_locations: AF | None = None,
     ):
         self.city_locations = None
         self.network_routes = None
         self.set_network_routes(network_routes, city_locations)
 
     def set_network_routes(
-        self, network_routes: Optional[AF] = None, city_locations: Optional[AF] = None
-    ):
+        self, network_routes: AF | None = None, city_locations: AF | None = None
+    ) -> None:
         """Set the network routes for the TSP solver"""
         # If we have network routes, use that, otherwise, use the city locations
         if network_routes is None:

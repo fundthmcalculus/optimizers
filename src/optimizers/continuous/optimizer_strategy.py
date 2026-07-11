@@ -83,7 +83,7 @@ class MultiTypeOptimizer(IOptimizer):
         self.initial_optimizer = initial_optimizer
         self.optimizer_selector = optimizer_selector
         self.fcn = fcn
-        self.optimizer_choice_history = []
+        self.optimizer_choice_history: list[OptimizationType] = []
 
     def solve(
         self,
@@ -158,7 +158,7 @@ class InputVariableGroup:
 class GroupedVariableOptimizerConfig(IOptimizerConfig):
     num_rounds: int = 5
     """Number of rounds to run"""
-    groups: list[InputVariableGroup] = None
+    groups: list[InputVariableGroup] | None = None
     """List of input variable groups to optimize, in the order in which to optimize them"""
 
 
