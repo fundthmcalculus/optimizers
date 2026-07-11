@@ -71,19 +71,27 @@ Behavior is statistically identical. This also removes the scipy `truncnorm` imp
 
 ---
 
-### 2. Copy fixed data to workers **once**, not every generation *(your flagged item)*
-**Files:** `src/optimizers/continuous/aco.py:114-125`, `pso.py:140-153`, `ga.py:154-166`; `src/optimizers/core/base.py:68-77` (`setup_for_generations`)
+### 2. Copy fixed data to workers **once**, not every generation *(your flagged item)* — ✅ IMPLEMENTED
+**Files:** `src/optimizers/core/parallel.py` (new `GenerationRunner`); `src/optimizers/continuous/aco.py`, `pso.py`, `ga.py` (each `solve()` now builds a `fixed` payload once and dispatches only varying args); `src/optimizers/continuous/base.py` (`live_meta`, `sync_worker_meta`).
 
-Today every generation calls `parallel(joblib.delayed(run_ants)(..., self.variables, self.wrapped_fcn, self.soln_deck.solution_archive))`. With `joblib_prefer="processes"`, joblib **pickles and ships every argument to every worker on every generation** — including the `variables` list, the wrapped goal function (which closes over `args`, i.e. your large fixed dataset), and the archive.
+Previously every generation called `parallel(joblib.delayed(run_ants)(..., self.variables, self.wrapped_fcn, self.soln_deck.solution_archive))`. With `joblib_prefer="processes"`, joblib **pickles and ships every argument to every worker on every generation** — including the `variables` list, the wrapped goal function (which closes over `args`, i.e. your large fixed dataset), and the archive.
 
-**Evidence:** re-pickling a 16 MB fixed array for a 25-gen × 4-job run costs **0.57 s just in serialization** (5.7 ms per dispatch), before any transport or fitness work. For the large datasets you describe, this scales linearly and dominates.
+**What shipped.** A shared `GenerationRunner` splits arguments into **fixed** (constant for the whole run: `variables`, wrapped goal fn, hyper-parameters — the goal fn closes over your large `args` dataset) and **varying** (the bounded archive + rank CDF, small). For the `processes` backend it owns a dedicated `loky.ProcessPoolExecutor` whose **initializer stashes the fixed payload once per worker** (keyed by an opaque token in a module global); each generation then dispatches only the small varying args. `cloudpickle` handles the goal-fn closure. ACO/PSO/GA all route through this one helper.
 
-**Fix — send the immutable data once.** Two complementary approaches, both general:
+**Evidence (measured on your hardware, 3 workers).** The re-ship cost is *per generation*, so it scales with generation count while ship-once stays flat:
 
-- **Persistent worker pool + initializer.** Replace the per-generation `joblib.delayed` fan-out with a `loky` reusable executor (or `concurrent.futures.ProcessPoolExecutor`) created once at `solve()` start, with an `initializer` that stashes the fixed payload (`variables`, `args`, goal fn) in a module global on each worker. Per generation you then dispatch only the *changing* data (the current archive, or just its indices). joblib's `loky` backend already keeps workers warm across `parallel()` calls when you reuse a single `Parallel(backend="loky")` instance — the missing piece is not re-sending the constant args.
-- **Memory-map large read-only arrays.** For big numpy payloads, hand workers a `np.memmap` (or rely on joblib's `max_nbytes` auto-memmap, which kicks in >1 MB) so the OS shares one physical copy across processes instead of pickling N copies. This is the lowest-risk way to stop replicating "a large section of memory."
+| generations | old (re-ship/gen) | new (ship-once) | speedup |
+|---:|---:|---:|---:|
+| 12 | 2.24 s | 2.33 s | 0.96× |
+| 30 | 5.38 s | 2.33 s | **2.3×** |
+| 60 | 10.83 s | 2.38 s | **4.6×** |
+| 100 | 18.12 s | 2.40 s | **7.5×** |
 
-Design note: the current code is *structurally* ready for this — the fixed args (`variables`, `wrapped_fcn`) never change during a solve, and only `solution_archive` mutates per generation. Factor the parallel dispatch into a small reusable helper so ACO/PSO/GA share one implementation.
+(non-memmappable ~30 MB Python-object payload closed over by the goal fn). Crossover is ~12 generations; the default `num_generations=50` sits squarely in the win zone, and the gap widens with run length.
+
+**Important nuance — memmap vs. Python objects.** joblib's `loky` backend **already auto-memmaps large numpy arrays** (`max_nbytes`, default 1 MB) *even when nested inside a closure*, so for a purely-numpy fixed dataset the old path was already near-optimal and ship-once gives only a small edge. The large, generation-scaling win is for **non-array Python payloads** — dicts, lists, pandas objects, custom classes — which joblib must fully re-pickle every generation. `GenerationRunner` eliminates that regardless of payload type.
+
+**Tradeoff.** The dedicated pool is spawned per `solve()` (a ~0.5–0.7 s one-time cost, amortized across the run) rather than reusing loky's process-global warm pool — deliberately, because sharing that global singleton collides with `joblib.Parallel(prefer="processes")` used by gradient descent (`AttributeError: ... _temp_folder_manager`). Isolation is worth the amortized spawn.
 
 ---
 
@@ -166,15 +174,15 @@ The iVAT reordering recursion (`for r in range(1,N): for c in range(r): ...`) is
 
 ---
 
-### 11. Choose threads vs processes correctly — and document it
-**Files:** `src/optimizers/core/base.py:106` (`joblib_prefer="threads"` default), all `solve()` methods
+### 11. Choose threads vs processes correctly — and document it — ✅ IMPLEMENTED (guidance) 
+**Files:** `src/optimizers/core/base.py:106` (`joblib_prefer="threads"` default), all `solve()` methods, `src/optimizers/core/parallel.py` (`GenerationRunner` docstring documents the tradeoff at the point of use).
 
 The default is `"threads"`. The inner worker bodies (`run_ants`, `run_ga`, ACO tour construction) are **largely pure Python**, so under the GIL threads give little speedup and add dispatch overhead. Threads only win when the fitness function is numpy-vectorized (releases the GIL) or you're on a free-threaded build (`sample.py` already probes `sys._is_gil_enabled()`).
 
-**Guidance to bake in:**
-- **CPU-bound pure-Python fitness →** `processes` (with #2 so fixed data isn't re-shipped).
-- **numpy-vectorized fitness / free-threaded 3.13t →** `threads` (no pickling, shared memory).
-- Document this tradeoff in the config docstring and pick a smarter default (e.g. `processes` when a large `args` payload is detected, else `threads`). Keep it a user-visible knob — it's workload-dependent.
+**Guidance (now encoded in `GenerationRunner` — one helper handles both backends):**
+- **CPU-bound pure-Python fitness →** `processes` (ship-once via #2 so fixed data isn't re-shipped).
+- **numpy-vectorized fitness / free-threaded 3.13t →** `threads` (no pickling, shared memory; `fixed` passed by reference).
+- The tradeoff is documented in the `GenerationRunner` docstring at the point of use. `joblib_prefer` stays a user-visible knob — it's workload-dependent. A future refinement (not yet done) is auto-selecting `processes` when a large `args` payload is detected.
 
 ---
 

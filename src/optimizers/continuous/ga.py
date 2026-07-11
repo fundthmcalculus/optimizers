@@ -15,9 +15,11 @@ from ..core.base import (
 )
 from .base import (
     check_stop_early,
+    sync_worker_meta,
 )
 from ..core.variables import InputVariables
 from ..core.random import rng as global_rng
+from ..core.parallel import GenerationRunner
 from .base import IOptimizer
 
 from ..solution_deck import (
@@ -90,15 +92,23 @@ def _mutate_batch(
 
 
 def run_ga(
-    n_steps: int,
-    mutation_rate: float,
-    crossover_rate: float,
-    local_optim: LocalOptimType,
+    fixed: tuple,
+    meta: dict,
     solution_values: AF | AI,
     solution_archive: AF,
-    variables: InputVariables,
-    fcn: WrappedGoalFcn,
 ) -> OptimizerRun:
+    # ``fixed`` is shipped to each worker once; ``meta`` is the small per-
+    # generation live metadata. See core.parallel.
+    (
+        arg_provider,
+        variables,
+        fcn,
+        mutation_rate,
+        crossover_rate,
+        local_optim,
+        n_steps,
+    ) = fixed
+    sync_worker_meta(arg_provider, meta)
     rng = global_rng()
     # Vectorize the genetic operators across the whole batch of offspring; only
     # evaluation / local search stays per-individual (scalar goal function).
@@ -159,34 +169,44 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             parallel,
             stopped_early,
         ) = self.initialize(preserve_percent)
-        for generations_completed in generation_pbar:
-            # Update runtime metadata for this generation
-            self._set_phase("evolve")
-            self._set_generation(generations_completed)
+        # Ship fixed data (variables, goal fn, GA hyper-parameters) to each
+        # worker once; only the archive + fitness vary per generation.
+        fixed = (
+            self._arg_provider,
+            self.variables,
+            self.wrapped_fcn,
+            self.config.mutation_rate,
+            self.config.crossover_rate,
+            self.config.local_grad_optim,
+            individuals_per_job,
+        )
+        runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
+        try:
+            for generations_completed in generation_pbar:
+                # Update runtime metadata for this generation
+                self._set_phase("evolve")
+                self._set_generation(generations_completed)
 
-            stopped_early = check_stop_early(
-                self.config, best_soln_history, self.soln_deck.solution_value
-            )
-            if stopped_early != "none":
-                break
-
-            job_output: list[OptimizerRun] = parallel(
-                joblib.delayed(run_ga)(
-                    individuals_per_job,
-                    local_optim=self.config.local_grad_optim,
-                    mutation_rate=self.config.mutation_rate,
-                    crossover_rate=self.config.crossover_rate,
-                    solution_values=self.soln_deck.solution_value,
-                    solution_archive=self.soln_deck.solution_archive,
-                    variables=self.variables,
-                    fcn=self.wrapped_fcn,
+                stopped_early = check_stop_early(
+                    self.config, best_soln_history, self.soln_deck.solution_value
                 )
-                for _ in range(n_jobs)
-            )
+                if stopped_early != "none":
+                    break
 
-            # Merge candidates into the archive
-            self.update_solution_deck(generation_pbar, job_output)
-            best_soln_history.append(self.soln_deck.get_best()[1])
+                job_output: list[OptimizerRun] = runner.run(
+                    run_ga,
+                    (
+                        self.live_meta(),
+                        self.soln_deck.solution_value,
+                        self.soln_deck.solution_archive,
+                    ),
+                )
+
+                # Merge candidates into the archive
+                self.update_solution_deck(generation_pbar, job_output)
+                best_soln_history.append(self.soln_deck.get_best()[1])
+        finally:
+            runner.close()
 
         # Mark finalize phase
         self._set_phase("finalize")

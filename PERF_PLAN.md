@@ -16,8 +16,12 @@ it is being split into a separate package. Report items #8 (FCM) and #9 (iVAT) a
 | 2 | `perf/2-continuous-quickwins` | PR1 | #1 truncnorm sampling, #4 RNG reuse, #14 `bump_eval` overhead | low |
 | 3 | `perf/3-solution-deck` | PR2 | #3 bound archive to `archive_size`, #12 sort/dedup once per gen | low |
 | 4 | `perf/4-aco-vectorize` | PR3 | #5 vectorize `run_ants` + hoist CDF, #15 discrete `random_value` | med |
-| 5 | `perf/5-parallel-arch` | PR4 | #2 send fixed data to workers once, #11 threads/processes guidance | med |
-| 6 | `perf/6-combinatorial` | PR5 | #6 precompute `eta**beta`/`tau**alpha`, #7 GA `vstack`, #10 vectorize distance/deposit, #13 njit local search | med |
+| 5 | `perf/5-ga-vectorize` | PR4 | GA: vectorized tournament/crossover/mutation + shared RNG | med |
+| 6 | `perf/6-pso-vectorize` | PR5 | PSO: vectorized init/velocity/eval + shared RNG | med |
+| 7 | `perf/7-parallel-arch` | PR6 | #2 send fixed data to workers once, #11 threads/processes guidance | med |
+| 8 | `perf/8-combinatorial` | PR7 | #6 precompute `eta**beta`/`tau**alpha`, #7 GA `vstack`, #10 vectorize distance/deposit, #13 njit local search | med |
+
+> Note: PRs 5/6 were split out to mirror the ACO vectorization (PR4) onto GA and PSO individually, which pushed the parallel-architecture and combinatorial work down to PR7/PR8.
 
 Each PR:
 - keeps changes **general and flexible** (no problem-specific assumptions);
@@ -39,7 +43,9 @@ Each PR:
    suite fast, which speeds up every subsequent PR's verification.
 2. **Solution deck** (PR3) — removes unbounded growth so later benchmarks are stable.
 3. **ACO vectorization** (PR4) — builds on the faster sampling primitive from PR2.
-4. **Parallel architecture** (PR5) — the "copy fixed data once" refactor; benefits from a
+4. **GA / PSO vectorization** (PR5/PR6) — mirror the ACO vectorization onto the other
+   two continuous solvers so they all share the fast, batched worker shape.
+5. **Parallel architecture** (PR7) — the "copy fixed data once" refactor; benefits from a
    clean, bounded deck and vectorized workers underneath it.
-5. **Combinatorial** (PR6) — independent of the continuous stack; lands last so its
+6. **Combinatorial** (PR8) — independent of the continuous stack; lands last so its
    larger surface area doesn't block the high-value continuous fixes.

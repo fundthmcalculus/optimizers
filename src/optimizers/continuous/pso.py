@@ -14,8 +14,15 @@ from ..solution_deck import (
     InputVariables,
     SolutionDeck,
 )
-from .base import IOptimizer, check_stop_early, GoalFcn, InputArguments
+from .base import (
+    IOptimizer,
+    check_stop_early,
+    sync_worker_meta,
+    GoalFcn,
+    InputArguments,
+)
 from ..core.random import rng as global_rng
+from ..core.parallel import GenerationRunner
 
 
 @dataclass
@@ -30,15 +37,10 @@ class ParticleSwarmOptimizerConfig(IOptimizerConfig):
 
 
 def run_particles(
-    n_particles: int,
-    inertia: float,
-    cognitive: float,
-    social: float,
-    velocity_clamp: float,
+    fixed: tuple,
+    meta: dict,
     global_best_position: AF,
     global_best_value: F,
-    variables: InputVariables,
-    fcn: WrappedGoalFcn,
 ) -> OptimizerRun:
     """
     Generate new candidate solutions using a PSO-inspired step that leverages the
@@ -49,6 +51,19 @@ def run_particles(
     solutions (p-best from archive, g-best as current best) with velocity clamping.
     """
     # Lifted from: https://en.wikipedia.org/wiki/Particle_swarm_optimization#Algorithm
+    # ``fixed`` is shipped to each worker once; ``meta`` is the small per-
+    # generation live metadata. See core.parallel.
+    (
+        arg_provider,
+        variables,
+        fcn,
+        inertia,
+        cognitive,
+        social,
+        velocity_clamp,
+        n_particles,
+    ) = fixed
+    sync_worker_meta(arg_provider, meta)
     rng = global_rng()
     n_vars = len(variables)
     # Per-variable domains, used to clamp velocity (constant across the run).
@@ -132,35 +147,45 @@ class ParticleSwarmOptimizer(IOptimizer):
             parallel,
             stopped_early,
         ) = self.initialize(preserve_percent)
-        for generations_completed in generation_pbar:
-            # Update runtime metadata for this generation
-            self._set_phase("evolve")
-            self._set_generation(generations_completed)
+        # Ship fixed data (variables, goal fn, PSO coefficients) to each worker
+        # once; only the current global best varies per generation.
+        fixed = (
+            self._arg_provider,
+            self.variables,
+            self.wrapped_fcn,
+            self.config.inertia,
+            self.config.cognitive,
+            self.config.social,
+            self.config.velocity_clamp,
+            individuals_per_job,
+        )
+        runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
+        try:
+            for generations_completed in generation_pbar:
+                # Update runtime metadata for this generation
+                self._set_phase("evolve")
+                self._set_generation(generations_completed)
 
-            stopped_early = check_stop_early(
-                self.config, best_soln_history, self.soln_deck.solution_value
-            )
-            if stopped_early != "none":
-                break
-
-            job_output: list[OptimizerRun] = parallel(
-                joblib.delayed(run_particles)(
-                    individuals_per_job,
-                    self.config.inertia,
-                    self.config.cognitive,
-                    self.config.social,
-                    self.config.velocity_clamp,
-                    self.soln_deck.solution_archive[0, :],
-                    self.soln_deck.solution_value[0],
-                    self.variables,
-                    self.wrapped_fcn,
+                stopped_early = check_stop_early(
+                    self.config, best_soln_history, self.soln_deck.solution_value
                 )
-                for _ in range(n_jobs)
-            )
+                if stopped_early != "none":
+                    break
 
-            # Merge candidates into the archive
-            self.update_solution_deck(generation_pbar, job_output)
-            best_soln_history.append(self.soln_deck.get_best()[1])
+                job_output: list[OptimizerRun] = runner.run(
+                    run_particles,
+                    (
+                        self.live_meta(),
+                        self.soln_deck.solution_archive[0, :],
+                        self.soln_deck.solution_value[0],
+                    ),
+                )
+
+                # Merge candidates into the archive
+                self.update_solution_deck(generation_pbar, job_output)
+                best_soln_history.append(self.soln_deck.get_best()[1])
+        finally:
+            runner.close()
 
         # Mark finalize phase
         self._set_phase("finalize")
