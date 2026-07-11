@@ -118,9 +118,12 @@ class IOptimizerConfig:
     the extra outputs should be tracked on each archived solution. See
     QD_PARETO_PLAN.md. Phase 1 wires the tracking only; it does not yet change
     how search selects parents."""
-    n_outputs: int = 1
-    """Number of tracked outputs per solution when ``objective_mode`` is not
-    ``"scalar"``. Used to validate the goal function's returned output vector."""
+    n_outputs: int = 0
+    """Number of tracked objectives/outputs for the Pareto report. When ``> 0``
+    (and ``objective_mode`` is not ``"scalar"``) the goal function returns
+    ``(fitness, outputs)``: ``fitness`` still drives the search, and the
+    ``outputs`` vector is collected for the multi-objective report (see
+    ``IOptimizer.qd_report``). ``0`` (default) = plain scalar objective."""
     descriptor_source: Literal["projection", "outputs"] = "projection"
     """MAP-Elites descriptor source. ``"projection"`` (default) derives the
     descriptor from a fixed random projection of the decision vector (works for
