@@ -20,7 +20,7 @@ class TwoOptTSPConfig(IOptimizerConfig):
     """Only check the next nodes, which makes this O(nk), but lower chance of finding crossovers"""
 
 
-def _swap_segment(ij, jk, new_route):
+def _swap_segment(ij: int, jk: int, new_route: AI) -> AI:
     ij += 1
     while ij < jk:
         temp = new_route[ij]
@@ -116,30 +116,14 @@ def _three_opt_kernel(distances, route, num_iterations, nearest_neighbors):
                     e = route[E]
                     f = route[Fi]
                     # The 8 reconnection lengths (no per-iteration allocation).
-                    d0 = (
-                        distances[a, b] + distances[c, d] + distances[e, f]
-                    )
-                    d1 = (
-                        distances[a, e] + distances[d, c] + distances[b, f]
-                    )
-                    d2 = (
-                        distances[a, b] + distances[c, e] + distances[d, f]
-                    )
-                    d3 = (
-                        distances[a, c] + distances[b, d] + distances[e, f]
-                    )
-                    d4 = (
-                        distances[a, c] + distances[b, e] + distances[d, f]
-                    )
-                    d5 = (
-                        distances[a, e] + distances[d, b] + distances[c, f]
-                    )
-                    d6 = (
-                        distances[a, d] + distances[e, c] + distances[b, f]
-                    )
-                    d7 = (
-                        distances[a, d] + distances[e, b] + distances[c, f]
-                    )
+                    d0 = distances[a, b] + distances[c, d] + distances[e, f]
+                    d1 = distances[a, e] + distances[d, c] + distances[b, f]
+                    d2 = distances[a, b] + distances[c, e] + distances[d, f]
+                    d3 = distances[a, c] + distances[b, d] + distances[e, f]
+                    d4 = distances[a, c] + distances[b, e] + distances[d, f]
+                    d5 = distances[a, e] + distances[d, b] + distances[c, f]
+                    d6 = distances[a, d] + distances[e, c] + distances[b, f]
+                    d7 = distances[a, d] + distances[e, b] + distances[c, f]
                     best = 0
                     best_len = d0
                     if d1 < best_len:
@@ -244,7 +228,7 @@ class TwoOptTSP(TSPBase):
             stop_reason="no_improvement" if no_moves else "max_iterations",
         )
 
-    def setup_local_search(self) -> tuple[int, AF]:
+    def setup_local_search(self) -> tuple[int, AI]:
         if self.initial_route is None or self.initial_value == None:
             # Use the nearest neighbor
             nn_config = NearestNeighborTSPConfig(
