@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=42", "wheel", "Cython>=3.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -32,6 +32,7 @@ dev = [
     "Flake8-pyproject",
     "optuna>=4.3.0",
     "pyclustertend",
+    "Cython>=3.0",
 ]
 
 [tool.setuptools]

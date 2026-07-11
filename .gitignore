@@ -213,3 +213,6 @@ __marimo__/
 /.idea/vcs.xml
 /samples/scluster/ordered_matrix_59.png
 /samples/scluster/ordered_matrix_827.png
+
+# Cython-generated C sources (build artifacts)
+src/optimizers/**/*.c
