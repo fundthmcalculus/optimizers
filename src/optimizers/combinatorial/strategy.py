@@ -205,6 +205,147 @@ def _three_opt_kernel(distances, route, num_iterations, nearest_neighbors):
     return no_moves
 
 
+def candidate_lists(distances: AF, k: int) -> AI:
+    """``k`` nearest neighbours per city (self excluded), as an ``(N, k)`` array.
+
+    Lin-Kernighan only proposes new edges to a city's nearest neighbours, which
+    turns each move search from O(N) into O(k) and is what makes it scale.
+    """
+    n = distances.shape[0]
+    k = max(1, min(k, n - 1))
+    dm = np.asarray(distances, dtype=np.float64).copy()
+    np.fill_diagonal(dm, np.inf)
+    return np.argsort(dm, axis=1)[:, :k].astype(np.int64)
+
+
+@njit(cache=True)
+def _lk_relocate(tour, pos, s, seg_len, anchor_pos, reverse, n):
+    # Move the (non-wrapping) segment tour[s .. s+seg_len-1] to sit immediately
+    # after the city currently at ``anchor_pos``, optionally reversed. Rebuilds
+    # the tour array in order (O(n)); only ever called on an improving move.
+    seg = np.empty(seg_len, dtype=tour.dtype)
+    for t in range(seg_len):
+        seg[t] = tour[s + seg_len - 1 - t] if reverse else tour[s + t]
+    anchor_city = tour[anchor_pos]
+    new = np.empty(n, dtype=tour.dtype)
+    idx = 0
+    for x in range(n):
+        if s <= x <= s + seg_len - 1:
+            continue
+        new[idx] = tour[x]
+        idx += 1
+        if tour[x] == anchor_city:
+            for t in range(seg_len):
+                new[idx] = seg[t]
+                idx += 1
+    for x in range(n):
+        tour[x] = new[x]
+        pos[tour[x]] = x
+
+
+@njit(cache=True)
+def _lk_kernel(distances, tour, cand, max_passes):
+    """Lin-Kernighan-style local search on a cyclic tour (mutated in place).
+
+    A variable-neighbourhood descent over two move families, both restricted to
+    near-neighbour candidates: (1) **2-opt** reversals — realize a new edge
+    ``(a, c)`` for a near neighbour ``c`` — and (2) **Or-opt** relocations of
+    length-1/2/3 segments to sit beside a near neighbour (forward or reversed).
+    The combined neighbourhood escapes the pure-2-opt local optima that trap
+    ``TwoOptTSP``/``ThreeOptTSP``, so LK typically returns shorter tours.
+    Returns the number of improving moves applied.
+    """
+    n = tour.shape[0]
+    k = cand.shape[1]
+    eps = 1e-9
+    pos = np.empty(n, dtype=np.int64)
+    for i in range(n):
+        pos[tour[i]] = i
+    total_moves = 0
+    for _p in range(max_passes):
+        improved = False
+        # ---------------- candidate-list 2-opt (both directions) -------------
+        for i in range(n):
+            a = tour[i]
+            for ddir in range(2):
+                b = tour[(i + 1) % n] if ddir == 0 else tour[(i - 1 + n) % n]
+                d_ab = distances[a, b]
+                for ci in range(k):
+                    c = cand[a, ci]
+                    d_ac = distances[a, c]
+                    if d_ac >= d_ab:
+                        break  # candidates sorted: no positive first-gain beyond
+                    j = pos[c]
+                    d = tour[(j + 1) % n] if ddir == 0 else tour[(j - 1 + n) % n]
+                    if c == b or d == a:
+                        continue
+                    if d_ab + distances[c, d] - d_ac - distances[b, d] <= eps:
+                        continue
+                    # reverse the interior so edges (a,c) + (b,d) are realized
+                    lo = i if ddir == 0 else (i - 1 + n) % n
+                    hi = j if ddir == 0 else (j - 1 + n) % n
+                    p = min(lo, hi) + 1
+                    q = max(lo, hi)
+                    while p < q:
+                        tmp = tour[p]
+                        tour[p] = tour[q]
+                        tour[q] = tmp
+                        pos[tour[p]] = p
+                        pos[tour[q]] = q
+                        p += 1
+                        q -= 1
+                    improved = True
+                    total_moves += 1
+                    break
+        # ---------------- Or-opt: relocate length 1..3 segments --------------
+        for seg_len in range(1, 4):
+            for s in range(0, n - seg_len):
+                s0 = tour[s]
+                sl = tour[s + seg_len - 1]
+                prev = tour[(s - 1 + n) % n]
+                nxt = tour[(s + seg_len) % n]
+                if prev == sl or nxt == s0:
+                    continue
+                removed = (
+                    distances[prev, s0] + distances[sl, nxt] - distances[prev, nxt]
+                )
+                best_gain = eps
+                best_pos = -1
+                best_rev = False
+                for src in range(2):
+                    anchor = s0 if src == 0 else sl
+                    for ci in range(cand.shape[1]):
+                        c = cand[anchor, ci]
+                        p = pos[c]
+                        if s - 1 <= p <= s + seg_len - 1:
+                            continue
+                        cnext = tour[(p + 1) % n]
+                        if cnext == s0:
+                            continue
+                        base = distances[c, cnext]
+                        gain_f = removed - (
+                            distances[c, s0] + distances[sl, cnext] - base
+                        )
+                        if gain_f > best_gain:
+                            best_gain = gain_f
+                            best_pos = p
+                            best_rev = False
+                        gain_r = removed - (
+                            distances[c, sl] + distances[s0, cnext] - base
+                        )
+                        if gain_r > best_gain:
+                            best_gain = gain_r
+                            best_pos = p
+                            best_rev = True
+                if best_pos >= 0:
+                    _lk_relocate(tour, pos, s, seg_len, best_pos, best_rev, n)
+                    improved = True
+                    total_moves += 1
+        if not improved:
+            break
+    return total_moves
+
+
 class TwoOptTSP(TSPBase):
     def __init__(
         self,
@@ -334,6 +475,72 @@ class ThreeOptTSP(TwoOptTSP):
             optimal_value=history[-1],
             value_history=np.array(history),
             stop_reason="no_improvement" if no_moves else "max_iterations",
+        )
+
+
+@dataclass
+class LinKernighanTSPConfig(TwoOptTSPConfig):
+    candidate_k: int = 8
+    """Number of nearest-neighbour candidates each move search considers."""
+    max_passes: int = 1000
+    """Cap on full improvement passes (LK runs to convergence well before this)."""
+
+
+class LinKernighanTSP(TwoOptTSP):
+    """Lin-Kernighan-style local search (2-opt + Or-opt over candidate lists).
+
+    A stronger local optimum than ``TwoOptTSP``/``ThreeOptTSP`` because its move
+    set spans both segment *reversal* (2-opt) and segment *relocation* (Or-opt),
+    escaping the reversal-only local optima the others settle into. Reuses
+    ``setup_local_search`` (nearest-neighbour start when no ``initial_route``);
+    optimizes the closed cyclic tour over all cities.
+    """
+
+    config: LinKernighanTSPConfig
+
+    def solve(self) -> CombinatoricsResult:
+        _, new_route = self.setup_local_search()
+        route = np.ascontiguousarray(new_route)
+        N = self.network_routes.shape[0]
+        # Work on the cyclic tour of the N cities; drop a trailing depot copy if
+        # the initial route appended one (NN does, for back_to_start).
+        if route.shape[0] == N + 1 and route[0] == route[-1]:
+            tour = np.ascontiguousarray(route[:-1], dtype=np.int64)
+        else:
+            tour = np.ascontiguousarray(route[:N], dtype=np.int64)
+
+        distances = np.ascontiguousarray(self.network_routes, dtype=np.float64)
+        cand = candidate_lists(distances, self.config.candidate_k)
+        max_passes = (
+            self.config.num_iterations
+            if self.config.num_iterations > 0
+            else self.config.max_passes
+        )
+        if (
+            getattr(self.config, "local_search_backend", "numba") == "cython"
+            and HAS_CYTHON
+        ):
+            tour, n_moves = _tsp_cython.lin_kernighan(distances, tour, cand, max_passes)
+        else:
+            n_moves = _lk_kernel(distances, tour, cand, max_passes)
+
+        # Or-opt can relocate the depot (city 0) off index 0. Rotate it back to
+        # the front so the reported path is depot-first like the other solvers
+        # and ``check_path_distance`` doesn't add a spurious ``distances[0, 0]``
+        # closing edge (which would over-report the tour length).
+        zero_pos = int(np.flatnonzero(tour == 0)[0])
+        if zero_pos != 0:
+            tour = np.ascontiguousarray(np.roll(tour, -zero_pos))
+
+        out = tour
+        if self.config.back_to_start:
+            out = np.append(tour, tour[0])
+        value = check_path_distance(self.network_routes, out, self.config.back_to_start)
+        return CombinatoricsResult(
+            optimal_path=np.array(out),
+            optimal_value=value,
+            value_history=np.array([value]),
+            stop_reason="no_improvement" if n_moves == 0 else "max_iterations",
         )
 
 
