@@ -20,6 +20,25 @@ class InputVariable(ABC):
     ) -> float:
         pass
 
+    def random_values(
+        self,
+        current_values: af64,
+        other_values: Optional[af64] = None,
+        learning_rate: float = 0.7,
+        rng=None,
+    ) -> af64:
+        """Vectorized ``random_value`` — draw one sample per entry of
+        ``current_values``. The base implementation loops (safe for any custom
+        subclass); numeric subclasses override it with a vectorized version so a
+        whole ant population can be sampled per variable in one call.
+        """
+        return np.array(
+            [
+                self.random_value(cv, other_values, learning_rate)
+                for cv in np.asarray(current_values)
+            ]
+        )
+
     @abstractmethod
     def perturb_value(self, current_value: float, perturbation: float = 0.1) -> float:
         pass

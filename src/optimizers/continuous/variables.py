@@ -46,6 +46,27 @@ class InputDiscreteVariable(InputVariable):
             return rng.choice(self.values, p=p_count)
         return rng.choice(self.values)
 
+    def random_values(
+        self,
+        current_values: AF,
+        other_values: Optional[AF] = None,
+        learning_rate: float = 0.7,
+        rng: Generator | None = None,
+    ) -> AF:
+        # The discrete weighting depends only on the archive column, not on the
+        # per-entry current value, so build the probability vector ONCE and draw
+        # all samples in a single rng.choice instead of running np.unique per
+        # sample. See report item #15.
+        if rng is None:
+            rng = global_rng()
+        n = np.asarray(current_values).shape[0]
+        if other_values is not None:
+            all_values = np.concatenate((self.values, other_values))
+            unique, counts = np.unique(all_values, return_counts=True)
+            p_count = counts / np.sum(counts)
+            return rng.choice(self.values, size=n, p=p_count)
+        return rng.choice(self.values, size=n)
+
     def initial_random_value(self, perturbation: float = 0.1) -> F | I:
         rng = global_rng()
         return rng.choice(self.values)
@@ -149,6 +170,38 @@ class InputContinuousVariable(InputVariable):
                 rng=rng,
             )
         return rng.uniform(self.lower_bound, self.upper_bound)
+
+    def random_values(
+        self,
+        current_values: AF,
+        other_values: Optional[AF] = None,
+        learning_rate: float = 0.7,
+        rng: Generator | None = None,
+    ) -> AF:
+        # Vectorized truncated-normal sampling: one draw per entry of
+        # current_values, each centered on its own value with spread derived
+        # from the (shared) archive column. Equivalent to calling random_value
+        # once per entry, but done as array ops. See report item #5.
+        if rng is None:
+            rng = global_rng()
+        cv = np.asarray(current_values, dtype=float)
+        if other_values is None:
+            return rng.uniform(self.lower_bound, self.upper_bound, size=cv.shape)
+        # Mean absolute deviation of the archive column from each center.
+        d2 = np.mean(np.abs(other_values[None, :] - cv[:, None]), axis=1)
+        stdev = learning_rate * d2
+        stdev = np.where(stdev <= 0.0, 1.0, stdev)
+        low, high = self.lower_bound, self.upper_bound
+        a = ndtr((low - cv) / stdev)
+        b = ndtr((high - cv) / stdev)
+        span = b - a
+        # Avoid a zero-width window for degenerate centers; sampled below.
+        safe_span = np.where(span <= 0.0, 1.0, span)
+        u = a + rng.uniform(size=cv.shape) * safe_span
+        x = cv + stdev * ndtri(u)
+        # Degenerate windows fall back to the clamped center.
+        x = np.where(span <= 0.0, cv, x)
+        return np.clip(x, low, high)
 
     def initial_random_value(
         self, perturbation: float = 0.1, rng: Generator | None = None

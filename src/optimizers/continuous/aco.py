@@ -40,30 +40,41 @@ def run_ants(
     solution_archive: af64,
     variables: InputVariables,
     fcn: WrappedGoalFcn,
+    cp_j: af64 | None = None,
 ) -> OptimizerRun:
-    cp_j = cdf(q_weight, len(solution_archive))
-    ant_solutions = np.zeros((n_ants, len(variables)))
-    ant_values = np.zeros(n_ants)
-    for ant in range(n_ants):
-        new_solution = np.zeros(len(variables))
-        # Generate a new solution from an existing one as a base
-        p = global_rng().uniform()
-        for i, variable in enumerate(variables):
-            # Find the entry based upon cdf
-            base_solution_idx = np.searchsorted(cp_j, p)
-            base_solution = solution_archive[base_solution_idx, :]
-            # Compute the weighted value for the variable
-            new_solution[i] = variable.random_value(
-                current_value=base_solution[i],
-                other_values=solution_archive[:, i],
-                learning_rate=learning_rate,
-            )
-        new_solution, new_value = apply_local_optimization(
-            fcn, local_optim, new_solution, variables
+    # The rank CDF depends only on q and the (bounded) archive length, so it is
+    # computed once per generation in solve() and passed in; recompute only as a
+    # fallback. See report item #5.
+    if cp_j is None:
+        cp_j = cdf(q_weight, len(solution_archive))
+    n_vars = len(variables)
+    rng = global_rng()
+
+    # Each ant picks a single base solution from the archive via the rank CDF
+    # (the original drew one p per ant and reused it across every variable).
+    base_idx = np.searchsorted(cp_j, rng.uniform(size=n_ants))
+    base_idx = np.clip(base_idx, 0, solution_archive.shape[0] - 1)
+    base_rows = solution_archive[base_idx]  # (n_ants, n_vars)
+
+    # Sample each variable across ALL ants at once. n_vars is small; n_ants is
+    # large, so this turns the hot inner loop into a handful of array ops.
+    ant_solutions = np.empty((n_ants, n_vars))
+    for i, variable in enumerate(variables):
+        ant_solutions[:, i] = variable.random_values(
+            current_values=base_rows[:, i],
+            other_values=solution_archive[:, i],
+            learning_rate=learning_rate,
+            rng=rng,
         )
 
-        # Store the new solution in the temporary archive.
-        ant_solutions[ant, :] = new_solution
+    # Evaluation (and optional local search) stays per-ant: the goal function is
+    # a user-supplied scalar and cannot be assumed vectorizable.
+    ant_values = np.empty(n_ants)
+    for ant in range(n_ants):
+        new_solution, new_value = apply_local_optimization(
+            fcn, local_optim, ant_solutions[ant], variables
+        )
+        ant_solutions[ant] = new_solution
         ant_values[ant] = new_value
     return OptimizerRun(
         population_values=ant_values, population_solutions=ant_solutions
@@ -111,6 +122,8 @@ class AntColonyOptimizer(IOptimizer):
             if stopped_early != "none":
                 break
 
+            # Compute the rank CDF once per generation (not once per worker).
+            cp_j = cdf(self.config.q, len(self.soln_deck.solution_archive))
             job_output: list[OptimizerRun] = parallel(
                 joblib.delayed(run_ants)(
                     individuals_per_job,
@@ -120,6 +133,7 @@ class AntColonyOptimizer(IOptimizer):
                     self.soln_deck.solution_archive,
                     self.variables,
                     self.wrapped_fcn,
+                    cp_j,
                 )
                 for _ in range(n_jobs)
             )
