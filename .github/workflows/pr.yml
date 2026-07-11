@@ -1,7 +1,7 @@
 name: PR Checks
 on:
+  # Run on every PR regardless of base branch so stacked PRs are checked too.
   pull_request:
-    branches: [ main ]
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -15,8 +15,10 @@ jobs:
         run: |
           pip install .[dev]
       - name: Check code formatting with black
-        run: |
-          pip install black
-          black --check .
+        run: black --check .
+      - name: Lint with flake8
+        run: flake8 src tests
+      - name: Type-check with mypy
+        run: mypy
       - name: Run tests
         run: PYTHONPATH=./src pytest tests/

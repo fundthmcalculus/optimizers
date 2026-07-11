@@ -124,6 +124,7 @@ class GenerationRunner:
                 for _ in range(n)
             ]
             return [f.result() for f in futures]
+        assert self._parallel is not None
         return self._parallel(
             joblib.delayed(worker_fn)(self._fixed, *varying_args) for _ in range(n)
         )

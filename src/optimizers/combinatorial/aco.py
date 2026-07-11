@@ -7,7 +7,7 @@ from joblib import delayed
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, setup_for_generations
-from ..core.types import AI, AF, F, ab8, i32, i16
+from ..core.types import AI, AF, ab8, i32, i16
 
 
 @dataclass
@@ -169,7 +169,7 @@ def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF | int:
 
 def run_ant(
     network_routes: AF, eta_beta: AF, tau_alpha: AF, config: AntColonyTSPConfig
-) -> tuple[AI, F]:
+) -> tuple[AI, float]:
     # Start at city 1, and visit each city exactly once
     cur_city = 0  # Offset by 1, so we start at city 1
     eta_shape_ = eta_beta.shape[0]

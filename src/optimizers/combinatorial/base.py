@@ -18,7 +18,7 @@ class CombinatoricsResult:
 
 def check_path_distance(
     distances: AF, order_path: AI, return_to_start: bool = False
-) -> F:
+) -> float:
     # Sum every consecutive edge in one fancy-indexed gather instead of a scalar
     # Python loop (report item #10). Equivalent to the old loop: the closing edge
     # returns to city 0 (order_path[0] is always the depot in these solvers).
@@ -51,8 +51,9 @@ class TSPBase(ABC):
         network_routes: AF | None = None,
         city_locations: AF | None = None,
     ):
-        self.city_locations = None
-        self.network_routes = None
+        self.city_locations: AF | None = None
+        # Always populated by set_network_routes below.
+        self.network_routes: AF = None
         self.set_network_routes(network_routes, city_locations)
 
     def set_network_routes(

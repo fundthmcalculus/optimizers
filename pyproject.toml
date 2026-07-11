@@ -31,8 +31,8 @@ dev = [
     "matplotlib>=3.10",
     "flake8",
     "Flake8-pyproject",
+    "mypy",
     "optuna>=4.3.0",
-    "pyclustertend",
 ]
 
 [tool.setuptools]
@@ -46,10 +46,31 @@ where = ["src"]
 
 [project.scripts]
 optimizers = "optimizers.__init__:main"
-fuzzy = "fuzzy.__init__:main"
 
 [tool.flake8]
 max-line-length = 120
 exclude = ".git,__pycache__,build,dist,.eggs,.tox,.venv,venv"
-include = "./src,./tests"
-extend-ignore = ["E203"]
+# E203 / W503 conflict with black's formatting; ignore per black's guidance.
+extend-ignore = ["E203", "W503"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src"]
+# Third-party numeric/plotting libs (numba, kmodes, plotly, joblib, sklearn,
+# scipy) ship no/partial stubs; don't fail on their missing type info.
+ignore_missing_imports = true
+warn_redundant_casts = true
+# The AF/AI aliases are unions of dtype-parameterized numpy arrays, so ordinary
+# array arithmetic trips these categories pervasively (false positives, not
+# bugs). Silence them for now; the real-defect categories (attr-defined,
+# return-value, name-defined, no-redef, call-arg, ...) stay enforced. Ratchet
+# these off as the numeric annotations tighten.
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "index",
+    "operator",
+    "union-attr",
+    "override",
+    "list-item",
+]

@@ -147,7 +147,7 @@ class GeneticAlgorithmTSP(TSPBase):
 
 def run_ga(
     genome: AI, genome_value: AF, network_routes: AF, config: GeneticAlgorithmTSPConfig
-) -> tuple[AI, F]:
+) -> tuple[AI, float]:
     # Take two parents
     parent_1 = _tournament_selection(genome, genome_value)
     parent_2 = _tournament_selection(genome, genome_value)

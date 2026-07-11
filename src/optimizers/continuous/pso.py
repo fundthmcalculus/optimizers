@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 
-import joblib
 import numpy as np
 
 from ..core.base import (
@@ -10,7 +9,6 @@ from ..core.base import (
 )
 from ..core.types import AF, F
 from ..solution_deck import (
-    WrappedGoalFcn,
     InputVariables,
     SolutionDeck,
 )
