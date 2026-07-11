@@ -20,7 +20,7 @@ class TwoOptTSPConfig(IOptimizerConfig):
     """Only check the next nodes, which makes this O(nk), but lower chance of finding crossovers"""
 
 
-def _swap_segment(ij, jk, new_route):
+def _swap_segment(ij: int, jk: int, new_route: AI) -> AI:
     ij += 1
     while ij < jk:
         temp = new_route[ij]
@@ -228,7 +228,7 @@ class TwoOptTSP(TSPBase):
             stop_reason="no_improvement" if no_moves else "max_iterations",
         )
 
-    def setup_local_search(self) -> tuple[int, AF]:
+    def setup_local_search(self) -> tuple[int, AI]:
         if self.initial_route is None or self.initial_value == None:
             # Use the nearest neighbor
             nn_config = NearestNeighborTSPConfig(

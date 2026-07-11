@@ -7,7 +7,7 @@ from joblib import delayed
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, setup_for_generations
-from ..core.types import AI, AF, F, i32, i16
+from ..core.types import AI, AF, F, ab8, i32, i16
 
 
 @dataclass
@@ -147,12 +147,12 @@ class AntColonyTSP(TSPBase):
             )
 
 
-def pheromone_update(tau_xy, delta_tau_xy, rho):
+def pheromone_update(tau_xy: AF, delta_tau_xy: AF, rho: float) -> AF:
     new_tau_xy = (1 - rho) * tau_xy + delta_tau_xy
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_beta_xy, tau_alpha_xy, allowed_y, x):
+def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF | int:
     # ``eta_beta``/``tau_alpha`` are already raised to beta/alpha upstream
     # (report item #6), so this is a single elementwise product per step.
     p = tau_alpha_xy[x, :] * eta_beta_xy[x, :]

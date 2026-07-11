@@ -11,7 +11,7 @@ def apply_local_optimization(
     local_optim: LocalOptimType,
     new_solution: AF,
     variables: list[InputVariable],
-):
+) -> tuple[AF, F]:
     ensure_literal_choice(local_optim, LocalOptimType)
     if local_optim == "grad":
         new_solution, new_value = full_grad_optim(fcn, new_solution, variables)

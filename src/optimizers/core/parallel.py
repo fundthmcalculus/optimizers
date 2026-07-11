@@ -26,15 +26,17 @@ import joblib
 from joblib import cpu_count
 from joblib.externals.loky import ProcessPoolExecutor
 
+from .base import JoblibPrefer
+
 # Per-worker cache of run-constant payloads, keyed by an opaque token. Populated
 # once per worker process by the pool initializer. This lives at module scope on
 # purpose: the initializer and the task functions both resolve it by reference in
 # the worker, so the initializer's write is visible to later tasks (a value that
 # was cloudpickled into each task instead would not be shared).
-_FIXED: dict = {}
+_FIXED: dict[str, Any] = {}
 
 
-def resolve_n_jobs(n_jobs: int) -> int:
+def resolve_n_jobs(n_jobs: int | None) -> int:
     """Normalize a config ``n_jobs`` (``< 1`` means "all but one core")."""
     if n_jobs is None or n_jobs < 1:
         return max(1, cpu_count() - 1)
@@ -45,7 +47,9 @@ def _init_worker(token: str, payload: Any) -> None:
     _FIXED[token] = payload
 
 
-def _call_with_fixed(worker_fn: Callable, token: str, args: Sequence[Any]) -> Any:
+def _call_with_fixed(
+    worker_fn: Callable[..., Any], token: str, args: Sequence[Any]
+) -> Any:
     # Runs in the worker: resolve the once-shipped fixed payload and call through.
     return worker_fn(_FIXED[token], *args)
 
@@ -81,7 +85,7 @@ class GenerationRunner:
     down in :meth:`close`.
     """
 
-    def __init__(self, n_jobs: int, prefer: str, fixed: Any):
+    def __init__(self, n_jobs: int, prefer: JoblibPrefer, fixed: Any):
         self.n_jobs = resolve_n_jobs(n_jobs)
         self.prefer = prefer
         self._fixed = fixed
@@ -102,8 +106,11 @@ class GenerationRunner:
             self._parallel = joblib.Parallel(n_jobs=self.n_jobs, prefer="threads")
 
     def run(
-        self, worker_fn: Callable, varying_args: Sequence[Any], count: int | None = None
-    ) -> list:
+        self,
+        worker_fn: Callable[..., Any],
+        varying_args: Sequence[Any],
+        count: int | None = None,
+    ) -> list[Any]:
         """Call ``worker_fn(fixed, *varying_args)`` ``count`` times in parallel.
 
         ``count`` defaults to ``n_jobs`` (one task per worker per generation).
