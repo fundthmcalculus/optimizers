@@ -35,6 +35,10 @@ class AntColonyMST(TSPBase):
         tour_lengths = []
         optimal_tour_length = np.inf
         if self.config.hot_start is not None:
+            if self.config.hot_start_length is None:
+                raise ValueError(
+                    "hot_start_length must be provided when hot_start is set"
+                )
             optimal_tour_length = self.config.hot_start_length
             optimal_city_order = self.config.hot_start
             for ij in range(self.config.hot_start.shape[0]):
@@ -110,7 +114,7 @@ def pheromone_update(tau_xy: AF, delta_tau_xy: AF, rho: float) -> AF:
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8) -> AF | int:
+def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8) -> AF:
     # ``eta_beta``/``tau_alpha`` are pre-raised to beta/alpha upstream (#6).
     p = tau_alpha_xy[~allowed_y, :] * eta_beta_xy[~allowed_y, :]
     # Remove negative probabilities, those are not allowed
@@ -119,7 +123,8 @@ def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8) -> AF | int:
     # Normalize the probabilities
     total = p.sum()
     if total == 0.0:
-        return 0
+        # all-zero (un-normalized) array; callers test np.sum(p) == 0
+        return p
     p /= total
     return p
 
@@ -163,7 +168,8 @@ def run_ant_mst(
         # Choose the next city-pair, must flatten probability matrix first
         cum_p = np.cumsum(p.flatten())
         new_p = np.random.random()
-        choice_idx = np.argmin(new_p > cum_p)
+        # float > ndarray is a valid elementwise compare; numpy stubs mistype it
+        choice_idx = np.argmin(new_p > cum_p)  # type: ignore[operator]
         from_row = choice_idx // order_len
         from_col = choice_idx % order_len
         city_order[idx, 0] = from_row

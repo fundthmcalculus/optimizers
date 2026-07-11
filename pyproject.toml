@@ -63,14 +63,16 @@ warn_redundant_casts = true
 # The AF/AI aliases are unions of dtype-parameterized numpy arrays, so ordinary
 # array arithmetic trips these categories pervasively (false positives, not
 # bugs). Silence them for now; the real-defect categories (attr-defined,
-# return-value, name-defined, no-redef, call-arg, ...) stay enforced. Ratchet
-# these off as the numeric annotations tighten.
+# return-value, name-defined, no-redef, call-arg, operator, union-attr, ...)
+# stay enforced. Ratchet these off as the numeric annotations tighten.
+#
+# Ratchet log:
+#   * operator + union-attr enabled (None-safety pass) — caught real bugs
+#     (dividing by an optional hot_start_length, iterating an optional groups).
 disable_error_code = [
     "arg-type",
     "assignment",
     "index",
-    "operator",
-    "union-attr",
     "override",
     "list-item",
 ]

@@ -117,6 +117,7 @@ class GenerationRunner:
         """
         n = self.n_jobs if count is None else count
         if self.prefer == "processes":
+            assert self._executor is not None
             futures = [
                 self._executor.submit(
                     _call_with_fixed, worker_fn, self._token, varying_args
