@@ -166,7 +166,7 @@ def run_ga(
         return child_2, child_2_fitness
 
 
-def _2opt_refine(new_route: AI, network_routes: AF, nearest_neighbors=10) -> AI:
+def _2opt_refine(new_route: AI, network_routes: AF, nearest_neighbors: int = 10) -> AI:
     N = len(new_route)
     ij = np.random.randint(low=1, high=max(1, N - nearest_neighbors))
     k_nn = N

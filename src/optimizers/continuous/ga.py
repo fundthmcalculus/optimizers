@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import joblib
 import numpy as np
+from numpy.random import Generator
 
 from .local import apply_local_optimization
 from ..core.types import AF, AI
@@ -42,7 +43,7 @@ def _tournament_selection_batch(
     population_fitness: AF,
     n: int,
     tournament_size: int = 3,
-    rng=None,
+    rng: Generator | None = None,
 ) -> AF | AI:
     # Select ``n`` winners at once. Each winner is the best of ``tournament_size``
     # distinct random rows; distinctness comes from argsort-of-random-keys, which
@@ -58,7 +59,10 @@ def _tournament_selection_batch(
 
 
 def _crossover_batch(
-    parents1: AF | AI, parents2: AF | AI, crossover_rate: float, rng=None
+    parents1: AF | AI,
+    parents2: AF | AI,
+    crossover_rate: float,
+    rng: Generator | None = None,
 ) -> tuple[AF | AI, AF | AI]:
     # Single-point crossover for every pair at once. Rows where crossover does
     # not fire pass the parents through unchanged (matching the scalar version).
@@ -75,7 +79,10 @@ def _crossover_batch(
 
 
 def _mutate_batch(
-    children: AF | AI, mutation_rate: float, variables: InputVariables, rng=None
+    children: AF | AI,
+    mutation_rate: float,
+    variables: InputVariables,
+    rng: Generator | None = None,
 ) -> AF | AI:
     # Mutate a whole batch of children. For each variable (few), decide which
     # rows mutate and perturb those entries with one vectorized call.
@@ -94,7 +101,7 @@ def _mutate_batch(
 
 def run_ga(
     fixed: tuple,
-    meta: dict,
+    meta: InputArguments,
     solution_values: AF | AI,
     solution_archive: AF,
 ) -> OptimizerRun:

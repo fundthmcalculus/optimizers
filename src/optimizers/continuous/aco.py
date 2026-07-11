@@ -35,7 +35,7 @@ class AntColonyOptimizerConfig(IOptimizerConfig):
 
 def run_ants(
     fixed: tuple,
-    meta: dict,
+    meta: InputArguments,
     solution_archive: af64,
     cp_j: af64,
 ) -> OptimizerRun:

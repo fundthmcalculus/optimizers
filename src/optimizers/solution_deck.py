@@ -1,5 +1,5 @@
 from functools import lru_cache, cache
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import scipy
@@ -19,7 +19,7 @@ class SolutionDeck:
         self,
         archive_size: int,
         num_vars: int,
-        dtype: f64 | i64 | b8 = f64,
+        dtype: type[np.generic] = f64,
         n_outputs: int = 0,
     ):
         self.solution_archive = np.empty((archive_size, num_vars), dtype=dtype)
@@ -45,7 +45,7 @@ class SolutionDeck:
         values: af64,
         local_optima: bool | b8 | ab8 = False,
         outputs: af64 | None = None,
-    ):
+    ) -> None:
         assert (
             solutions.shape[0] == values.shape[0]
         ), f"Batch size mismatch on append, solutions={solutions.shape}, values={values.shape}"
@@ -230,7 +230,7 @@ class SolutionDeck:
     def __len__(self) -> int:
         return self.solution_archive.shape[0]
 
-    def get(self, idx) -> tuple[af64, f64, b8]:
+    def get(self, idx: int) -> tuple[af64, f64, b8]:
         return (
             self.solution_archive[idx],
             self.solution_value[idx],
@@ -257,7 +257,7 @@ class SolutionDeck:
         return cluster_labels, k_modes_model.mode_indicies_
 
     # ----- Serialization helpers for checkpointing -----
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         data = {
             "archive_size": int(self.archive_size),
             "num_vars": int(self.num_vars),
@@ -272,7 +272,7 @@ class SolutionDeck:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict) -> "SolutionDeck":
+    def from_dict(cls, data: dict[str, Any]) -> "SolutionDeck":
         archive_size = int(data.get("archive_size", 0))
         num_vars = int(data.get("num_vars", 0))
         dtype = np.dtype(data.get("dtype", str(np.float64)))
@@ -295,7 +295,7 @@ class SolutionDeck:
 
 
 @lru_cache(maxsize=16)
-def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> np.ndarray:
+def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> af64:
     """
     Generate N points uniformly distributed on the unit hyper-cube [0,1]^k using Lloyd's algorithm.
 
@@ -322,7 +322,7 @@ def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> np.ndarray:
 
 
 @lru_cache(maxsize=16)
-def fibonacci_sphere_points(n: int, k: int) -> np.ndarray:
+def fibonacci_sphere_points(n: int, k: int) -> af64:
     """
     Generate N points uniformly distributed on the k-dimensional unit sphere using a Fibonacci spiral,
     then scale the rectangular coordinates to be on the unit hyper-cube [0,1]^k.
@@ -385,7 +385,7 @@ def inv_elliptic2(s: f64, m: f64) -> f64:
 
 
 @lru_cache(maxsize=16)
-def spiral_points(n: int, k: int) -> np.ndarray:
+def spiral_points(n: int, k: int) -> af64:
     """
     Generates N points in a k-dimensional space using rotation matrices. Source: https://www.fujipress.jp/jaciii/jc/jacii001500081116/
 
