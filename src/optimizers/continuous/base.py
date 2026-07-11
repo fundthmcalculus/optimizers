@@ -103,8 +103,12 @@ class IOptimizer(abc.ABC):
             takes_args = _accepts_args(func)
 
             def __wrapped(x: AF, _f=func, _ap=self._arg_provider):
-                _ap.bump_eval()
+                # Only pay the runtime-metadata bookkeeping (a time.time() call
+                # plus dict writes, per evaluation) when the goal function
+                # actually consumes args. For plain ``f(x)`` objectives nothing
+                # reads the metadata, so skip it entirely. See report item #14.
                 if takes_args:
+                    _ap.bump_eval()
                     return _f(x, _ap.current())
                 return _f(x)
 

@@ -2,7 +2,7 @@ from typing import Optional
 
 import numpy as np
 from numpy.random import Generator
-from scipy.stats import truncnorm
+from scipy.special import ndtr, ndtri
 
 from ..core.types import AF, AI, F, I
 from ..core.variables import InputVariable
@@ -103,12 +103,33 @@ class InputContinuousVariable(InputVariable):
         new_value = current_value + sigma * global_rng().normal()
         return max(min(self.upper_bound, new_value), self.lower_bound)
 
-    def __get_truncated_normal(self, mean=0.0, stdev=1.0, low=0.0, high=10.0) -> float:
-        if stdev == 0.0:
+    def __get_truncated_normal(
+        self,
+        mean=0.0,
+        stdev=1.0,
+        low=0.0,
+        high=10.0,
+        rng: Generator | None = None,
+    ) -> float:
+        # Inverse-CDF (Gaussian) sampling of a truncated normal. This avoids
+        # constructing a scipy ``truncnorm`` frozen distribution on every call
+        # (which spent ~60% of ACO runtime building docstrings); the draw is
+        # statistically identical. See PERFORMANCE_REPORT.md item #1.
+        if stdev <= 0.0:
             stdev = 1.0
-        return truncnorm(
-            (low - mean) / stdev, (high - mean) / stdev, loc=mean, scale=stdev
-        ).rvs()
+        if rng is None:
+            rng = global_rng()
+        a = ndtr((low - mean) / stdev)
+        b = ndtr((high - mean) / stdev)
+        if b <= a:
+            # Degenerate window (mean far outside [low, high]); fall back to the
+            # nearer bound rather than dividing a zero-width interval.
+            return float(min(max(mean, low), high))
+        u = rng.uniform(a, b)
+        x = mean + stdev * ndtri(u)
+        # ndtri can return +/-inf at the extreme tails; clamp to the domain so
+        # the result is always within [low, high] as truncnorm guaranteed.
+        return float(min(max(x, low), high))
 
     def random_value(
         self,
@@ -116,7 +137,7 @@ class InputContinuousVariable(InputVariable):
         other_values: Optional[AF] = None,
         learning_rate: float = 0.7,
     ):
-        rng = np.random.default_rng()
+        rng = global_rng()
         if other_values is not None:
             # TODO - Other than Manhattan distance, what other distance metrics can be used?
             d2 = np.sum(np.abs(other_values - current_value)) / len(other_values)
@@ -125,6 +146,7 @@ class InputContinuousVariable(InputVariable):
                 stdev=learning_rate * d2,
                 low=self.lower_bound,
                 high=self.upper_bound,
+                rng=rng,
             )
         return rng.uniform(self.lower_bound, self.upper_bound)
 
@@ -132,7 +154,7 @@ class InputContinuousVariable(InputVariable):
         self, perturbation: float = 0.1, rng: Generator | None = None
     ) -> float:
         if rng is None:
-            rng = np.random.default_rng()
+            rng = global_rng()
         return rng.uniform(self.lower_bound, self.upper_bound)
 
     def range_value(self, p: float) -> float:
