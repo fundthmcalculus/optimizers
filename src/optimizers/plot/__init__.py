@@ -170,3 +170,118 @@ def plot_run_statistics(
     fig.tight_layout()
 
     return _finish(fig)
+
+
+def plot_pareto_front(
+    objectives: AF,
+    objective_names: list[str] | None = None,
+) -> Figure:
+    """Scatter the tracked objectives with the Pareto-non-dominated set highlighted.
+
+    Quality-diversity add-on (QD_PARETO_PLAN.md §4.5). Handles 2 or 3 objectives;
+    for more, the first three are shown. Returns the figure.
+    """
+    from ..archive.metrics import non_dominated_mask
+
+    f = np.atleast_2d(np.asarray(objectives, dtype=float))
+    m = f.shape[1]
+    mask = non_dominated_mask(f)
+    names = objective_names or [f"objective {i + 1}" for i in range(m)]
+
+    if m == 2:
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.scatter(
+            f[~mask, 0],
+            f[~mask, 1],
+            s=36,
+            c="lightgray",
+            label="dominated",
+            zorder=2,
+        )
+        # Order the front by the first objective so the connecting line is monotone.
+        front = f[mask][np.argsort(f[mask, 0])]
+        ax.plot(
+            front[:, 0],
+            front[:, 1],
+            marker="o",
+            markersize=8,
+            linewidth=2,
+            color="crimson",
+            label="Pareto front",
+            zorder=3,
+        )
+        ax.set_xlabel(names[0])
+        ax.set_ylabel(names[1])
+    else:
+        cols = [0, 1, 2] if m >= 3 else [0, 1]
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(projection="3d")
+        ax.scatter(
+            f[~mask, cols[0]],
+            f[~mask, cols[1]],
+            f[~mask, cols[2]],
+            s=12,
+            c="lightgray",
+            label="dominated",
+        )
+        ax.scatter(
+            f[mask, cols[0]],
+            f[mask, cols[1]],
+            f[mask, cols[2]],
+            s=36,
+            c="crimson",
+            label="Pareto front",
+        )
+        ax.set_xlabel(names[0])
+        ax.set_ylabel(names[1])
+        ax.set_zlabel(names[2] if len(names) > 2 else "objective 3")
+
+    ax.set_title("Pareto front")
+    ax.legend(loc="best")
+    fig.tight_layout()
+
+    return _finish(fig)
+
+
+def plot_map_elites(archive, objective_name: str = "fitness") -> Figure:
+    """Scatter a CVT MAP-Elites archive's cells in 2-D, colored by elite fitness.
+
+    Occupied cells are colored by their elite's value (lower=better); empty cells
+    are shown faintly. Uses the first two descriptor dimensions. Returns the
+    figure.
+    """
+    centroids, values, occupied = archive.cell_data()
+    centroids = np.asarray(centroids, dtype=float)
+    values = np.asarray(values, dtype=float)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    empty = ~occupied
+    if np.any(empty):
+        ax.scatter(
+            centroids[empty, 0],
+            centroids[empty, 1],
+            s=25,
+            c="lightgray",
+            label="empty cell",
+            zorder=2,
+        )
+    if np.any(occupied):
+        scatter = ax.scatter(
+            centroids[occupied, 0],
+            centroids[occupied, 1],
+            s=64,
+            c=values[occupied],
+            cmap="viridis",
+            label="elite",
+            zorder=3,
+        )
+        fig.colorbar(scatter, ax=ax, label=objective_name)
+
+    ax.set_title("MAP-Elites archive")
+    ax.set_xlabel("descriptor 1")
+    ax.set_ylabel("descriptor 2")
+    ax.legend(loc="best")
+    fig.tight_layout()
+
+    return _finish(fig)

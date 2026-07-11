@@ -149,6 +149,10 @@ class CVTArchive:
         """Fraction of cells occupied — the MAP-Elites exploration measure."""
         return float(self._cell_occupied.sum()) / float(self.n_cells)
 
+    def cell_data(self) -> tuple[af64, af64, AF]:
+        """``(centroids, cell_value, occupied_mask)`` for plotting/inspection."""
+        return self.centroids, self._cell_value, self._cell_occupied
+
     # ---- scalar-surface parity methods ----
     def sort(self) -> None:
         idx = np.argsort(self.solution_value)
