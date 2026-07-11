@@ -39,6 +39,25 @@ class TwoOptTSPConfig(IOptimizerConfig):
     it has been built (falls back to numba otherwise). Results are identical."""
 
 
+def _depot_first_tour(route: AI, n: int) -> AI:
+    """Reduce a kernel-mutated route to the ``n`` distinct cities, depot-first.
+
+    2-opt's wrap-edge sweep (``start=-1`` when ``back_to_start``) can reverse a
+    segment beginning at index 0, relocating the depot (city 0) into the middle.
+    That is a cost-preserving rotation of the cyclic tour, but ``check_path_distance``
+    closes the loop back to city 0 *specifically*, so a non-depot-first route makes
+    it add a spurious closing edge and over-report the length. Drop any appended
+    depot copy (``route[:n]``) and rotate city 0 to the front. Returns the *open*
+    depot-first tour: callers pass it to ``check_path_distance`` (which adds the
+    return leg for ``back_to_start``) and append the depot themselves for output.
+    """
+    tour = np.asarray(route[:n])
+    zero_pos = int(np.flatnonzero(tour == 0)[0])
+    if zero_pos != 0:
+        tour = np.roll(tour, -zero_pos)
+    return np.ascontiguousarray(tour)
+
+
 def _swap_segment(ij: int, jk: int, new_route: AI) -> AI:
     ij += 1
     while ij < jk:
@@ -404,15 +423,20 @@ class TwoOptTSP(TSPBase):
                 )
             )
 
-        history = [
-            check_path_distance(
-                self.network_routes, new_route, self.config.back_to_start
-            )
-        ]
+        # 2-opt can rotate the depot off index 0; restore depot-first order so
+        # check_path_distance measures the true (cyclic) tour length. Measure on
+        # the open tour, then append the depot for the returned closed path (the
+        # NearestNeighbor/LinKernighan/ConvexHull convention for back_to_start).
+        tour = _depot_first_tour(new_route, N)
+        value = check_path_distance(
+            self.network_routes, tour, self.config.back_to_start
+        )
+        out = np.append(tour, tour[0]) if self.config.back_to_start else tour
+        history = [value]
 
         return CombinatoricsResult(
-            optimal_path=np.array(new_route),
-            optimal_value=history[-1],
+            optimal_path=np.array(out),
+            optimal_value=value,
             value_history=np.array(history),
             stop_reason="no_improvement" if no_moves else "max_iterations",
         )
@@ -480,15 +504,18 @@ class ThreeOptTSP(TwoOptTSP):
                 )
             )
 
-        history = [
-            check_path_distance(
-                self.network_routes, new_route, self.config.back_to_start
-            )
-        ]
+        # 3-opt never writes index 0, so the depot rotation is a no-op here; keep
+        # the shared normalization for one depot-first postcondition across both.
+        tour = _depot_first_tour(new_route, N)
+        value = check_path_distance(
+            self.network_routes, tour, self.config.back_to_start
+        )
+        out = np.append(tour, tour[0]) if self.config.back_to_start else tour
+        history = [value]
 
         return CombinatoricsResult(
-            optimal_path=np.array(new_route),
-            optimal_value=history[-1],
+            optimal_path=np.array(out),
+            optimal_value=value,
             value_history=np.array(history),
             stop_reason="no_improvement" if no_moves else "max_iterations",
         )

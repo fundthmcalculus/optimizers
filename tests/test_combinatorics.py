@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from sklearn.metrics import pairwise_distances
 
 from optimizers.combinatorial.aco import (
@@ -7,6 +8,7 @@ from optimizers.combinatorial.aco import (
 )
 from optimizers.combinatorial.ga import GeneticAlgorithmTSPConfig, GeneticAlgorithmTSP
 from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
+from optimizers.combinatorial.base import check_path_distance
 from optimizers.combinatorial.strategy import (
     NearestNeighborTSPConfig,
     NearestNeighborTSP,
@@ -174,6 +176,68 @@ def test_nn_tsp():
         all_cities,
         [result.optimal_path, result2.optimal_path, result3.optimal_path],
     )
+
+
+@pytest.mark.parametrize("back_to_start", [True, False])
+def test_ga_local_optimize_respects_back_to_start(back_to_start):
+    # Issue #47: local_optimize must run the 2-opt refinement with the SAME
+    # open/closed objective as the GA itself. A regression here silently forces
+    # a closed loop, so the reported value stops matching the tour that is
+    # returned (and, for back_to_start=False, can be worse than pre-refinement).
+    np.random.seed(0)
+    all_cities = circle_random_clusters()
+    distances: AF = pairwise_distances(all_cities)
+    config = GeneticAlgorithmTSPConfig(
+        name="ga local-opt",
+        num_generations=N_GENERATIONS,
+        population_size=N_ANTS,
+        stop_after_iterations=5,
+        joblib_prefer="threads",
+        back_to_start=back_to_start,
+        local_optimize=True,
+    )
+    optimizer = GeneticAlgorithmTSP(
+        config, network_routes=distances, city_locations=all_cities
+    )
+    result = optimizer.solve()
+
+    path = np.asarray(result.optimal_path)
+    # Closed tours return depot-first AND depot-last (the return leg); the open
+    # form omits the return leg. Strip it before checking the city set.
+    cities = path[:-1] if back_to_start else path
+    assert sorted(cities.tolist()) == list(range(distances.shape[0]))
+    assert path[0] == 0
+    # The reported value is measured with the run's own back_to_start setting.
+    expected = check_path_distance(distances, path, back_to_start)
+    assert np.isclose(result.optimal_value, expected)
+
+
+@pytest.mark.parametrize("back_to_start", [True, False])
+def test_aco_local_optimize_respects_back_to_start(back_to_start):
+    # Issue #47 companion for the ant-colony path (which MTSP delegates to).
+    np.random.seed(0)
+    all_cities = circle_random_clusters()
+    distances: AF = pairwise_distances(all_cities)
+    config = AntColonyTSPConfig(
+        name="aco local-opt",
+        num_generations=N_GENERATIONS,
+        population_size=N_ANTS,
+        stop_after_iterations=5,
+        joblib_prefer="threads",
+        back_to_start=back_to_start,
+        local_optimize=True,
+    )
+    optimizer = AntColonyTSP(
+        config, network_routes=distances, city_locations=all_cities
+    )
+    result = optimizer.solve()
+
+    path = np.asarray(result.optimal_path)
+    cities = path[:-1] if back_to_start else path
+    assert sorted(cities.tolist()) == list(range(distances.shape[0]))
+    assert path[0] == 0
+    expected = check_path_distance(distances, path, back_to_start)
+    assert np.isclose(result.optimal_value, expected)
 
 
 def test_convex_hull_tsp():
