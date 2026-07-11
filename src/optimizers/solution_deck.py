@@ -20,6 +20,7 @@ class SolutionDeck:
         archive_size: int,
         num_vars: int,
         dtype: type[np.generic] = f64,
+        n_outputs: int = 0,
     ):
         self.solution_archive = np.empty((archive_size, num_vars), dtype=dtype)
         self.solution_value = np.empty((archive_size,), dtype=dtype)
@@ -27,13 +28,35 @@ class SolutionDeck:
         self.archive_size = archive_size
         self.num_vars = num_vars
         self._dtype = dtype
+        # Quality-diversity add-on: when ``n_outputs > 0`` the deck tracks a vector
+        # of outputs per solution (kept row-aligned with ``solution_archive``
+        # through every append/sort/dedup/truncate). ``None`` == classic scalar
+        # deck, so the default path is byte-identical. See QD_PARETO_PLAN.md §1.
+        self.n_outputs = n_outputs
+        self.solution_outputs: af64 | None = (
+            np.full((archive_size, n_outputs), np.nan, dtype=f64)
+            if n_outputs > 0
+            else None
+        )
 
     def append(
-        self, solutions: af64, values: af64, local_optima: bool | b8 | ab8 = False
+        self,
+        solutions: af64,
+        values: af64,
+        local_optima: bool | b8 | ab8 = False,
+        outputs: af64 | None = None,
     ) -> None:
         assert (
             solutions.shape[0] == values.shape[0]
         ), f"Batch size mismatch on append, solutions={solutions.shape}, values={values.shape}"
+        # Quality-diversity add-on: keep the tracked-outputs array row-aligned.
+        if self.solution_outputs is not None:
+            assert outputs is not None, "deck tracks outputs but none were provided"
+            assert outputs.shape[0] == solutions.shape[0], (
+                f"Batch size mismatch on append, solutions={solutions.shape}, "
+                f"outputs={outputs.shape}"
+            )
+            self.solution_outputs = np.vstack([self.solution_outputs, outputs])
         # Append local optima flags
         if isinstance(local_optima, bool) or isinstance(local_optima, np.bool_):
             self.is_local_optima = np.hstack(
@@ -136,12 +159,54 @@ class SolutionDeck:
             self.is_local_optima = np.delete(
                 self.is_local_optima, rows_to_delete, axis=0
             )
+            if self.solution_outputs is not None:
+                self.solution_outputs = np.delete(
+                    self.solution_outputs, rows_to_delete, axis=0
+                )
 
     def sort(self) -> None:
         idx = np.argsort(self.solution_value)
         self.solution_archive = self.solution_archive[idx]
         self.solution_value = self.solution_value[idx]
         self.is_local_optima = self.is_local_optima[idx]
+        if self.solution_outputs is not None:
+            self.solution_outputs = self.solution_outputs[idx]
+
+    def set_all_outputs(self, outputs: af64) -> None:
+        """Set the full tracked-outputs array (row-aligned with the archive).
+
+        Used to seed outputs for the initial deck in a multi-output run, once the
+        archive has been initialized. See QD_PARETO_PLAN.md §1.
+        """
+        assert outputs.shape[0] == self.solution_archive.shape[0], (
+            f"outputs rows {outputs.shape[0]} != archive rows "
+            f"{self.solution_archive.shape[0]}"
+        )
+        self.n_outputs = outputs.shape[1]
+        self.solution_outputs = np.asarray(outputs, dtype=f64)
+
+    def add_generation(
+        self,
+        solutions: af64,
+        values: af64,
+        outputs: af64 | None = None,
+        local_optima: bool = False,
+    ) -> None:
+        """Insert one generation of candidates (the classic elitist path).
+
+        Unified ``Archive`` seam: the scalar deck appends, deduplicates and
+        truncates back to ``archive_size`` (identical to the previous inline
+        logic in ``update_solution_deck``); MAP-Elites/Pareto archives override
+        this with their own insertion rule.
+        """
+        self.append(
+            solutions=solutions,
+            values=values,
+            local_optima=local_optima,
+            outputs=outputs,
+        )
+        self.deduplicate()
+        self.truncate(self.archive_size)
 
     def truncate(self, size: int = -1) -> None:
         """Keep only the best ``size`` entries, dropping the rest.
@@ -159,6 +224,8 @@ class SolutionDeck:
         self.solution_archive = self.solution_archive[:size]
         self.solution_value = self.solution_value[:size]
         self.is_local_optima = self.is_local_optima[:size]
+        if self.solution_outputs is not None:
+            self.solution_outputs = self.solution_outputs[:size]
 
     def __len__(self) -> int:
         return self.solution_archive.shape[0]
@@ -199,6 +266,9 @@ class SolutionDeck:
             "solution_value": self.solution_value.tolist(),
             "is_local_optima": self.is_local_optima.astype(bool).tolist(),
         }
+        if self.solution_outputs is not None:
+            data["n_outputs"] = int(self.n_outputs)
+            data["solution_outputs"] = self.solution_outputs.tolist()
         return data
 
     @classmethod
@@ -218,6 +288,9 @@ class SolutionDeck:
             else min(len(deck.solution_archive), len(deck.solution_value))
         )
         deck.num_vars = num_vars if num_vars > 0 else deck.solution_archive.shape[1]
+        if "solution_outputs" in data:
+            deck.n_outputs = int(data.get("n_outputs", 0))
+            deck.solution_outputs = np.array(data["solution_outputs"], dtype=f64)
         return deck
 
 

@@ -21,10 +21,13 @@ from ..core.base import (
     GoalFcn,
 )
 from ..core.types import AF, F
+from ..core.random import get_seed
 from ..solution_deck import (
     SolutionDeck,
     WrappedGoalFcn,
 )
+from ..archive.cvt import CVTArchive
+from ..archive.descriptor import RandomProjectionDescriptor
 
 
 class _ArgProvider:
@@ -99,6 +102,21 @@ class IOptimizer(abc.ABC):
             except (ValueError, TypeError):
                 return True  # assume safe to pass args
 
+        # Quality-diversity add-on (QD_PARETO_PLAN.md §1). In a non-scalar
+        # ``objective_mode`` the goal function returns ``(fitness, outputs)``. The
+        # wrapped fitness callable still yields a scalar, so every existing solver
+        # is untouched; the extra outputs are collected parent-side and tracked on
+        # the deck. Default ``"scalar"`` mode is byte-identical to before.
+        self._objective_mode = getattr(config, "objective_mode", "scalar")
+        self._descriptor_source = getattr(config, "descriptor_source", "projection")
+        self._n_outputs = int(getattr(config, "n_outputs", 1))
+        # The goal fn returns (fitness, outputs) only when a descriptor is built
+        # from outputs; the default projection descriptor works from a plain
+        # scalar objective, so nothing is unwrapped in that (primary) path.
+        self._returns_outputs = (
+            self._objective_mode != "scalar" and self._descriptor_source == "outputs"
+        )
+
         def _wrap_goal(func: GoalFcn) -> WrappedGoalFcn:
             takes_args = _accepts_args(func)
 
@@ -109,17 +127,66 @@ class IOptimizer(abc.ABC):
                 # reads the metadata, so skip it entirely. See report item #14.
                 if takes_args:
                     _ap.bump_eval()
-                    return _f(x, _ap.current())
-                return _f(x)
+                    result = _f(x, _ap.current())
+                else:
+                    result = _f(x)
+                # Multi-output goal fns return (fitness, outputs); solvers only
+                # ever need the scalar fitness.
+                return result[0] if self._returns_outputs else result
 
             return __wrapped
 
         # Wrap the goal function and constraint functions
         self.wrapped_fcn: WrappedGoalFcn = _wrap_goal(fcn)
 
-        self.soln_deck = existing_soln_deck or SolutionDeck(
-            archive_size=config.solution_archive_size,
+        # Parent-side full evaluator, used only in multi-output mode to gather the
+        # tracked outputs for archived solutions. It is a *recording* pass (no eval
+        # bookkeeping), not a search evaluation. NOTE (Phase 1): this re-evaluates
+        # the objective in the parent; Phase 2 moves output capture into the
+        # workers so it costs nothing extra.
+        _takes_args = _accepts_args(fcn)
+
+        def _eval_full(x: AF, _f=fcn, _ap=self._arg_provider, _ta=_takes_args):
+            return _f(x, _ap.current()) if _ta else _f(x)
+
+        self._eval_full = _eval_full
+
+        if existing_soln_deck is not None:
+            self.soln_deck = existing_soln_deck
+        elif self._objective_mode == "map-elites":
+            self.soln_deck = self._build_mapelites_archive(config, variables)
+        else:
+            self.soln_deck = SolutionDeck(
+                archive_size=config.solution_archive_size,
+                num_vars=len(variables),
+                n_outputs=self._n_outputs if self._returns_outputs else 0,
+            )
+
+    def _build_mapelites_archive(
+        self, config: IOptimizerConfig, variables: InputVariables
+    ) -> CVTArchive:
+        """Construct the CVT MAP-Elites archive (Phase 2, QD_PARETO_PLAN.md §4.1)."""
+        lower = np.array([v.lower_bound for v in variables], dtype=float)
+        upper = np.array([v.upper_bound for v in variables], dtype=float)
+        seed = get_seed()
+        if self._descriptor_source == "outputs":
+            raise NotImplementedError(
+                "descriptor_source='outputs' lands in a later phase; use the "
+                "default 'projection' descriptor for now."
+            )
+        ddim = int(config.descriptor_dim)
+        descriptor_fn = RandomProjectionDescriptor(
+            len(variables), ddim, lower, upper, seed=seed or 0
+        )
+        return CVTArchive(
             num_vars=len(variables),
+            lower=lower,
+            upper=upper,
+            descriptor_fn=descriptor_fn,
+            descriptor_dim=ddim,
+            n_cells=int(config.archive_cells),
+            descriptor_source=self._descriptor_source,
+            seed=seed,
         )
 
     def live_meta(self) -> InputArguments:
@@ -159,6 +226,12 @@ class IOptimizer(abc.ABC):
             self.variables, self.wrapped_fcn, preserve_percent
         )
         self.soln_deck.sort()
+        # QD add-on: seed tracked outputs for the initial archive so the deck's
+        # solution_outputs stays row-aligned from generation zero.
+        if self._returns_outputs and self.soln_deck.solution_outputs is not None:
+            self.soln_deck.set_all_outputs(
+                self._evaluate_outputs(self.soln_deck.solution_archive)
+            )
 
         # Add the progress bar
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
@@ -175,6 +248,20 @@ class IOptimizer(abc.ABC):
             parallel,
             stopped_early,
         )
+
+    def _evaluate_outputs(self, solutions: AF) -> AF:
+        """Collect the tracked-outputs vector for each solution (multi-output mode).
+
+        A recording pass that keeps the deck's ``solution_outputs`` populated; it
+        does not influence search (Phase 1). Expects the goal function to return
+        ``(fitness, outputs)`` with ``outputs`` of length ``n_outputs``.
+        """
+        solutions = np.atleast_2d(solutions)
+        outs = np.empty((solutions.shape[0], self._n_outputs), dtype=float)
+        for i in range(solutions.shape[0]):
+            _, outputs = self._eval_full(solutions[i])
+            outs[i, :] = np.asarray(outputs, dtype=float).ravel()
+        return outs
 
     def update_solution_deck(
         self, generation_pbar: tqdm.tqdm, job_output: list[OptimizerRun]
@@ -193,13 +280,19 @@ class IOptimizer(abc.ABC):
         all_values = np.concatenate(
             [np.atleast_1d(output.population_values) for output in job_output]
         )
-        self.soln_deck.append(
-            solutions=all_solutions,
-            values=all_values,
+        # QD add-on: record the tracked outputs (only when the descriptor / report
+        # is built from goal-function outputs; the projection descriptor needs
+        # none). The archive's ``add_generation`` owns the insertion rule — elitist
+        # truncation for the scalar deck, cell replacement for MAP-Elites.
+        all_outputs = None
+        if self._returns_outputs:
+            all_outputs = self._evaluate_outputs(all_solutions)
+        self.soln_deck.add_generation(
+            all_solutions,
+            all_values,
+            outputs=all_outputs,
             local_optima=self.config.local_grad_optim != "none",
         )
-        self.soln_deck.deduplicate()
-        self.soln_deck.truncate(self.soln_deck.archive_size)
         generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
     def validate_config(self) -> None:
