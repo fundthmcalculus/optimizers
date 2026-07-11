@@ -6,6 +6,7 @@ untouched.
 """
 
 import numpy as np
+import pytest
 
 from optimizers.archive import (
     CVTArchive,
@@ -18,8 +19,43 @@ from optimizers.continuous.ga import (
     GeneticAlgorithmOptimizerConfig,
 )
 from optimizers.continuous.aco import AntColonyOptimizer, AntColonyOptimizerConfig
+from optimizers.continuous.pso import (
+    ParticleSwarmOptimizer,
+    ParticleSwarmOptimizerConfig,
+)
 from optimizers.continuous.variables import InputContinuousVariable
 from optimizers.core.random import set_seed
+
+_QD_SOLVERS = [
+    (GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig),
+    (AntColonyOptimizer, AntColonyOptimizerConfig),
+    (ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig),
+]
+
+
+@pytest.mark.parametrize("opt_cls,cfg_cls", _QD_SOLVERS)
+@pytest.mark.parametrize("variation", ["native", "iso_line"])
+def test_all_solvers_map_elites(opt_cls, cfg_cls, variation):
+    """GA, ACO and PSO all run in map-elites mode with either variation, build a
+    CVT archive, fill cells, and keep a best-first scalar surface."""
+    set_seed(5)
+    cfg = cfg_cls(
+        name="me",
+        num_generations=10,
+        population_size=30,
+        n_jobs=2,
+        joblib_prefer="threads",
+        objective_mode="map-elites",
+        descriptor_dim=2,
+        archive_cells=24,
+        qd_variation=variation,
+        stop_after_iterations=999,
+    )
+    opt = opt_cls(cfg, _sphere, _vars(), args={})
+    opt.solve()
+    assert isinstance(opt.soln_deck, CVTArchive)
+    assert opt.soln_deck.coverage > 0.2
+    assert np.all(np.diff(opt.soln_deck.solution_value) >= 0)
 
 
 def _vars(n=6):

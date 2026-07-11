@@ -8,7 +8,7 @@ from ..core.base import (
     OptimizerResult,
     OptimizerRun,
 )
-from ..core.types import AF, F
+from ..core.types import AF
 from ..solution_deck import (
     InputVariables,
     SolutionDeck,
@@ -22,6 +22,8 @@ from .base import (
 )
 from ..core.random import rng as global_rng
 from ..core.parallel import GenerationRunner
+from ..archive.variation import iso_line_offspring
+from .local import apply_local_optimization
 
 
 @dataclass
@@ -38,8 +40,8 @@ class ParticleSwarmOptimizerConfig(IOptimizerConfig):
 def run_particles(
     fixed: tuple[Any, ...],
     meta: InputArguments,
-    global_best_position: AF,
-    global_best_value: F,
+    solution_archive: AF,
+    solution_values: AF,
 ) -> OptimizerRun:
     """
     Generate new candidate solutions using a PSO-inspired step that leverages the
@@ -61,10 +63,31 @@ def run_particles(
         social,
         velocity_clamp,
         n_particles,
+        local_optim,
+        qd,
     ) = fixed
+    map_elites, variation, iso_sigma, line_sigma, lower, upper = qd
     sync_worker_meta(arg_provider, meta)
     rng = global_rng()
     n_vars = len(variables)
+
+    if map_elites and variation == "iso_line":
+        # Shared Iso+LineDD variation over the diverse CVT archive (same operator
+        # as GA/ACO in this mode, for fair comparison). See QD_PARETO_PLAN.md §4.3.
+        children = iso_line_offspring(
+            solution_archive, n_particles, iso_sigma, line_sigma, lower, upper, rng
+        )
+        positions = np.empty((n_particles, n_vars))
+        values = np.empty(n_particles)
+        for k in range(n_particles):
+            s, v = apply_local_optimization(fcn, local_optim, children[k], variables)
+            positions[k] = s
+            values[k] = v
+        return OptimizerRun(population_values=values, population_solutions=positions)
+
+    # Native PSO path: global best is the archive's top entry (best-first).
+    global_best_position = solution_archive[0, :]
+    global_best_value = solution_values[0]
     # Per-variable domains, used to clamp velocity (constant across the run).
     domains = np.array([v.domain for v in variables])
 
@@ -148,6 +171,14 @@ class ParticleSwarmOptimizer(IOptimizer):
         ) = self.initialize(preserve_percent)
         # Ship fixed data (variables, goal fn, PSO coefficients) to each worker
         # once; only the current global best varies per generation.
+        qd = (
+            self._objective_mode == "map-elites",
+            self.config.qd_variation,
+            self.config.iso_sigma,
+            self.config.line_sigma,
+            np.array([v.lower_bound for v in self.variables], dtype=float),
+            np.array([v.upper_bound for v in self.variables], dtype=float),
+        )
         fixed = (
             self._arg_provider,
             self.variables,
@@ -157,6 +188,8 @@ class ParticleSwarmOptimizer(IOptimizer):
             self.config.social,
             self.config.velocity_clamp,
             individuals_per_job,
+            self.config.local_grad_optim,
+            qd,
         )
         runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
         try:
@@ -175,8 +208,8 @@ class ParticleSwarmOptimizer(IOptimizer):
                     run_particles,
                     (
                         self.live_meta(),
-                        self.soln_deck.solution_archive[0, :],
-                        self.soln_deck.solution_value[0],
+                        self.soln_deck.solution_archive,
+                        self.soln_deck.solution_value,
                     ),
                 )
 

@@ -275,7 +275,9 @@ class SolutionDeck:
     def from_dict(cls, data: dict[str, Any]) -> "SolutionDeck":
         archive_size = int(data.get("archive_size", 0))
         num_vars = int(data.get("num_vars", 0))
-        dtype = np.dtype(data.get("dtype", str(np.float64)))
+        # ``.type`` yields the scalar class (e.g. np.float64) the constructor
+        # expects (type[np.generic]), not a dtype instance.
+        dtype = np.dtype(data.get("dtype", str(np.float64))).type
         deck = cls(archive_size=archive_size, num_vars=num_vars, dtype=dtype)
         # Overwrite with stored arrays (may be larger due to appends)
         deck.solution_archive = np.array(data["solution_archive"], dtype=dtype)
