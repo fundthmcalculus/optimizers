@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 from sklearn.metrics import pairwise_distances
@@ -55,17 +56,25 @@ def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
     seed = NearestNeighborTSP(
         NearestNeighborTSPConfig(name="w"), network_routes=d.copy()
     ).solve()
-    kw = dict(
-        initial_route=seed.optimal_path.copy(),
-        initial_value=seed.optimal_value,
+    seed_route = cast(AI, np.ascontiguousarray(seed.optimal_path))
+    seed_value = seed.optimal_value
+    TwoOptTSP(
+        TwoOptTSPConfig(name="w", local_search_backend=backend),
         network_routes=d.copy(),
-    )
-    TwoOptTSP(TwoOptTSPConfig(name="w", local_search_backend=backend), **kw).solve()
+        initial_route=seed_route.copy(),
+        initial_value=seed_value,
+    ).solve()
     ThreeOptTSP(
-        TwoOptTSPConfig(name="w", num_iterations=1, local_search_backend=backend), **kw
+        TwoOptTSPConfig(name="w", num_iterations=1, local_search_backend=backend),
+        network_routes=d.copy(),
+        initial_route=seed_route.copy(),
+        initial_value=seed_value,
     ).solve()
     LinKernighanTSP(
-        LinKernighanTSPConfig(name="w", local_search_backend=backend), **kw
+        LinKernighanTSPConfig(name="w", local_search_backend=backend),
+        network_routes=d.copy(),
+        initial_route=seed_route.copy(),
+        initial_value=seed_value,
     ).solve()
 
 
@@ -150,7 +159,8 @@ def compare_tsp_heuristics(
             gap_pct=(
                 100.0 * (float(res.optimal_value) - best) / best if best > 0 else 0.0
             ),
-            optimal_path=res.optimal_path,
+            # These heuristics all return a single tour (never a list of tours).
+            optimal_path=cast(AI, res.optimal_path),
         )
         for name, res, dt in records
     ]

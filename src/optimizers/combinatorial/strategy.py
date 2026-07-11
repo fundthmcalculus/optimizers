@@ -496,6 +496,8 @@ class LinKernighanTSP(TwoOptTSP):
     optimizes the closed cyclic tour over all cities.
     """
 
+    config: LinKernighanTSPConfig
+
     def solve(self) -> CombinatoricsResult:
         _, new_route = self.setup_local_search()
         route = np.ascontiguousarray(new_route)
@@ -521,6 +523,14 @@ class LinKernighanTSP(TwoOptTSP):
             tour, n_moves = _tsp_cython.lin_kernighan(distances, tour, cand, max_passes)
         else:
             n_moves = _lk_kernel(distances, tour, cand, max_passes)
+
+        # Or-opt can relocate the depot (city 0) off index 0. Rotate it back to
+        # the front so the reported path is depot-first like the other solvers
+        # and ``check_path_distance`` doesn't add a spurious ``distances[0, 0]``
+        # closing edge (which would over-report the tour length).
+        zero_pos = int(np.flatnonzero(tour == 0)[0])
+        if zero_pos != 0:
+            tour = np.ascontiguousarray(np.roll(tour, -zero_pos))
 
         out = tour
         if self.config.back_to_start:
