@@ -5,7 +5,7 @@ import numpy as np
 import time
 import uuid
 import inspect
-from typing import Optional, Callable, Any, Literal
+from typing import Optional, Any
 
 from ..core import InputVariables
 from ..core.base import (
@@ -112,7 +112,7 @@ class IOptimizer(abc.ABC):
                     return _f(x, _ap.current())
                 return _f(x)
 
-            return __wrapped  # type: ignore[return-value]
+            return __wrapped
 
         # Wrap the goal function and constraint functions
         self.wrapped_fcn: WrappedGoalFcn = _wrap_goal(fcn)

@@ -1,12 +1,10 @@
-from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
 from joblib import delayed
 
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
-from .strategy import TwoOptTSPConfig, TwoOptTSP
-from ..core.base import IOptimizerConfig, setup_for_generations
+from ..core.base import setup_for_generations
 from ..core.types import AI, AF, F, ab8, i32, i16
 from .aco import AntColonyTSPConfig
 

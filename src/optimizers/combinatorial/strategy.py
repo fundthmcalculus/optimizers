@@ -1,4 +1,3 @@
-import heapq
 from dataclasses import dataclass
 from typing import Optional
 
@@ -229,7 +228,7 @@ class TwoOptTSP(TSPBase):
         )
 
     def setup_local_search(self) -> tuple[int, AI]:
-        if self.initial_route is None or self.initial_value == None:
+        if self.initial_route is None or self.initial_value is None:
             # Use the nearest neighbor
             nn_config = NearestNeighborTSPConfig(
                 back_to_start=self.config.back_to_start, name=self.config.name
@@ -242,6 +241,7 @@ class TwoOptTSP(TSPBase):
             solution = nn_solver.solve()
             self.initial_route = solution.optimal_path
             self.initial_value = solution.optimal_value
+        assert self.initial_route is not None
         new_route = self.initial_route.copy()
         N = self.network_routes.shape[0]
         return N, new_route
@@ -383,6 +383,7 @@ class ConvexHullTSP(TSPBase):
                 t += 2 * np.pi
             return t
 
+        assert self.city_locations is not None  # ConvexHull requires coordinates
         restarted = False
         while True:
             # Find the point which is CCW from this point by the least amount.

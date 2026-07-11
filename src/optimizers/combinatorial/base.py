@@ -46,13 +46,18 @@ def _check_stop_early(config: IOptimizerConfig, soln_history: list[F]) -> StopRe
 
 
 class TSPBase(ABC):
+    # ``network_routes`` is always populated by ``set_network_routes`` during
+    # __init__ (the None branch asserts city_locations is present), so it is a
+    # non-Optional distance matrix for the lifetime of the solver.
+    city_locations: AF | None
+    network_routes: AF
+
     def __init__(
         self,
         network_routes: AF | None = None,
         city_locations: AF | None = None,
     ):
         self.city_locations = None
-        self.network_routes = None
         self.set_network_routes(network_routes, city_locations)
 
     def set_network_routes(

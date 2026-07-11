@@ -3,7 +3,7 @@ from ..core.base import LocalOptimType, ensure_literal_choice
 from ..solution_deck import WrappedGoalFcn
 from .variables import InputVariable, InputDiscreteVariable
 from ..core.types import AF, F
-from typing import get_args, Optional
+from typing import get_args
 
 
 def apply_local_optimization(

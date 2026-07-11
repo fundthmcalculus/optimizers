@@ -68,7 +68,7 @@ class AntColonyMTSP:
             variables=variables,
             fcn=goal_fcn,
         )
-        result = solver.solve()
+        solver.solve()
 
         raise ValueError("TSP clustering is not yet supported")
 
@@ -81,8 +81,6 @@ class AntColonyMTSP:
             cluster_cities = self.city_locations[cluster, :]
             cluster_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
             cluster_config.name = f"{self.config.name}-{cluster_id + 1}"
-            # Not relevant, but for clarity
-            cluster_config.n_clusters = 1
             tsp_solve = AntColonyTSP(cluster_config, city_locations=cluster_cities)
             cluster_result = tsp_solve.solve()
             # Map cluster indices back to original indices
@@ -125,7 +123,7 @@ class AntColonyMTSP:
                 n_clusters=self.config.n_clusters, assign_labels="discretize"
             )
             cluster_labels = sc.fit_predict(self.city_locations)
-            clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
+            clusters = [[] for _ in range(self.config.n_clusters)]
             for i, label in enumerate(cluster_labels):
                 clusters[label].append(i)
             return clusters
