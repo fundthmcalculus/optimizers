@@ -188,6 +188,8 @@ class GroupedVariableOptimizer(IOptimizer):
         # TODO - Pass in previous best solution deck
         # TODO - Support for check-pointing!
         default_values = [var.initial_value for var in self.variables]
+        if self.config.groups is None:
+            raise ValueError("GroupedVariableOptimizerConfig.groups must be set")
         for cur_round in range(self.config.num_rounds):
             for group in self.config.groups:
                 group_vars = [v for v in self.variables if v.name in group.variables]

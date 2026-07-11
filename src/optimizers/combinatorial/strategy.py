@@ -241,6 +241,7 @@ class TwoOptTSP(TSPBase):
             solution = nn_solver.solve()
             self.initial_route = solution.optimal_path
             self.initial_value = solution.optimal_value
+        assert self.initial_route is not None
         new_route = self.initial_route.copy()
         N = self.network_routes.shape[0]
         return N, new_route
@@ -369,6 +370,8 @@ class ConvexHullTSP(TSPBase):
     def solve(self) -> CombinatoricsResult:
         # Use the windmill method starting at point-0.
         # NOTE - This will give us the convex hull PLUS the sequence required to get there.
+        if self.city_locations is None:
+            raise ValueError("ConvexHullTSP requires city_locations")
         current_node = 0
         total_distance = 0
         tour = [current_node]

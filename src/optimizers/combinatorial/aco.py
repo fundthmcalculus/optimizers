@@ -57,6 +57,10 @@ class AntColonyTSP(TSPBase):
         tour_lengths = []
         optimal_tour_length = np.inf
         if self.config.hot_start is not None:
+            if self.config.hot_start_length is None:
+                raise ValueError(
+                    "hot_start_length must be provided when hot_start is set"
+                )
             optimal_tour_length = self.config.hot_start_length
             optimal_city_order = self.config.hot_start
             for i in range(len(self.config.hot_start) - 1):
@@ -152,7 +156,7 @@ def pheromone_update(tau_xy: AF, delta_tau_xy: AF, rho: float) -> AF:
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF | int:
+def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF:
     # ``eta_beta``/``tau_alpha`` are already raised to beta/alpha upstream
     # (report item #6), so this is a single elementwise product per step.
     p = tau_alpha_xy[x, :] * eta_beta_xy[x, :]
@@ -162,7 +166,8 @@ def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF | int:
     # Normalize the probabilities
     total = p.sum()
     if total == 0.0:
-        return 0
+        # all-zero (un-normalized) array; callers test np.sum(p) == 0
+        return p
     p /= total
     return p
 
