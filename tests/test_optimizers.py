@@ -194,6 +194,65 @@ def test_gd():
     assert soln is not None
 
 
+def test_gd_nested_flag_forces_serial():
+    # Gradient descent is a local search. Driven standalone it keeps its
+    # configured parallelism; driven as a nested/inner solve it must run serially
+    # so it does not oversubscribe the CPU on top of the outer system's parallelism.
+    variables = [
+        InputContinuousVariable("x", -5, 5),
+        InputContinuousVariable("y", -5, 5),
+    ]
+    cfg = GradientDescentOptimizerConfig(
+        name="gd-njobs",
+        n_jobs=4,
+        joblib_prefer="processes",
+        parallel_discrete_search=True,
+    )
+    standalone = GradientDescentOptimizer(cfg, optim_ackley, variables)
+    assert standalone.config.n_jobs == 4  # top-level GD keeps its parallelism
+    nested = GradientDescentOptimizer(cfg, optim_ackley, variables, nested=True)
+    assert nested.config.n_jobs == 1  # nested GD is forced serial
+
+
+def test_grouped_optimizer_runs_nested_gd_serially(monkeypatch):
+    # When a higher-level optimization system drives GD, it must construct it with
+    # nested=True (so the configured n_jobs is overridden to 1). Spy on the GD
+    # class the strategy module resolves and capture what it built.
+    from optimizers.continuous import optimizer_strategy as strat
+
+    captured: dict = {}
+    real_gd = strat.GradientDescentOptimizer
+
+    class SpyGD(real_gd):  # type: ignore[valid-type, misc]
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            captured["nested"] = kwargs.get("nested", False)
+            captured["n_jobs"] = self.config.n_jobs
+
+    monkeypatch.setattr(strat, "GradientDescentOptimizer", SpyGD)
+
+    variables = [
+        InputContinuousVariable("x", -5, 5),
+        InputContinuousVariable("y", -5, 5),
+    ]
+    config = GroupedVariableOptimizerConfig(
+        name="grouped-gd",
+        num_rounds=1,
+        num_generations=2,
+        n_jobs=4,
+        joblib_prefer="processes",
+        groups=[
+            InputVariableGroup(name="g", variables=["x", "y"], optimizer_type="gd"),
+        ],
+    )
+    GroupedVariableOptimizer(
+        config=config, variables=variables, fcn=optim_ackley
+    ).solve()
+
+    assert captured.get("nested") is True
+    assert captured.get("n_jobs") == 1
+
+
 def test_pso():
     input_variables = [
         InputContinuousVariable("x", -15, 30),

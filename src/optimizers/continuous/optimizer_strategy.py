@@ -122,8 +122,10 @@ class MultiTypeOptimizer(IOptimizer):
                 converted_config, self.fcn, self.variables, self.args
             )
         elif selected_type == "gd":
+            # Nested local search: this strategy owns the higher-level search, so
+            # GD runs serially (see GradientDescentOptimizer's ``nested`` flag).
             optimizer = GradientDescentOptimizer(
-                converted_config, self.fcn, self.variables, self.args
+                converted_config, self.fcn, self.variables, self.args, nested=True
             )
         else:
             # Should be unreachable due to ensure_literal_choice
@@ -207,7 +209,12 @@ class GroupedVariableOptimizer(IOptimizer):
                 elif group.optimizer_type == "ga":
                     optim = GeneticAlgorithmOptimizer(config, new_fcn, group_vars)
                 elif group.optimizer_type == "gd":
-                    optim = GradientDescentOptimizer(config, new_fcn, group_vars)
+                    # Nested local search: the grouped optimizer owns the outer
+                    # loop over groups/rounds, so GD runs serially (see its
+                    # ``nested`` flag).
+                    optim = GradientDescentOptimizer(
+                        config, new_fcn, group_vars, nested=True
+                    )
                 else:
                     raise NotImplementedError("Optimizer not implemented")
                 result = optim.solve()
