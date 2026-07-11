@@ -14,6 +14,10 @@ jobs:
       - name: Install dependencies
         run: |
           pip install .[dev]
+      - name: Build compiled extensions in place
+        # so the src-layout tests (PYTHONPATH=./src) import the compiled
+        # _tsp_cython kernels rather than skipping them
+        run: python setup.py build_ext --inplace
       - name: Check code formatting with black
         run: |
           pip install black
