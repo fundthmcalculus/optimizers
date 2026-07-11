@@ -87,20 +87,28 @@ class GeneticAlgorithmTSP(TSPBase):
                     delayed(parallel_ga)(i_ant) for i_ant in range(n_jobs)
                 )
 
+                # Collect this generation's offspring, then grow the genome with a
+                # SINGLE vstack/concatenate instead of reallocating the whole
+                # archive once per individual (report item #7: O(pop²·N) copying).
+                new_orders = []
+                new_values = []
                 for ant, result_gen in enumerate(all_results):
                     for city_order, tour_length in result_gen:
                         # If a dead-end, skip!
                         if tour_length == np.inf:
                             continue
-                        # Append to the genome
-                        genome = np.vstack((genome, city_order))
-                        genome_value = np.hstack((genome_value, tour_length))
+                        new_orders.append(city_order)
+                        new_values.append(tour_length)
+                if new_orders:
+                    genome = np.vstack((genome, np.vstack(new_orders)))
+                    genome_value = np.concatenate(
+                        (genome_value, np.asarray(new_values, dtype=genome_value.dtype))
+                    )
 
                 # Sort by genome and keep only the required rows
-                genome = genome[np.argsort(genome_value)]
-                genome_value = np.sort(genome_value)
-                genome = genome[: self.config.solution_archive_size, :]
-                genome_value = genome_value[: self.config.solution_archive_size]
+                order = np.argsort(genome_value)
+                genome = genome[order][: self.config.solution_archive_size, :]
+                genome_value = genome_value[order][: self.config.solution_archive_size]
 
                 tour_lengths.append(genome_value[0])
                 generation_pbar.set_postfix(best_value=genome_value[0])
@@ -158,7 +166,7 @@ def run_ga(
         return child_2, child_2_fitness
 
 
-def _2opt_refine(new_route: AI, network_routes: AF, nearest_neighbors=10) -> AI:
+def _2opt_refine(new_route: AI, network_routes: AF, nearest_neighbors: int = 10) -> AI:
     N = len(new_route)
     ij = np.random.randint(low=1, high=max(1, N - nearest_neighbors))
     k_nn = N

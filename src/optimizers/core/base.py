@@ -1,4 +1,4 @@
-from typing import Literal, Optional, TypeVar, Type, get_args, Callable, Union, Any
+from typing import Literal, Optional, TypeVar, get_args, Callable, Union, Any
 from dataclasses import dataclass, fields
 import numpy as np
 from joblib import cpu_count, Parallel
@@ -21,7 +21,7 @@ WrappedGoalFcn = Callable[[AF], F]
 T = TypeVar("T")
 
 
-def literal_options(literal_type) -> list:
+def literal_options(literal_type: Any) -> list[Any]:
     """Return the list of allowed values for a typing.Literal type."""
     try:
         return list(get_args(literal_type))
@@ -29,7 +29,7 @@ def literal_options(literal_type) -> list:
         return []
 
 
-def ensure_literal_choice(value, literal_type) -> None:
+def ensure_literal_choice(value: Any, literal_type: Any) -> None:
     """Validate a value against a typing.Literal and raise a helpful error.
 
     Args:
@@ -46,7 +46,7 @@ def ensure_literal_choice(value, literal_type) -> None:
         )
 
 
-def create_from_dict(data: dict, cls: Type[T]) -> T:
+def create_from_dict(data: dict[str, Any], cls: type[T]) -> T:
     """Create a dataclass instance from a dictionary.
 
     Args:
@@ -123,13 +123,13 @@ class OptimizerResult:
     generations_completed: int = 0
     """Number of generations completed before stopping."""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(val={self.solution_score}, x={self.solution_vector}, "
             f"stop_reason={self.stop_reason})"
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
     def __add__(self, other: "OptimizerResult") -> "OptimizerResult":

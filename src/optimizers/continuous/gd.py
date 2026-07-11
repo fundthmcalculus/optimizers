@@ -11,6 +11,7 @@ from ..core.base import (
     GoalFcn,
     InputArguments,
 )
+from ..core.types import AF
 from ..solution_deck import (
     WrappedGoalFcn,
     InputVariables,
@@ -31,7 +32,7 @@ class GradientDescentOptimizerConfig(IOptimizerConfig):
 def solve_gd(
     variables: InputVariables, fcn: WrappedGoalFcn
 ) -> tuple[OptimizeResult, list[float]]:
-    x0 = [x.initial_value for x in variables]
+    x0 = np.array([x.initial_value for x in variables])
     # Effectively pin the discrete values.
     bounds = [
         (
@@ -41,15 +42,15 @@ def solve_gd(
         )
         for x in variables
     ]
-    res: OptimizeResult = minimize(fcn, np.array(x0), bounds=bounds)
+    res: OptimizeResult = minimize(fcn, x0, bounds=bounds)
     x0_val = fcn(x0)
     x1_val = fcn(res.x)
     return res, [x0_val, x1_val]
 
 
 def solve_gd_from_x0(
-    x0: np.ndarray, variables: InputVariables, fcn: WrappedGoalFcn
-) -> tuple[OptimizeResult, list[float]]:
+    x0: AF, variables: InputVariables, fcn: WrappedGoalFcn
+) -> tuple[OptimizerResult, list[float]]:
     # Effectively pin the discrete values.
     bounds = [
         (
@@ -89,7 +90,7 @@ def solve_gd_with_mutate(
 
 
 def solve_gd_for_1var(
-    x0: np.ndarray, variables: InputVariables, var_idx: int, fcn: WrappedGoalFcn
+    x0: AF, variables: InputVariables, var_idx: int, fcn: WrappedGoalFcn
 ) -> OptimizerResult:
     bounds = [(x0[ij], x0[ij]) for ij in range(len(x0))]
     bounds[var_idx] = (variables[var_idx].lower_bound, variables[var_idx].upper_bound)

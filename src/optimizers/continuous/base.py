@@ -103,8 +103,12 @@ class IOptimizer(abc.ABC):
             takes_args = _accepts_args(func)
 
             def __wrapped(x: AF, _f=func, _ap=self._arg_provider):
-                _ap.bump_eval()
+                # Only pay the runtime-metadata bookkeeping (a time.time() call
+                # plus dict writes, per evaluation) when the goal function
+                # actually consumes args. For plain ``f(x)`` objectives nothing
+                # reads the metadata, so skip it entirely. See report item #14.
                 if takes_args:
+                    _ap.bump_eval()
                     return _f(x, _ap.current())
                 return _f(x)
 
@@ -117,6 +121,16 @@ class IOptimizer(abc.ABC):
             archive_size=config.solution_archive_size,
             num_vars=len(variables),
         )
+
+    def live_meta(self) -> InputArguments:
+        """The per-generation runtime metadata that changes during the run.
+
+        The rest of the metadata (run_id, max_generation, population_size, ...)
+        is constant and ships with the goal function once, so only these live
+        fields need to be re-synced to worker processes each generation.
+        """
+        meta = self._arg_provider.meta
+        return {"generation": meta.get("generation"), "phase": meta.get("phase")}
 
     def _set_phase(self, phase: Phase) -> None:
         # Validate at runtime for extra safety in non-type-checked contexts
@@ -163,15 +177,29 @@ class IOptimizer(abc.ABC):
         )
 
     def update_solution_deck(
-        self, generation_pbar: tqdm, job_output: list[OptimizerRun]
-    ):
-        for output in job_output:
-            self.soln_deck.append(
-                solutions=output.population_solutions,
-                values=output.population_values,
-                local_optima=self.config.local_grad_optim != "none",
-            )
-            self.soln_deck.deduplicate()
+        self, generation_pbar: tqdm.tqdm, job_output: list[OptimizerRun]
+    ) -> None:
+        if not job_output:
+            return
+        # Merge all worker outputs in a single batch, then deduplicate/sort and
+        # truncate back to archive_size ONCE per generation. Previously this
+        # looped per-output calling append + deduplicate (which sorts), so the
+        # ever-growing archive was re-sorted n_jobs times every generation and
+        # never bounded. See PERFORMANCE_REPORT.md items #12 (sort/dedup once)
+        # and #3 (bound growth).
+        all_solutions = np.vstack(
+            [output.population_solutions for output in job_output]
+        )
+        all_values = np.concatenate(
+            [np.atleast_1d(output.population_values) for output in job_output]
+        )
+        self.soln_deck.append(
+            solutions=all_solutions,
+            values=all_values,
+            local_optima=self.config.local_grad_optim != "none",
+        )
+        self.soln_deck.deduplicate()
+        self.soln_deck.truncate(self.soln_deck.archive_size)
         generation_pbar.set_postfix(best_value=self.soln_deck.solution_value[0])
 
     def validate_config(self) -> None:
@@ -188,8 +216,22 @@ class IOptimizer(abc.ABC):
         if self.config.n_jobs < 0:
             self.config.n_jobs = joblib.cpu_count() - 1
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Solver(name={self.config.name})"
+
+
+def sync_worker_meta(
+    arg_provider: "_ArgProvider | None", meta: Optional[InputArguments]
+) -> None:
+    """Apply the parent's live metadata snapshot to a worker's arg provider.
+
+    In the ``processes`` backend each worker holds its own copy of the arg
+    provider (shipped once with the goal function), so the optimizer passes the
+    small live-metadata dict each generation and the worker merges it here before
+    evaluating the goal function.
+    """
+    if arg_provider is not None and meta:
+        arg_provider.meta.update(meta)
 
 
 def check_stop_early(
