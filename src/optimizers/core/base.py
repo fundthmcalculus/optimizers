@@ -133,12 +133,14 @@ class IOptimizerConfig:
     """Dimensionality of the MAP-Elites descriptor / projection target."""
     archive_cells: int = 256
     """Number of MAP-Elites (CVT) cells — the archive capacity in map-elites mode."""
-    qd_variation: Literal["ga", "iso_line"] = "ga"
-    """MAP-Elites variation operator. ``"ga"`` (default) keeps the solver's own
-    crossover/mutation but sources parents from the diverse CVT archive — this
-    preserves convergence while the archive curbs premature convergence.
-    ``"iso_line"`` uses the Iso+LineDD operator (more explorative; can lag on
-    smooth, well-structured objectives)."""
+    qd_variation: Literal["native", "iso_line"] = "native"
+    """MAP-Elites variation operator, applied uniformly to GA/ACO/PSO.
+    ``"native"`` (default) keeps each solver's own operator (GA crossover, ACO
+    ant sampling, PSO velocity) but sources parents from the diverse CVT archive —
+    preserving convergence while the archive curbs premature convergence.
+    ``"iso_line"`` replaces it with the shared Iso+LineDD operator for every
+    solver (more explorative; can lag on smooth objectives; makes the three
+    solvers directly comparable under one variation operator)."""
     iso_sigma: float = 0.01
     """Iso+LineDD isotropic std-dev, as a fraction of each variable's domain."""
     line_sigma: float = 0.2

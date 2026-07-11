@@ -10,7 +10,7 @@ MAP-Elites, ``ParetoArchive``) land in later phases of ``QD_PARETO_PLAN.md``.
 from .base import Archive
 from .cvt import CVTArchive
 from .descriptor import RandomProjectionDescriptor, OutputsDescriptor
-from .variation import iso_line_dd
+from .variation import iso_line_dd, iso_line_offspring
 from .metrics import (
     non_dominated_mask,
     pareto_front,
@@ -32,6 +32,7 @@ __all__ = [
     "RandomProjectionDescriptor",
     "OutputsDescriptor",
     "iso_line_dd",
+    "iso_line_offspring",
     "non_dominated_mask",
     "pareto_front",
     "hypervolume",

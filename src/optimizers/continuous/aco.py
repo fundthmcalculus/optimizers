@@ -20,6 +20,7 @@ from ..solution_deck import (
     WrappedGoalFcn,
 )
 from ..core.random import rng as global_rng
+from ..archive.variation import iso_line_offspring
 
 from .base import IOptimizer
 from ..core.variables import InputVariables
@@ -41,10 +42,29 @@ def run_ants(
 ) -> OptimizerRun:
     # ``fixed`` is the run-constant payload shipped to each worker once (see
     # core.parallel); ``meta`` is the small per-generation live metadata.
-    arg_provider, variables, fcn, learning_rate, local_optim, n_ants = fixed
+    arg_provider, variables, fcn, learning_rate, local_optim, n_ants, qd = fixed
+    map_elites, variation, iso_sigma, line_sigma, lower, upper = qd
     sync_worker_meta(arg_provider, meta)
     n_vars = len(variables)
     rng = global_rng()
+
+    if map_elites and variation == "iso_line":
+        # Shared Iso+LineDD variation over the diverse CVT archive (same operator
+        # as GA/PSO in this mode, for fair comparison). See QD_PARETO_PLAN.md §4.3.
+        children = iso_line_offspring(
+            solution_archive, n_ants, iso_sigma, line_sigma, lower, upper, rng
+        )
+        ant_solutions = np.empty((n_ants, n_vars))
+        ant_values = np.empty(n_ants)
+        for ant in range(n_ants):
+            new_solution, new_value = apply_local_optimization(
+                fcn, local_optim, children[ant], variables
+            )
+            ant_solutions[ant] = new_solution
+            ant_values[ant] = new_value
+        return OptimizerRun(
+            population_values=ant_values, population_solutions=ant_solutions
+        )
 
     # Each ant picks a single base solution from the archive via the rank CDF
     # (the original drew one p per ant and reused it across every variable).
@@ -109,6 +129,14 @@ class AntColonyOptimizer(IOptimizer):
         ) = self.initialize(preserve_percent)
         # Fixed data (variables, wrapped goal fn, hyper-parameters) is shipped to
         # each worker exactly once; only the archive + CDF vary per generation.
+        qd = (
+            self._objective_mode == "map-elites",
+            self.config.qd_variation,
+            self.config.iso_sigma,
+            self.config.line_sigma,
+            np.array([v.lower_bound for v in self.variables], dtype=float),
+            np.array([v.upper_bound for v in self.variables], dtype=float),
+        )
         fixed = (
             self._arg_provider,
             self.variables,
@@ -116,6 +144,7 @@ class AntColonyOptimizer(IOptimizer):
             self.config.learning_rate,
             self.config.local_grad_optim,
             individuals_per_job,
+            qd,
         )
         runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
         try:
