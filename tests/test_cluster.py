@@ -133,7 +133,7 @@ def test_vat_scaling():
 
 
 def test_merge_ivat():
-    all_cities = circle_random_clusters(n_clusters=10, n_cities=1)
+    all_cities = circle_random_clusters(n_clusters=10, n_cities=5)
     matrix_of_pairwise_distance = pairwise_distances(all_cities)
     # Scramble the order to ensure we sort it!
     cols = np.arange(len(all_cities), dtype="int")
@@ -144,6 +144,7 @@ def test_merge_ivat():
     ivat_mst, vat_mst, ivat_order, vat_order = compute_ivat(matrix_of_pairwise_distance)
 
     plot_vat_ivat(ivat_mst, vat_mst)
+    plt.show()
 
 
 def plot_vat_ivat(ivat_mst, vat_mst):

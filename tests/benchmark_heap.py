@@ -54,7 +54,7 @@ def benchmark_vat_mst():
             t0 = time.time_ns()
             h_seq2, p_seq2 = vat_prim_mst_custom(adj)
             t1 = time.time_ns()
-            shuffle_array(True, adj, p_seq2)
+            shuffle_array(False, adj, p_seq2)
             t2 = time.time_ns()
             ts.append([t0, t1, t2])
         end_time = time.time()

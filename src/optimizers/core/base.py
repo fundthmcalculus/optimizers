@@ -18,8 +18,7 @@ GoalFcn = Union[
     Callable[[AF, InputArguments], float],
 ]
 WrappedGoalFcn = Callable[[AF], F]
-ConstraintFcn = GoalFcn
-WrappedConstraintFcn = WrappedGoalFcn
+T = TypeVar("T")
 
 
 def literal_options(literal_type) -> list:
@@ -45,9 +44,6 @@ def ensure_literal_choice(value, literal_type) -> None:
         raise ValueError(
             f"Invalid {type(literal_type)}={value!r}. Allowed options: {allowed_str}"
         )
-
-
-T = TypeVar("T")
 
 
 def create_from_dict(data: dict, cls: Type[T]) -> T:

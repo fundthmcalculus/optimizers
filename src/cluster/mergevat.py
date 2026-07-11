@@ -1,5 +1,4 @@
 import heapq
-from collections import OrderedDict
 
 from .heap import heappush as custom_heappush, heappop as custom_heappop
 
@@ -22,6 +21,7 @@ def compute_ivat(
     for r in range(1, N):
         jj = np.argmin(d_star[r, :r])
         argmin_seq.append(jj)
+        d_p_star[r, jj] = d_star[r,jj]
         # jj = as_seq[r-1]
         for c in range(r):
             d_p_star[c, r] = d_p_star[r, c] = (
@@ -45,7 +45,7 @@ def compute_ordered_dis_njit_merge(
 
 
 @njit(cache=True, parallel=True, nogil=True)
-def shuffle_array(inplace: bool, matrix_of_pairwise_distance: ndarray, p: ndarray, progress_bar: ProgressBar = None) -> ndarray:
+def shuffle_array(inplace: bool, matrix_of_pairwise_distance: ndarray, p: ndarray, progress_bar: ProgressBar | None = None) -> ndarray:
     if inplace:
         ordered_matrix = matrix_of_pairwise_distance
     else:
@@ -443,61 +443,3 @@ def vat_prim_mst_seq(samples: np.ndarray) -> np.ndarray:
 def _get_dist(samples: np.ndarray, idx1: int, idx2: int) -> float:
     diff = samples[idx1, :] - samples[idx2, :]
     return np.sqrt(np.sum(np.square(diff)))
-
-
-class BoundedOrderedDictionary[T]:
-    def __init__(self, p: int):
-        self.N: int = p  # Universe size for bounded dictionaries
-        self.L: list[T] = [None]*self.N # TODO - Size this appropriately!
-
-    def defined(self, x: int) -> bool:
-        return self.L[x] is not None
-
-    def lookup(self, x: int) -> T:
-        return self.L[x]
-
-    def insert(self, x: int, i: T) -> None:
-        self.L[x] = i
-
-    def delete(self, x: int) -> None:
-        self.L[x] = None
-
-    def size(self) -> int:
-        return self.N
-
-    def locate(self, x: int):
-        for y in range(x+1, len(self.L)):
-            if self.L[y] is not None:
-                return y
-        return -1
-
-    def suc(self, x: int) -> T:
-        # TODO - Get the next element.
-        pass
-
-    def pred(self, x: int) -> T:
-        # TODO - Get the previous element.
-        pass
-
-
-class StratifiedTree:
-    def __init__(self):
-        # TODO - Pick the optimal prime nr > capacity
-        self.N: int = 16_001 # Universe
-        self.k = int(np.log2(self.N))
-        self.size = 0
-        self.mi = -1
-        self.ma = -1
-        self.top: "StratifiedTree" = None
-        self.bot: BoundedOrderedDictionary["StratifiedTree"] = BoundedOrderedDictionary(self.N)
-        self.D: BoundedOrderedDictionary[int] = BoundedOrderedDictionary(self.N)
-
-    def locate(self, x: int) -> int:
-        if x > self.ma:
-            return -1
-        if x < self.mi:
-            return self.mi
-        if self.size > 2:
-            x1 = _high_bits(x)
-            x2 = _low_bits(x)
-            str_ptr =
