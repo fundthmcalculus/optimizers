@@ -11,6 +11,13 @@ from .base import Archive
 from .cvt import CVTArchive
 from .descriptor import RandomProjectionDescriptor, OutputsDescriptor
 from .variation import iso_line_dd
+from .metrics import (
+    non_dominated_mask,
+    pareto_front,
+    hypervolume,
+    qd_score,
+    QDReport,
+)
 from ..solution_deck import SolutionDeck
 
 # The current scalar deck IS the scalar archive; alias it under the forward-
@@ -25,4 +32,9 @@ __all__ = [
     "RandomProjectionDescriptor",
     "OutputsDescriptor",
     "iso_line_dd",
+    "non_dominated_mask",
+    "pareto_front",
+    "hypervolume",
+    "qd_score",
+    "QDReport",
 ]

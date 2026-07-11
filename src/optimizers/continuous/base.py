@@ -28,6 +28,7 @@ from ..solution_deck import (
 )
 from ..archive.cvt import CVTArchive
 from ..archive.descriptor import RandomProjectionDescriptor
+from ..archive.metrics import QDReport, qd_score, pareto_front, hypervolume
 
 
 class _ArgProvider:
@@ -109,13 +110,12 @@ class IOptimizer(abc.ABC):
         # the deck. Default ``"scalar"`` mode is byte-identical to before.
         self._objective_mode = getattr(config, "objective_mode", "scalar")
         self._descriptor_source = getattr(config, "descriptor_source", "projection")
-        self._n_outputs = int(getattr(config, "n_outputs", 1))
-        # The goal fn returns (fitness, outputs) only when a descriptor is built
-        # from outputs; the default projection descriptor works from a plain
-        # scalar objective, so nothing is unwrapped in that (primary) path.
-        self._returns_outputs = (
-            self._objective_mode != "scalar" and self._descriptor_source == "outputs"
-        )
+        self._n_outputs = int(getattr(config, "n_outputs", 0))
+        # The goal fn returns (fitness, outputs) when the user asks to track
+        # objectives for the Pareto report (n_outputs > 0). ``fitness`` still
+        # drives the search (scalar); outputs are read at report time. The
+        # default projection path tracks nothing and stays a plain scalar run.
+        self._returns_outputs = self._objective_mode != "scalar" and self._n_outputs > 0
 
         def _wrap_goal(func: GoalFcn) -> WrappedGoalFcn:
             takes_args = _accepts_args(func)
@@ -228,7 +228,7 @@ class IOptimizer(abc.ABC):
         self.soln_deck.sort()
         # QD add-on: seed tracked outputs for the initial archive so the deck's
         # solution_outputs stays row-aligned from generation zero.
-        if self._returns_outputs and self.soln_deck.solution_outputs is not None:
+        if self.soln_deck.solution_outputs is not None:
             self.soln_deck.set_all_outputs(
                 self._evaluate_outputs(self.soln_deck.solution_archive)
             )
@@ -263,6 +263,37 @@ class IOptimizer(abc.ABC):
             outs[i, :] = np.asarray(outputs, dtype=float).ravel()
         return outs
 
+    def qd_report(self, reference: AF | None = None) -> QDReport:
+        """Summarize the finished run (QD_PARETO_PLAN.md §4.5).
+
+        Reports archive coverage / QD-score / best fitness, and — when the goal
+        function tracks objectives (``n_outputs > 0``) — the **Pareto front** over
+        those objectives across the final archive plus its hypervolume. Outputs
+        are evaluated once here over the final elites (a cheap recording pass), so
+        the per-generation search path pays nothing for the report.
+        """
+        archive = self.soln_deck
+        archive.sort()
+        values = np.asarray(archive.solution_value, dtype=float)
+        num = int(len(archive))
+        best = float(values[0]) if values.size else float("inf")
+        coverage = getattr(archive, "coverage", None)
+        report = QDReport(
+            num_elites=num,
+            best_fitness=best,
+            coverage=coverage,
+            qd_score=qd_score(values),
+        )
+        if self._returns_outputs and num > 0:
+            objs = self._evaluate_outputs(archive.solution_archive)
+            front = pareto_front(objs)
+            report.all_objectives = objs
+            report.pareto_solutions = archive.solution_archive[front]
+            report.pareto_objectives = objs[front]
+            ref = objs.max(axis=0) + 1e-9 if reference is None else reference
+            report.hypervolume = hypervolume(objs, ref)
+        return report
+
     def update_solution_deck(
         self, generation_pbar: tqdm.tqdm, job_output: list[OptimizerRun]
     ) -> None:
@@ -285,7 +316,7 @@ class IOptimizer(abc.ABC):
         # none). The archive's ``add_generation`` owns the insertion rule — elitist
         # truncation for the scalar deck, cell replacement for MAP-Elites.
         all_outputs = None
-        if self._returns_outputs:
+        if self.soln_deck.solution_outputs is not None:
             all_outputs = self._evaluate_outputs(all_solutions)
         self.soln_deck.add_generation(
             all_solutions,

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Literal, Optional
 
 import numpy as np
 from numba import njit
@@ -7,6 +7,19 @@ from numba import njit
 from ..core import IOptimizerConfig
 from .base import TSPBase, CombinatoricsResult, check_path_distance
 from ..core.types import AI, F, AF
+
+# Optional compiled backend (2-opt / 3-opt). Built via `setup.py build_ext`
+# (see CYTHON_ANALYSIS.md); if it isn't compiled, the numba kernels are used, so
+# a plain source checkout still runs without a build step.
+try:
+    from . import _tsp_cython
+
+    HAS_CYTHON = True
+except ImportError:  # pragma: no cover - exercised only in unbuilt checkouts
+    _tsp_cython = None
+    HAS_CYTHON = False
+
+LocalSearchBackend = Literal["numba", "cython"]
 
 
 @dataclass
@@ -17,6 +30,10 @@ class TwoOptTSPConfig(IOptimizerConfig):
     """Number of iterations to run"""
     nearest_neighbors: int = -1
     """Only check the next nodes, which makes this O(nk), but lower chance of finding crossovers"""
+    local_search_backend: LocalSearchBackend = "numba"
+    """Which compiled 2-opt/3-opt kernel to use. ``"numba"`` (default) is the JIT
+    kernel; ``"cython"`` uses the ahead-of-time compiled ``nogil`` extension when
+    it has been built (falls back to numba otherwise). Results are identical."""
 
 
 def _swap_segment(ij: int, jk: int, new_route: AI) -> AI:
@@ -201,18 +218,31 @@ class TwoOptTSP(TSPBase):
 
     def solve(self) -> CombinatoricsResult:
         N, new_route = self.setup_local_search()
-        # njit kernel (report item #13); logic identical to the old Python loop.
+        # Compiled 2-opt (report item #13); logic identical across backends.
         new_route = np.ascontiguousarray(new_route)
         distances = np.ascontiguousarray(self.network_routes, dtype=np.float64)
-        no_moves = bool(
-            _two_opt_kernel(
+        if (
+            getattr(self.config, "local_search_backend", "numba") == "cython"
+            and HAS_CYTHON
+        ):
+            new_route, no_moves = _tsp_cython.two_opt(
                 distances,
                 new_route,
                 self.config.num_iterations,
                 self.config.nearest_neighbors,
                 self.config.back_to_start,
             )
-        )
+            no_moves = bool(no_moves)
+        else:
+            no_moves = bool(
+                _two_opt_kernel(
+                    distances,
+                    new_route,
+                    self.config.num_iterations,
+                    self.config.nearest_neighbors,
+                    self.config.back_to_start,
+                )
+            )
 
         history = [
             check_path_distance(
@@ -266,18 +296,29 @@ class ThreeOptTSP(TwoOptTSP):
 
     def solve(self) -> CombinatoricsResult:
         N, new_route = self.setup_local_search()
-        # njit kernel (report item #13); logic identical to the old Python
-        # loop, including num_iterations=-1 -> range(-1) being a no-op.
+        # Compiled 3-opt (report item #13); num_iterations=-1 is a no-op pass.
         new_route = np.ascontiguousarray(new_route)
         distances = np.ascontiguousarray(self.network_routes, dtype=np.float64)
-        no_moves = bool(
-            _three_opt_kernel(
+        if (
+            getattr(self.config, "local_search_backend", "numba") == "cython"
+            and HAS_CYTHON
+        ):
+            new_route, no_moves = _tsp_cython.three_opt(
                 distances,
                 new_route,
                 self.config.num_iterations,
                 self.config.nearest_neighbors,
             )
-        )
+            no_moves = bool(no_moves)
+        else:
+            no_moves = bool(
+                _three_opt_kernel(
+                    distances,
+                    new_route,
+                    self.config.num_iterations,
+                    self.config.nearest_neighbors,
+                )
+            )
 
         history = [
             check_path_distance(
