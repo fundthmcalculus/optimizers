@@ -18,14 +18,16 @@ class CombinatoricsResult:
 
 
 def check_path_distance(distances: AF, order_path: AI, return_to_start=False) -> F:
-    total_dist = 0.0
-    for ij, p0 in enumerate(order_path):
-        if ij == len(order_path) - 1:
-            if return_to_start:
-                total_dist += distances[p0, 0]
-        else:
-            p1 = order_path[ij + 1]
-            total_dist += distances[p0, p1]
+    # Sum every consecutive edge in one fancy-indexed gather instead of a scalar
+    # Python loop (report item #10). Equivalent to the old loop: the closing edge
+    # returns to city 0 (order_path[0] is always the depot in these solvers).
+    order_path = np.asarray(order_path)
+    if order_path.shape[0] < 2:
+        total_dist = 0.0
+    else:
+        total_dist = float(distances[order_path[:-1], order_path[1:]].sum())
+    if return_to_start and order_path.shape[0] >= 1:
+        total_dist += float(distances[order_path[-1], 0])
     return total_dist
 
 

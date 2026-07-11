@@ -118,21 +118,21 @@ Design note: the current code is *structurally* ready for this — the fixed arg
 
 ---
 
-### 6. Precompute `eta**beta` and `tau**alpha` in combinatorial ACO
-**Files:** `src/optimizers/combinatorial/aco.py:142-151` (`p_xy`), `aco_mst.py:107-116`
+### 6. Precompute `eta**beta` and `tau**alpha` in combinatorial ACO — ✅ IMPLEMENTED
+**Files:** `src/optimizers/combinatorial/aco.py` (`p_xy`, `solve`), `aco_mst.py` (`p_xy`, `solve`)
 
-`p_xy` evaluates `np.power(tau_xy[x,:], alpha) * np.power(eta_xy[x,:], beta)` on **every step of every ant of every generation.** `eta` (desirability, `1/distance`) *never changes*, yet `eta**beta` is recomputed billions of times; `tau` changes only once per generation.
+`p_xy` evaluated `np.power(tau_xy[x,:], alpha) * np.power(eta_xy[x,:], beta)` on **every step of every ant of every generation.** `eta` (desirability, `1/distance`) *never changes*, yet `eta**beta` was recomputed billions of times; `tau` changes only once per generation.
 
-**Fix:** compute `eta_beta = eta**beta` **once** in `solve()` and pass it in; compute `tau_alpha = tau**alpha` **once per generation** before the parallel dispatch. This collapses the dominant cost from O(pop·steps·gens) to O(gens). Likely the single biggest combinatorial win.
+**Done:** `eta_beta = eta**beta` is computed **once** in `solve()`; `tau_alpha = tau**alpha` **once per generation** before the parallel dispatch. `p_xy` is now a single elementwise product. Both `aco.py` and `aco_mst.py` updated — collapses the power cost from O(pop·steps·gens) to O(gens)/O(1). Combined with #10, measured ACO-TSP wall-clock 3.56 s → 2.86 s at N=200.
 
 ---
 
-### 7. Stop rebuilding the GA archive with `vstack` inside the results loop
-**File:** `src/optimizers/combinatorial/ga.py:96-103`
+### 7. Stop rebuilding the GA archive with `vstack` inside the results loop — ✅ IMPLEMENTED
+**File:** `src/optimizers/combinatorial/ga.py`
 
-For every individual returned every generation, the entire `genome` (archive_size × N) and `genome_value` are reallocated via `np.vstack`/`np.hstack` — O(pop²·N) copying per generation.
+For every individual returned every generation, the entire `genome` (archive_size × N) and `genome_value` were reallocated via `np.vstack`/`np.hstack` — O(pop²·N) copying per generation.
 
-**Fix:** collect the generation's `(order, length)` into Python lists, then do a **single** `np.stack`/`np.concatenate` before the sort/truncate. Or preallocate a fixed `archive_size + pop` buffer (same pattern as #3).
+**Done:** the generation's offspring are collected into Python lists, then the genome grows with a **single** `np.vstack`/`np.concatenate` before one argsort/truncate. Measured GA-TSP wall-clock 0.50 s → 0.32 s at N=200.
 
 ---
 
@@ -154,15 +154,15 @@ The iVAT reordering recursion (`for r in range(1,N): for c in range(r): ...`) is
 
 ---
 
-### 10. Vectorize `check_path_distance` and `delta_tau`
-**Files:** `src/optimizers/combinatorial/base.py:20-29`, `aco.py:92-99`, `aco_mst.py:77-84`
+### 10. Vectorize `check_path_distance` and `delta_tau` — ✅ IMPLEMENTED
+**Files:** `src/optimizers/combinatorial/base.py` (`check_path_distance`), `aco.py` (deposit + sampling)
 
-`check_path_distance` is a scalar Python loop over the tour (called 2× per GA individual and per 2-opt result). Pheromone deposit `delta_tau` is a Python per-edge loop.
+`check_path_distance` was a scalar Python loop over the tour (called 2× per GA individual and per 2-opt result). Pheromone deposit `delta_tau` was a Python per-edge loop; `run_ant` sampled with `np.random.choice(..., p=p)`.
 
-**Fix:**
-- Distance: `distances[order[:-1], order[1:]].sum()` (+ the return-to-start edge). Prime `@njit` candidate.
-- Deposit: `np.add.at(delta_tau, (order[:-1], order[1:]), q/tour_length)` plus the closing edge — vectorizes the whole tour at once.
-- In `aco.py:187`, `np.random.choice(..., p=p)` is slow and lock-contended; replace with `np.searchsorted(np.cumsum(p), rng.random())` (as `aco_mst` already does).
+**Done:**
+- Distance: `distances[order[:-1], order[1:]].sum()` + the return-to-start edge, in one gather.
+- Deposit: `np.add.at(delta_tau, (order[:-1], order[1:]), q/tour_length)` + the closing edge — the whole tour at once. (`aco_mst`'s deposit is a 2-D `(from,to)` form with distinct semantics and was left as-is.)
+- Sampling: `np.searchsorted(np.cumsum(p), np.random.random())` replaces `np.random.choice(..., p=p)`, avoiding its per-call re-validation/re-cumsum and global lock. Same distribution (searchsorted `side='left'` skips zero-probability cities).
 
 ---
 
@@ -187,12 +187,18 @@ The default is `"threads"`. The inner worker bodies (`run_ants`, `run_ga`, ACO t
 
 ---
 
-### 13. `@njit` the local-search kernels
-**Files:** `src/optimizers/combinatorial/strategy.py` — `TwoOptTSP` (`:51-71`), `ThreeOptTSP` (`:122-305`), `NearestNeighborTSP` (`:348-369`), `ConvexHullTSP` (`:422-429`); `ga.py:161-181` (`_2opt_refine`, run 2× per GA individual)
+### 13. `@njit` the local-search kernels — ✅ IMPLEMENTED (2-opt, 3-opt, NN)
+**Files:** `src/optimizers/combinatorial/strategy.py` — `_two_opt_kernel`, `_three_opt_kernel` (new `@njit(cache=True)` kernels), `TwoOptTSP.solve`, `ThreeOptTSP.solve`, `NearestNeighborTSP.solve`
 
-These are triple/double-nested Python loops with scalar matrix indexing and, in 3-opt, an `np.zeros(8)` allocated in the innermost O(n³) loop. `NearestNeighborTSP` uses a Python `set` membership scan.
+These were triple/double-nested Python loops with scalar matrix indexing and, in 3-opt, an `np.zeros(8)` allocated in the innermost O(n³) loop. `NearestNeighborTSP` used a Python `set` membership scan.
 
-**Fix:** `@njit(cache=True)` the 2-opt/3-opt passes; for NN keep a boolean `visited` mask and use `np.argmin(np.where(mask, np.inf, distances[current]))`. These are the classic numba sweet spot (tight scalar loops over arrays).
+**Done:**
+- 2-opt / 3-opt: moved into `@njit(cache=True)` kernels (the per-iteration `np.zeros(8)` is gone — the 8 lengths are scalars, and argmin is an unrolled comparison chain). Logic verified **bit-identical** to the original on N=30/80/150 (routes and values match exactly for the well-defined `back_to_start` case, including 3-opt with real `num_iterations`).
+- NN: boolean `visited` mask + `np.argmin(np.where(visited, inf, distances[current]))` — `argmin`'s first-min tie-break matches the old strict-`<` first-found, so routes are identical.
+- **Measured (numba warm):** 2-opt full-scan N=400 **479 ms → 1.3 ms (~370×)**; full 3-opt (3 iters) at N=500 went from **>120 s (timed out) → 0.63 s**.
+- **Bug found & fixed:** the original 3-opt indexed `route[kl+1]` up to `N`, in-bounds only because `back_to_start` appends a depot node; with no appended node it raised `IndexError`. The kernel caps the inner bound by route length (a no-op for the appended case) so njit — which skips bounds checks — cannot read out of bounds.
+
+**Not done:** `ConvexHullTSP` (geometric windmill scan, not a hot path in practice) and `ga.py:_2opt_refine` (a single bounded pass per child — left as-is to keep the GA worker cloudpickle-simple; it benefits indirectly from the vectorized `check_path_distance`).
 
 ---
 
