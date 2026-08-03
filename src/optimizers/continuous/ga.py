@@ -12,6 +12,7 @@ from ..core.base import (
     OptimizerRun,
     GoalFcn,
     InputArguments,
+    BatchGoalFcn,
 )
 from .base import (
     check_stop_early,
@@ -44,13 +45,28 @@ def _tournament_selection_batch(
     rng: Generator | None = None,
 ) -> AF | AI:
     # Select ``n`` winners at once. Each winner is the best of ``tournament_size``
-    # distinct random rows; distinctness comes from argsort-of-random-keys, which
-    # vectorizes the per-selection np.random.choice(replace=False). See report #5.
+    # random rows, drawn directly via ``rng.integers`` -- O(n*k) instead of the
+    # previous O(n*deck_len) (first an O(n*deck_len log deck_len) argsort, then
+    # an O(n*deck_len) argpartition; see git history for both). At a large
+    # archive this previously dominated GA's wall-clock end to end (measured:
+    # population 8000/archive 24000 took 251s, ~100x slower than ACO/PSO on
+    # the same workload -- see PERF_CONTINUOUS_REPORT.md §6b).
+    #
+    # This does not enforce distinctness within one tournament (unlike the
+    # argsort/argpartition versions before it), so it is not bit-identical or
+    # even guaranteed-equivalent to them -- it draws different random numbers
+    # and can (rarely) pick the same row twice in one tournament. The
+    # probability of any repeat among k draws is ~k*(k-1)/(2*deck_len) (e.g.
+    # ~0.05% for k=3, deck_len=3000) and *shrinks* as the archive grows -- the
+    # opposite of the old approach's cost, which *grew* with the archive.
+    # Statistically inconsequential for a stochastic search; accepted
+    # deliberately in exchange for a complexity-class fix (see
+    # PERF_CONTINUOUS_REPORT.md §6b for the discussion this implements).
     if rng is None:
         rng = global_rng()
     deck_len = len(population_deck)
     k = min(tournament_size, deck_len)
-    candidates = np.argsort(rng.random((n, deck_len)), axis=1)[:, :k]  # (n, k)
+    candidates = rng.integers(0, deck_len, size=(n, k))  # (n, k)
     candidate_fitness = population_fitness[candidates]  # (n, k)
     winners = candidates[np.arange(n), np.argmin(candidate_fitness, axis=1)]
     return population_deck[winners]  # (n, n_vars)
@@ -114,6 +130,7 @@ def run_ga(
         local_optim,
         n_steps,
         qd,
+        batch_fcn,
     ) = fixed
     map_elites, variation, iso_sigma, line_sigma, lower, upper = qd
     sync_worker_meta(arg_provider, meta)
@@ -149,18 +166,28 @@ def run_ga(
     child1 = _mutate_batch(child1, mutation_rate, variables, rng=rng)
     child2 = _mutate_batch(child2, mutation_rate, variables, rng=rng)
 
-    new_population = np.empty((n_steps, len(variables)))
-    new_population_fitness = np.empty(n_steps)
-    for row in range(n_steps):
-        # Optimize child-1, because firstborn rights.
-        c1, f1 = apply_local_optimization(fcn, local_optim, child1[row], variables)
-        c2, f2 = apply_local_optimization(fcn, local_optim, child2[row], variables)
-        if f1 < f2:
-            new_population[row, :] = c1
-            new_population_fitness[row] = f1
-        else:
-            new_population[row, :] = c2
-            new_population_fitness[row] = f2
+    if local_optim == "none" and batch_fcn is not None:
+        # No local search to interleave, and the caller supplied a batched goal
+        # function: score both whole children batches in two vectorized calls
+        # instead of ``2 * n_steps`` scalar ones. See PERF_CONTINUOUS_REPORT.md.
+        f1 = batch_fcn(child1)
+        f2 = batch_fcn(child2)
+        pick1 = f1 < f2  # ties go to child2, matching the scalar loop below
+        new_population = np.where(pick1[:, None], child1, child2)
+        new_population_fitness = np.where(pick1, f1, f2)
+    else:
+        new_population = np.empty((n_steps, len(variables)))
+        new_population_fitness = np.empty(n_steps)
+        for row in range(n_steps):
+            # Optimize child-1, because firstborn rights.
+            c1, f1 = apply_local_optimization(fcn, local_optim, child1[row], variables)
+            c2, f2 = apply_local_optimization(fcn, local_optim, child2[row], variables)
+            if f1 < f2:
+                new_population[row, :] = c1
+                new_population_fitness[row] = f1
+            else:
+                new_population[row, :] = c2
+                new_population_fitness[row] = f2
     return OptimizerRun(
         population_solutions=new_population,
         population_values=new_population_fitness,
@@ -176,6 +203,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
+        batch_fcn: BatchGoalFcn | None = None,
     ):
         super().__init__(
             config,
@@ -183,6 +211,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             variables,
             args,
             existing_soln_deck,
+            batch_fcn,
         )
         self.config: GeneticAlgorithmOptimizerConfig = GeneticAlgorithmOptimizerConfig(
             **{**config.__dict__}
@@ -218,6 +247,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             self.config.local_grad_optim,
             individuals_per_job,
             qd,
+            self.wrapped_batch_fcn,
         )
         runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
         try:

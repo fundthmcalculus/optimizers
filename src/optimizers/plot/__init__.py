@@ -243,6 +243,74 @@ def plot_pareto_front(
     return _finish(fig)
 
 
+def plot_benchmark_timings(
+    results: list[Any],
+    title: str = "GA / ACO / PSO wall-clock (local_grad_optim='none')",
+) -> Figure:
+    """Grouped bar chart of solver wall-clock time, with error bars across seeds.
+
+    Parameters
+    ----------
+    results:
+        A list of ``optimizers.benchmarks.BenchmarkResult`` (or anything with
+        ``.function``, ``.optimizer``, ``.mode``, ``.wall_time`` attributes).
+        One subplot per distinct ``function``; within each, one bar per
+        ``(optimizer, mode)`` pair, showing the mean wall-clock time across
+        seeds with the standard deviation as an error bar.
+    """
+    import numpy as np
+
+    functions = sorted({r.function for r in results})
+    optimizers = sorted({r.optimizer for r in results})
+    modes = sorted({r.mode for r in results})
+
+    fig, axes = plt.subplots(
+        1, len(functions), figsize=(5.5 * len(functions), 5), squeeze=False
+    )
+    axes = axes[0]
+
+    bar_width = 0.8 / max(len(modes), 1)
+    tab10_colors: list[Any] = plt.get_cmap("tab10").colors  # type: ignore[attr-defined]
+    colors = {mode: c for mode, c in zip(modes, tab10_colors)}
+
+    for ax, function_name in zip(axes, functions):
+        x = np.arange(len(optimizers))
+        for mi, mode in enumerate(modes):
+            means = []
+            stds = []
+            for optimizer_name in optimizers:
+                times = [
+                    r.wall_time
+                    for r in results
+                    if r.function == function_name
+                    and r.optimizer == optimizer_name
+                    and r.mode == mode
+                ]
+                means.append(np.mean(times) if times else np.nan)
+                stds.append(np.std(times) if times else np.nan)
+            offset = (mi - (len(modes) - 1) / 2) * bar_width
+            ax.bar(
+                x + offset,
+                means,
+                width=bar_width,
+                yerr=stds,
+                capsize=4,
+                label=mode,
+                color=colors[mode],
+            )
+        ax.set_title(function_name)
+        ax.set_xticks(x)
+        ax.set_xticklabels(optimizers)
+        ax.set_ylabel("wall-clock time (s)")
+        ax.grid(True, axis="y", alpha=0.3)
+        ax.legend(loc="best", title="eval mode")
+
+    fig.suptitle(title)
+    fig.tight_layout()
+
+    return _finish(fig)
+
+
 def plot_map_elites(archive: Any, objective_name: str = "fitness") -> Figure:
     """Scatter a CVT MAP-Elites archive's cells in 2-D, colored by elite fitness.
 

@@ -127,28 +127,41 @@ class SolutionDeck:
         # TODO - Handle the case of discrete variables with manhattan distance?
         # Sort first
         self.sort()
+        n = len(self.solution_archive)
+        if n < 2:
+            return
+        # The scalar version below called ``np.allclose`` once per row, comparing
+        # only each row to its immediate (sorted-by-value) predecessor -- the
+        # inner loop always broke after its first iteration (``j_row = i_row -
+        # 1``), whether or not it matched. That per-row Python/NumPy-function-
+        # call overhead dominated the profiler on cheap objectives (see
+        # PERF_CONTINUOUS_REPORT.md): each ``np.allclose`` call re-validates
+        # shapes/dtypes and dispatches through ``np.isclose`` + ``all`` for a
+        # single length-``num_vars`` row. Replacing it with one vectorized
+        # comparison over every adjacent pair reproduces the exact same boolean
+        # decisions (``|a-b| <= atol + rtol*|b|``, same operand order) in a
+        # single NumPy call.
+        a: af64 = self.solution_archive[1:].astype(f64, copy=False)
+        b: af64 = self.solution_archive[:-1].astype(f64, copy=False)
+        is_close = np.all(np.abs(a - b) <= abs_err + rel_err * np.abs(b), axis=-1)
         # Deduplicate solutions (worst to best) - cache the list of rows to delete.
+        # The archive_size cap check is inherently sequential (it depends on how
+        # many rows are already queued for deletion), but is pure Python int
+        # bookkeeping now -- no NumPy calls -- so it stays cheap even for a large
+        # archive.
+        # NOTE: the original nested loop's inner ``range(i_row - 1, 0, -1)`` is
+        # empty for ``i_row == 1`` (stops before reaching 0), so the very last
+        # pair -- row 1 vs row 0 -- was never compared. Preserved here exactly
+        # (``i_row`` stops at 2) so this stays a pure perf change, not a
+        # behavior change: ``is_close[0]`` (that pair) is computed but unused.
         rows_to_delete: list[int] = list()
-        for i_row in range(len(self.solution_archive) - 1, 0, -1):
-            for j_row in range(i_row - 1, 0, -1):
-                if np.allclose(
-                    self.solution_archive[i_row],
-                    self.solution_archive[j_row],
-                    rtol=rel_err,
-                    atol=abs_err,
-                ):
-                    if (
-                        len(self.solution_value) - len(rows_to_delete)
-                        <= self.archive_size
-                    ):
-                        # Keep skipping
-                        break
-                    # Remove the worst entry first (later in sorted order has higher violation/value)
-                    rows_to_delete.append(i_row)
-                    break
-                else:
-                    # Because sorted, we can break early
-                    break
+        for i_row in range(n - 1, 1, -1):
+            if is_close[i_row - 1]:
+                if n - len(rows_to_delete) <= self.archive_size:
+                    # Keep skipping
+                    continue
+                # Remove the worst entry first (later in sorted order has higher violation/value)
+                rows_to_delete.append(i_row)
 
         # Ensure unique and sorted indices for deletion
         if rows_to_delete:
