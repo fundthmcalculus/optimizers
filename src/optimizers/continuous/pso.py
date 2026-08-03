@@ -38,6 +38,21 @@ class ParticleSwarmOptimizerConfig(IOptimizerConfig):
     velocity_clamp: float = 0.5
 
 
+def clamp_velocity(velocity: AF, domains: AF, velocity_clamp: float) -> AF:
+    """Bound each velocity component to ``velocity_clamp`` x that variable's domain.
+
+    Extracted so the semantics can be asserted directly (see
+    ``test_pso_velocity_clamp_bounds_rather_than_decays``). The previous inline
+    form was ``p_vel *= clip(p_vel / domains, -clamp, clamp)``, which multiplied
+    the velocity by a clamped *ratio* rather than clamping it: whenever
+    ``|v| < domain`` -- nearly always -- the factor is below one, so the velocity
+    shrank by that fraction on every iteration and collapsed geometrically
+    instead of being bounded. See GitHub #101.
+    """
+    limit = velocity_clamp * domains
+    return np.clip(velocity, -limit, limit)
+
+
 def run_particles(
     fixed: tuple[Any, ...],
     meta: InputArguments,
@@ -117,18 +132,22 @@ def run_particles(
     for d, v in enumerate(variables):
         p_best_pos[:, d] = v.initial_random_values(n_particles, rng=rng)
         p_vel[:, d] = v.initial_random_velocities(n_particles, rng=rng)
-    # Seed one particle directly from the archived incumbent (GitHub #101,
-    # defect 2). Without this, the incumbent -- the archive's current best --
-    # only ever acts as an external attractor (``swarm_best_pos`` below) and
-    # never becomes a particle position itself. Since this routine is
-    # stateless across generations (a fresh uniform draw every call), a warm
-    # start written into the archive before the run never actually enters the
-    # swarm: nothing here ever moves *from* it, only *towards* it. Zero
-    # initial velocity so the seeded particle starts exactly at the incumbent
-    # rather than being displaced before its first update.
+    # Seed one particle from the archived incumbent (#101, defect 2). Otherwise
+    # the incumbent -- the archive's current best, and the whole point of a warm
+    # start -- only ever acts as an external attractor (``swarm_best_pos``
+    # below) and never becomes a particle position, so the swarm can move
+    # *towards* it but never explores *from* it.
+    #
+    # Its velocity is deliberately left as the random draw above rather than set
+    # to zero. A particle sitting exactly at the incumbent has p_best == p_pos,
+    # and because the incumbent is the archive's best it is also
+    # swarm_best_pos, so the cognitive and social terms both vanish; with zero
+    # inertia carried in, the velocity update yields exactly zero and the
+    # particle is a fixed point for the rest of the run. A non-zero velocity
+    # makes it explore outward from the incumbent, which is the point of
+    # seeding it.
     if n_particles > 0:
-        p_best_pos[0, :] = global_best_position
-        p_vel[0, :] = 0.0
+        p_best_pos[0, :] = np.asarray(global_best_position, dtype=float)
     p_pos = p_best_pos.copy()  # Current Position starts at the initial best
     p_best_val = _eval_batch(p_best_pos)
 
