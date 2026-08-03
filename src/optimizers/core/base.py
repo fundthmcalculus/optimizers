@@ -44,6 +44,18 @@ WrappedGoalFcn = Callable[[AF], F]
 ConstraintFcn = GoalFcn
 WrappedConstraintFcn = WrappedGoalFcn
 
+# Optional batched form of the goal function: takes the whole generation's
+# candidate matrix ``(n, num_vars)`` at once and returns ``(n,)`` scores, one
+# vectorized call instead of ``n`` scalar ones. Same "takes args or not" shapes
+# as ``GoalFcn``. See PERF_CONTINUOUS_REPORT.md -- opt-in fast path for GA/ACO/
+# PSO used only when ``local_grad_optim == "none"`` (no per-candidate local
+# search to interleave with the batch).
+BatchGoalFcn = Union[
+    Callable[[AF], AF],
+    Callable[[AF, InputArguments], AF],
+]
+WrappedBatchGoalFcn = Callable[[AF], AF]
+
 
 def literal_options(literal_type: Any) -> list[Any]:
     """Return the list of allowed values for a typing.Literal type."""

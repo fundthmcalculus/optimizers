@@ -9,6 +9,7 @@ from ..core.base import (
     OptimizerRun,
     GoalFcn,
     InputArguments,
+    BatchGoalFcn,
 )
 from ..core.types import AF
 from ..solution_deck import (
@@ -65,11 +66,25 @@ def run_particles(
         n_particles,
         local_optim,
         qd,
+        batch_fcn,
     ) = fixed
     map_elites, variation, iso_sigma, line_sigma, lower, upper = qd
     sync_worker_meta(arg_provider, meta)
     rng = global_rng()
     n_vars = len(variables)
+    # No local search is layered onto the native PSO loop below regardless of
+    # ``local_optim`` (it always scores raw particle positions), so the batched
+    # path is safe whenever the caller supplied one and there's no local search
+    # to interleave -- same gating as ACO/GA for consistency. See
+    # PERF_CONTINUOUS_REPORT.md.
+    use_batch = local_optim == "none" and batch_fcn is not None
+
+    def _eval_batch(positions: AF) -> AF:
+        return (
+            batch_fcn(positions)
+            if use_batch
+            else np.array([fcn(positions[k, :]) for k in range(positions.shape[0])])
+        )
 
     if map_elites and variation == "iso_line":
         # Shared Iso+LineDD variation over the diverse CVT archive (same operator
@@ -90,7 +105,7 @@ def run_particles(
         )
 
     # Native PSO path: global best is the archive's top entry (best-first).
-    global_best_position = solution_archive[0, :]
+    global_best_position = np.asarray(solution_archive[0, :], dtype=float)
     global_best_value = solution_values[0]
     # Per-variable domains, used to clamp velocity (constant across the run).
     domains = np.array([v.domain for v in variables])
@@ -102,8 +117,20 @@ def run_particles(
     for d, v in enumerate(variables):
         p_best_pos[:, d] = v.initial_random_values(n_particles, rng=rng)
         p_vel[:, d] = v.initial_random_velocities(n_particles, rng=rng)
+    # Seed one particle directly from the archived incumbent (GitHub #101,
+    # defect 2). Without this, the incumbent -- the archive's current best --
+    # only ever acts as an external attractor (``swarm_best_pos`` below) and
+    # never becomes a particle position itself. Since this routine is
+    # stateless across generations (a fresh uniform draw every call), a warm
+    # start written into the archive before the run never actually enters the
+    # swarm: nothing here ever moves *from* it, only *towards* it. Zero
+    # initial velocity so the seeded particle starts exactly at the incumbent
+    # rather than being displaced before its first update.
+    if n_particles > 0:
+        p_best_pos[0, :] = global_best_position
+        p_vel[0, :] = 0.0
     p_pos = p_best_pos.copy()  # Current Position starts at the initial best
-    p_best_val = np.array([fcn(p_best_pos[k, :]) for k in range(n_particles)])
+    p_best_val = _eval_batch(p_best_pos)
 
     # Get the best position
     best_idx = np.argmin(p_best_val)
@@ -124,14 +151,21 @@ def run_particles(
             + r_p * cognitive * (p_best_pos - p_pos)
             + social * r_g * (swarm_best_pos[None, :] - p_pos)
         )
-        # Clamp the velocity (same per-dimension ratio clamp as before).
-        p_vel *= np.minimum(
-            np.maximum(p_vel / domains, -velocity_clamp), velocity_clamp
-        )
+        # Clamp the velocity magnitude to a fraction of each variable's domain
+        # (GitHub #101, defect 1). The previous ``p_vel *= clip(p_vel/domains,
+        # -clamp, clamp)`` multiplied the velocity by a clamped *ratio*
+        # instead of clamping it: whenever |v| < domain -- nearly always --
+        # the factor is < 1, so velocity shrinks by that same fraction every
+        # iteration and collapses geometrically to zero within a handful of
+        # steps (measured: ~1e-83 of its initial value by iteration 6 with the
+        # default clamp=0.5), well inside the 10 iterations run per
+        # generation. A real clamp bounds the magnitude instead of decaying it.
+        limit = velocity_clamp * domains
+        p_vel = np.clip(p_vel, -limit, limit)
         # Update the particle position for this time step.
         p_pos += p_vel
         # Evaluate all particles, then update personal/swarm bests vectorized.
-        new_vals = np.array([fcn(p_pos[k, :]) for k in range(n_particles)])
+        new_vals = _eval_batch(p_pos)
         improved = new_vals < p_best_val
         p_best_val = np.where(improved, new_vals, p_best_val)
         p_best_pos[improved] = p_pos[improved]
@@ -155,6 +189,7 @@ class ParticleSwarmOptimizer(IOptimizer):
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
+        batch_fcn: BatchGoalFcn | None = None,
     ):
         super().__init__(
             config,
@@ -162,6 +197,7 @@ class ParticleSwarmOptimizer(IOptimizer):
             variables,
             args,
             existing_soln_deck,
+            batch_fcn,
         )
         self.config: ParticleSwarmOptimizerConfig = ParticleSwarmOptimizerConfig(
             **{**config.__dict__}
@@ -198,6 +234,7 @@ class ParticleSwarmOptimizer(IOptimizer):
             individuals_per_job,
             self.config.local_grad_optim,
             qd,
+            self.wrapped_batch_fcn,
         )
         runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
         try:
