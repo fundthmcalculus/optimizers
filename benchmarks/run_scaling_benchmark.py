@@ -66,6 +66,14 @@ def main() -> None:
     parser.add_argument("--n-dim", type=int, default=20)
     parser.add_argument("--num-generations", type=int, default=20)
     parser.add_argument(
+        "--optimizers",
+        nargs="+",
+        choices=list(OPTIMIZERS),
+        default=list(OPTIMIZERS),
+        help="Subset of optimizers to run (default: all). Useful for a "
+        "targeted large-population trial of just one solver.",
+    )
+    parser.add_argument(
         "--quick", action="store_true", help="Small sweep for a fast sanity check."
     )
     parser.add_argument(
@@ -79,7 +87,7 @@ def main() -> None:
 
     os.makedirs(args.out_dir, exist_ok=True)
     rows = []
-    for optimizer_name in OPTIMIZERS:
+    for optimizer_name in args.optimizers:
         for population_size in populations:
             times = [
                 _time_one(
@@ -107,7 +115,7 @@ def main() -> None:
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    for optimizer_name in OPTIMIZERS:
+    for optimizer_name in args.optimizers:
         opt_rows = [r for r in rows if r[0] == optimizer_name]
         pops = [r[1] for r in opt_rows]
         means = [r[2] for r in opt_rows]
