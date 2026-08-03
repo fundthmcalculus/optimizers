@@ -432,6 +432,27 @@ this one would trade that guarantee for a further ~2–5× at very large
 archives. Worth doing if GA at population ≥1000 is a real workload — flagged
 here rather than assumed.
 
+**How far this actually goes at scale (population up to 8000):** the
+`argpartition` fix is real but doesn't change GA's shape, only its constant —
+extending the sweep past §6a's population 2000 makes that unmistakable:
+
+| population | GA (after argpartition) | ACO (after §6a fix) | PSO |
+|---:|---:|---:|---:|
+| 1000 | 1.54s | 0.30s | 0.34s |
+| 2000 | 5.61s | 0.64s | 0.67s |
+| 4000 | 36.4s | 1.24s | 1.30s |
+| 8000 | **251.2s** | 2.42s | 2.60s |
+
+(20 dims, 15 generations, archive = 3×population, mean over 3 seeds,
+`benchmarks/run_scaling_benchmark.py --optimizers GA ACO PSO --populations
+1000 2000 4000 8000`; see `benchmarks/results/scaling_timings_ga_to_8000.png`.)
+GA roughly quadruples each time population doubles (the O(n²) signature);
+ACO and PSO roughly double, as expected after §6a's fix removed ACO's own
+O(n²) term. By population 8000, GA is **~100× slower than ACO/PSO** — it is
+now the single biggest remaining inefficiency in this codebase for any
+workload that runs GA at population ≳2000, well past the point where the
+"left on the table" trade-off above is worth reconsidering.
+
 ### 6c. Where this leaves the Cython question
 
 The Cython kernel (§4) accelerates the *objective evaluation* batch call.
