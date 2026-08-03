@@ -19,6 +19,8 @@ from ..core.base import (
     Phase,
     InputArguments,
     GoalFcn,
+    BatchGoalFcn,
+    WrappedBatchGoalFcn,
 )
 from ..core.types import AF, F
 from ..core.random import get_seed
@@ -90,6 +92,25 @@ class _ArgProvider:
         except Exception:
             self.meta["elapsed_time"] = 0.0
 
+    def bump_eval_batch(self, n: int) -> None:
+        """Record ``n`` evaluations done in one vectorized batch call.
+
+        Same bookkeeping as calling :meth:`bump_eval` ``n`` times, but the
+        ``time.time()`` syscall and dict writes happen once instead of once per
+        row -- the whole point of the batched-evaluation fast path (see
+        ``run_ants``/``run_ga``/``run_particles``) is to avoid per-candidate
+        Python overhead, so the bookkeeping must not reintroduce it.
+        """
+        self._local += int(n)
+        now = time.time()
+        self.meta["eval_count"] = self.eval_base + self._local
+        self.meta["now"] = now
+        start = self.meta.get("start_time", now)
+        try:
+            self.meta["elapsed_time"] = float(now - start)
+        except Exception:
+            self.meta["elapsed_time"] = 0.0
+
     def reset_local(self, base: int) -> None:
         """Begin a fresh counting context from ``base`` (process-worker copies).
 
@@ -121,6 +142,7 @@ class IOptimizer(abc.ABC):
         variables: InputVariables,
         args: Optional[InputArguments] = None,
         existing_soln_deck: Optional[SolutionDeck] = None,
+        batch_fcn: Optional[BatchGoalFcn] = None,
     ):
         self.config: IOptimizerConfig = config
         self.variables: InputVariables = variables
@@ -191,6 +213,36 @@ class IOptimizer(abc.ABC):
 
         # Wrap the goal function and constraint functions
         self.wrapped_fcn: WrappedGoalFcn = _wrap_goal(fcn)
+
+        # Optional batched evaluator: the same goal, but scored for a whole
+        # generation's candidate matrix in one vectorized call instead of once
+        # per candidate. Only meaningful for the plain-scalar objective (multi-
+        # output/map-elites modes need the per-candidate ``outputs`` tuple, which
+        # a batched call can't produce), so it's ignored there. Solvers only use
+        # it when ``local_grad_optim == "none"`` (see run_ants/run_ga/
+        # run_particles) -- with local search enabled every candidate needs its
+        # own scalar re-evaluations during the search, which a single batch call
+        # cannot interleave with.
+        self.wrapped_batch_fcn: Optional[WrappedBatchGoalFcn] = None
+        if batch_fcn is not None and not self._returns_outputs:
+            batch_takes_args = _accepts_args(batch_fcn)
+
+            def __wrapped_batch(
+                x: AF,
+                _f: Callable[..., AF] = batch_fcn,
+                _ap: "_ArgProvider" = self._arg_provider,
+                _ta: bool = batch_takes_args,
+            ) -> AF:
+                # Same "only pay for bookkeeping if something reads it" rule as
+                # the scalar wrapper (see __wrapped / report item #14).
+                if _ta:
+                    _ap.bump_eval_batch(x.shape[0])
+                    result = _f(x, _ap.current())
+                else:
+                    result = _f(x)
+                return np.asarray(result, dtype=float)
+
+            self.wrapped_batch_fcn = __wrapped_batch
 
         # Parent-side full evaluator, used only in multi-output mode to gather the
         # tracked outputs for archived solutions. It is a *recording* pass (no eval

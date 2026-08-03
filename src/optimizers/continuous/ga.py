@@ -12,6 +12,7 @@ from ..core.base import (
     OptimizerRun,
     GoalFcn,
     InputArguments,
+    BatchGoalFcn,
 )
 from .base import (
     check_stop_early,
@@ -114,6 +115,7 @@ def run_ga(
         local_optim,
         n_steps,
         qd,
+        batch_fcn,
     ) = fixed
     map_elites, variation, iso_sigma, line_sigma, lower, upper = qd
     sync_worker_meta(arg_provider, meta)
@@ -149,18 +151,28 @@ def run_ga(
     child1 = _mutate_batch(child1, mutation_rate, variables, rng=rng)
     child2 = _mutate_batch(child2, mutation_rate, variables, rng=rng)
 
-    new_population = np.empty((n_steps, len(variables)))
-    new_population_fitness = np.empty(n_steps)
-    for row in range(n_steps):
-        # Optimize child-1, because firstborn rights.
-        c1, f1 = apply_local_optimization(fcn, local_optim, child1[row], variables)
-        c2, f2 = apply_local_optimization(fcn, local_optim, child2[row], variables)
-        if f1 < f2:
-            new_population[row, :] = c1
-            new_population_fitness[row] = f1
-        else:
-            new_population[row, :] = c2
-            new_population_fitness[row] = f2
+    if local_optim == "none" and batch_fcn is not None:
+        # No local search to interleave, and the caller supplied a batched goal
+        # function: score both whole children batches in two vectorized calls
+        # instead of ``2 * n_steps`` scalar ones. See PERF_CONTINUOUS_REPORT.md.
+        f1 = batch_fcn(child1)
+        f2 = batch_fcn(child2)
+        pick1 = f1 < f2  # ties go to child2, matching the scalar loop below
+        new_population = np.where(pick1[:, None], child1, child2)
+        new_population_fitness = np.where(pick1, f1, f2)
+    else:
+        new_population = np.empty((n_steps, len(variables)))
+        new_population_fitness = np.empty(n_steps)
+        for row in range(n_steps):
+            # Optimize child-1, because firstborn rights.
+            c1, f1 = apply_local_optimization(fcn, local_optim, child1[row], variables)
+            c2, f2 = apply_local_optimization(fcn, local_optim, child2[row], variables)
+            if f1 < f2:
+                new_population[row, :] = c1
+                new_population_fitness[row] = f1
+            else:
+                new_population[row, :] = c2
+                new_population_fitness[row] = f2
     return OptimizerRun(
         population_solutions=new_population,
         population_values=new_population_fitness,
@@ -176,6 +188,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
+        batch_fcn: BatchGoalFcn | None = None,
     ):
         super().__init__(
             config,
@@ -183,6 +196,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             variables,
             args,
             existing_soln_deck,
+            batch_fcn,
         )
         self.config: GeneticAlgorithmOptimizerConfig = GeneticAlgorithmOptimizerConfig(
             **{**config.__dict__}
@@ -218,6 +232,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             self.config.local_grad_optim,
             individuals_per_job,
             qd,
+            self.wrapped_batch_fcn,
         )
         runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
         try:

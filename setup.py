@@ -39,21 +39,32 @@ else:
     _extra_compile = ["-O3", "-fopenmp"]
     _extra_link = ["-fopenmp"]
 
-_extension = Extension(
-    "optimizers.combinatorial._tsp_cython",
-    ["src/optimizers/combinatorial/_tsp_cython.pyx"],
-    extra_compile_args=_extra_compile,
-    extra_link_args=_extra_link,
-    # A compile failure degrades to the numba fallback instead of failing install.
-    optional=True,
-)
+_extensions = [
+    Extension(
+        "optimizers.combinatorial._tsp_cython",
+        ["src/optimizers/combinatorial/_tsp_cython.pyx"],
+        extra_compile_args=_extra_compile,
+        extra_link_args=_extra_link,
+        # A compile failure degrades to the numba fallback instead of failing install.
+        optional=True,
+    ),
+    Extension(
+        "optimizers.benchmarks._bench_cython",
+        ["src/optimizers/benchmarks/_bench_cython.pyx"],
+        extra_compile_args=_extra_compile,
+        extra_link_args=_extra_link,
+        # A compile failure degrades to the pure-NumPy batch functions instead
+        # of failing install (see benchmarks/cython_kernels.py).
+        optional=True,
+    ),
+]
 
 if cythonize is not None:
     ext_modules = cythonize(
-        [_extension],
+        _extensions,
         compiler_directives={"language_level": "3"},
     )
 else:
-    ext_modules = [_extension]
+    ext_modules = _extensions
 
 setup(ext_modules=ext_modules)

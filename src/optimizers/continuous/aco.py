@@ -10,6 +10,7 @@ from ..core.base import (
     OptimizerRun,
     GoalFcn,
     InputArguments,
+    BatchGoalFcn,
 )
 from ..continuous.base import check_stop_early, cdf, sync_worker_meta
 from ..core.parallel import GenerationRunner
@@ -40,7 +41,16 @@ def run_ants(
 ) -> OptimizerRun:
     # ``fixed`` is the run-constant payload shipped to each worker once (see
     # core.parallel); ``meta`` is the small per-generation live metadata.
-    arg_provider, variables, fcn, learning_rate, local_optim, n_ants, qd = fixed
+    (
+        arg_provider,
+        variables,
+        fcn,
+        learning_rate,
+        local_optim,
+        n_ants,
+        qd,
+        batch_fcn,
+    ) = fixed
     map_elites, variation, iso_sigma, line_sigma, lower, upper = qd
     sync_worker_meta(arg_provider, meta)
     n_vars = len(variables)
@@ -83,15 +93,21 @@ def run_ants(
             rng=rng,
         )
 
-    # Evaluation (and optional local search) stays per-ant: the goal function is
-    # a user-supplied scalar and cannot be assumed vectorizable.
-    ant_values = np.empty(n_ants)
-    for ant in range(n_ants):
-        new_solution, new_value = apply_local_optimization(
-            fcn, local_optim, ant_solutions[ant], variables
-        )
-        ant_solutions[ant] = new_solution
-        ant_values[ant] = new_value
+    # Evaluation (and optional local search) stays per-ant by default: the goal
+    # function is a user-supplied scalar and cannot be assumed vectorizable.
+    # When there is no local search to interleave AND the caller supplied a
+    # batched goal function, score the whole ant batch in one vectorized call
+    # instead of ``n_ants`` scalar ones -- see PERF_CONTINUOUS_REPORT.md.
+    if local_optim == "none" and batch_fcn is not None:
+        ant_values = batch_fcn(ant_solutions)
+    else:
+        ant_values = np.empty(n_ants)
+        for ant in range(n_ants):
+            new_solution, new_value = apply_local_optimization(
+                fcn, local_optim, ant_solutions[ant], variables
+            )
+            ant_solutions[ant] = new_solution
+            ant_values[ant] = new_value
     return OptimizerRun(
         population_values=ant_values,
         population_solutions=ant_solutions,
@@ -107,6 +123,7 @@ class AntColonyOptimizer(IOptimizer):
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
+        batch_fcn: BatchGoalFcn | None = None,
     ):
         super().__init__(
             config,
@@ -114,6 +131,7 @@ class AntColonyOptimizer(IOptimizer):
             variables,
             args,
             existing_soln_deck,
+            batch_fcn,
         )
         self.config: AntColonyOptimizerConfig = AntColonyOptimizerConfig(
             **{**config.__dict__}
@@ -147,6 +165,7 @@ class AntColonyOptimizer(IOptimizer):
             self.config.local_grad_optim,
             individuals_per_job,
             qd,
+            self.wrapped_batch_fcn,
         )
         runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
         try:

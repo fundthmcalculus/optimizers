@@ -9,6 +9,7 @@ from ..core.base import (
     OptimizerRun,
     GoalFcn,
     InputArguments,
+    BatchGoalFcn,
 )
 from ..core.types import AF
 from ..solution_deck import (
@@ -65,11 +66,25 @@ def run_particles(
         n_particles,
         local_optim,
         qd,
+        batch_fcn,
     ) = fixed
     map_elites, variation, iso_sigma, line_sigma, lower, upper = qd
     sync_worker_meta(arg_provider, meta)
     rng = global_rng()
     n_vars = len(variables)
+    # No local search is layered onto the native PSO loop below regardless of
+    # ``local_optim`` (it always scores raw particle positions), so the batched
+    # path is safe whenever the caller supplied one and there's no local search
+    # to interleave -- same gating as ACO/GA for consistency. See
+    # PERF_CONTINUOUS_REPORT.md.
+    use_batch = local_optim == "none" and batch_fcn is not None
+
+    def _eval_batch(positions: AF) -> AF:
+        return (
+            batch_fcn(positions)
+            if use_batch
+            else np.array([fcn(positions[k, :]) for k in range(positions.shape[0])])
+        )
 
     if map_elites and variation == "iso_line":
         # Shared Iso+LineDD variation over the diverse CVT archive (same operator
@@ -103,7 +118,7 @@ def run_particles(
         p_best_pos[:, d] = v.initial_random_values(n_particles, rng=rng)
         p_vel[:, d] = v.initial_random_velocities(n_particles, rng=rng)
     p_pos = p_best_pos.copy()  # Current Position starts at the initial best
-    p_best_val = np.array([fcn(p_best_pos[k, :]) for k in range(n_particles)])
+    p_best_val = _eval_batch(p_best_pos)
 
     # Get the best position
     best_idx = np.argmin(p_best_val)
@@ -131,7 +146,7 @@ def run_particles(
         # Update the particle position for this time step.
         p_pos += p_vel
         # Evaluate all particles, then update personal/swarm bests vectorized.
-        new_vals = np.array([fcn(p_pos[k, :]) for k in range(n_particles)])
+        new_vals = _eval_batch(p_pos)
         improved = new_vals < p_best_val
         p_best_val = np.where(improved, new_vals, p_best_val)
         p_best_pos[improved] = p_pos[improved]
@@ -155,6 +170,7 @@ class ParticleSwarmOptimizer(IOptimizer):
         variables: InputVariables,
         args: InputArguments | None = None,
         existing_soln_deck: SolutionDeck | None = None,
+        batch_fcn: BatchGoalFcn | None = None,
     ):
         super().__init__(
             config,
@@ -162,6 +178,7 @@ class ParticleSwarmOptimizer(IOptimizer):
             variables,
             args,
             existing_soln_deck,
+            batch_fcn,
         )
         self.config: ParticleSwarmOptimizerConfig = ParticleSwarmOptimizerConfig(
             **{**config.__dict__}
@@ -198,6 +215,7 @@ class ParticleSwarmOptimizer(IOptimizer):
             individuals_per_job,
             self.config.local_grad_optim,
             qd,
+            self.wrapped_batch_fcn,
         )
         runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
         try:
