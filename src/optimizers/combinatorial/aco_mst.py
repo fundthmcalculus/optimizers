@@ -6,6 +6,7 @@ from joblib import delayed
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from ..core.base import setup_for_generations
 from ..core.types import AI, AF, F, ab8, i32, i16
+from ..core.random import rng, run_in_stream, spawn_streams
 from .aco import AntColonyTSPConfig
 
 # NOTE - MST is the same as TSP parameters, except the "back to start" is ignored.
@@ -67,8 +68,13 @@ class AntColonyMST(TSPBase):
                         )
                     return results
 
+                # One stream per task, so the draws inside the workers are a
+                # function of the seed and the task index rather than of the
+                # order the scheduler ran them in.
+                streams = spawn_streams(n_jobs)
                 all_results = parallel(
-                    delayed(parallel_ant)(i_ant) for i_ant in range(n_jobs)
+                    delayed(run_in_stream)(streams[i_ant], parallel_ant, i_ant)
+                    for i_ant in range(n_jobs)
                 )
 
                 for ant, result_gen in enumerate(all_results):
@@ -162,7 +168,7 @@ def run_ant_mst(
             break
         # Choose the next city-pair, must flatten probability matrix first
         cum_p = np.cumsum(p.flatten())
-        new_p = np.random.random()
+        new_p = rng().random()
         choice_idx = np.argmin(new_p > cum_p)
         from_row = choice_idx // order_len
         from_col = choice_idx % order_len

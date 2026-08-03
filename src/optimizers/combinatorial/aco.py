@@ -4,6 +4,8 @@ from typing import Optional
 import numpy as np
 from joblib import delayed
 
+from ..core.random import rng, run_in_stream, spawn_streams
+
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, setup_for_generations
@@ -87,8 +89,13 @@ class AntColonyTSP(TSPBase):
                         )
                     return results
 
+                # One stream per task, so the draws inside the workers are a
+                # function of the seed and the task index rather than of the
+                # order the scheduler ran them in.
+                streams = spawn_streams(n_jobs)
                 all_results = parallel(
-                    delayed(parallel_ant)(i_ant) for i_ant in range(n_jobs)
+                    delayed(run_in_stream)(streams[i_ant], parallel_ant, i_ant)
+                    for i_ant in range(n_jobs)
                 )
 
                 for ant, result_gen in enumerate(all_results):
@@ -205,7 +212,7 @@ def run_ant(
         # Choose the next city via inverse-CDF sampling (report item #10):
         # cheaper than np.random.choice(..., p=p), which re-validates and
         # re-cumsums p on every call and takes a global lock.
-        cur_city = int(np.searchsorted(np.cumsum(p), np.random.random()))
+        cur_city = int(np.searchsorted(np.cumsum(p), rng().random()))
         if cur_city >= eta_shape_:
             cur_city = eta_shape_ - 1
         total_length += network_routes[city_order[idx], cur_city]

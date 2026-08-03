@@ -107,6 +107,118 @@ def test_different_seeds_still_differ():
 
 
 # ---------------------------------------------------------------------------
+# The combinatorial solvers, which build their own `joblib.Parallel` rather than
+# going through `GenerationRunner` and so need the streams wired in separately.
+# ---------------------------------------------------------------------------
+
+
+def city_distances(n=12):
+    from sklearn.metrics import pairwise_distances
+
+    return pairwise_distances(np.random.RandomState(3).uniform(0, 10, size=(n, 2)))
+
+
+def solve_tsp_once(kind, *, seed=0, n_jobs=1):
+    from optimizers.combinatorial.aco import AntColonyTSP, AntColonyTSPConfig
+    from optimizers.combinatorial.ga import (
+        GeneticAlgorithmTSP,
+        GeneticAlgorithmTSPConfig,
+    )
+
+    optimizer_cls, config_cls = {
+        "ga": (GeneticAlgorithmTSP, GeneticAlgorithmTSPConfig),
+        "aco": (AntColonyTSP, AntColonyTSPConfig),
+    }[kind]
+    set_seed(seed)
+    config = config_cls(
+        name=f"determinism-tsp-{kind}",
+        num_generations=4,
+        population_size=8,
+        solution_archive_size=16,
+        stop_after_iterations=8,
+        n_jobs=n_jobs,
+        joblib_prefer="threads",
+    )
+    with (
+        contextlib.redirect_stdout(io.StringIO()),
+        contextlib.redirect_stderr(io.StringIO()),
+    ):
+        result = optimizer_cls(config, city_distances()).solve()
+    return round(float(result.optimal_value), 10)
+
+
+@pytest.mark.parametrize("kind", ["ga", "aco"])
+@pytest.mark.parametrize("n_jobs", [1, 3])
+def test_tsp_same_seed_same_result(kind, n_jobs):
+    runs = [solve_tsp_once(kind, n_jobs=n_jobs) for _ in range(3)]
+    assert len(set(runs)) == 1, f"TSP {kind} at n_jobs={n_jobs} varied: {runs}"
+
+
+@pytest.mark.parametrize("kind", ["ga", "aco"])
+def test_tsp_different_seeds_still_differ(kind):
+    a = [solve_tsp_once(kind, seed=s, n_jobs=3) for s in range(6)]
+    assert len(set(a)) > 1, f"TSP {kind} ignored its seed: {a}"
+
+
+# ---------------------------------------------------------------------------
+# Every draw goes through the seeded generator
+# ---------------------------------------------------------------------------
+
+
+def test_no_legacy_global_random_calls_remain():
+    """`set_seed` can only govern draws that go through `rng()`.
+
+    The legacy `np.random.*` functions are a *separate* generator with separate
+    state. `set_seed` does seed them, so they were reproducible in a single
+    thread -- but they cannot participate in the per-task streams, so any of them
+    reached from a worker is unseedable in parallel however the dispatch is
+    wired. Grepping is crude, but it is the only check that stays true for code
+    nobody has written yet.
+    """
+    import pathlib
+    import re
+
+    source_root = pathlib.Path(__file__).resolve().parents[1] / "src" / "optimizers"
+    # `np.random.seed` and the Generator constructors are the seeding machinery
+    # itself, not draws from the legacy global.
+    allowed = re.compile(
+        r"np\.random\.(seed|default_rng|Generator|SeedSequence|RandomState)\b"
+    )
+    offender = re.compile(r"np\.random\.[A-Za-z_]+\s*\(")
+
+    found = []
+    for path in sorted(source_root.rglob("*.py")):
+        for number, line in enumerate(path.read_text().splitlines(), start=1):
+            code = line.split("#", 1)[0]
+            for match in offender.finditer(code):
+                if not allowed.match(match.group(0).rstrip("(").strip()):
+                    found.append(
+                        f"{path.relative_to(source_root)}:{number}: {line.strip()}"
+                    )
+    assert not found, "legacy global RNG calls found:\n" + "\n".join(found)
+
+
+def test_lloyds_points_respect_a_reseed():
+    """The cache is keyed on the seed as well as the shape.
+
+    It is memoised on ``(n, k, n_steps)`` and its result depends on the seed, so
+    keying on the shape alone returned points generated under whichever seed
+    called first.
+    """
+    from optimizers.solution_deck import lloyds_algorithm_points
+
+    set_seed(0)
+    first = lloyds_algorithm_points(4, 2)
+    set_seed(1)
+    second = lloyds_algorithm_points(4, 2)
+    set_seed(0)
+    again = lloyds_algorithm_points(4, 2)
+
+    assert not np.array_equal(first, second), "a reseed must change the points"
+    np.testing.assert_array_equal(first, again)
+
+
+# ---------------------------------------------------------------------------
 # The stream machinery itself
 # ---------------------------------------------------------------------------
 

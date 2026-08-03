@@ -7,7 +7,7 @@ from kmodes.kmodes import KModes
 
 from .core.base import ensure_literal_choice
 from .core.base import WrappedGoalFcn as WrappedGoalFcn  # re-exported
-from .core.random import get_seed
+from .core.random import get_seed, rng
 from .core.types import f64, af64, ab8, b8
 from .core.variables import InputVariables as InputVariables  # re-exported
 
@@ -297,7 +297,6 @@ class SolutionDeck:
         return deck
 
 
-@lru_cache(maxsize=16)
 def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> af64:
     """
     Generate N points uniformly distributed on the unit hyper-cube [0,1]^k using Lloyd's algorithm.
@@ -307,11 +306,19 @@ def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> af64:
         k (int): Dimension of the hyper-cube.
         n_steps (int): Number of iterations for Lloyd's algorithm.
     """
-    from sklearn.cluster import KMeans
-    from optimizers.core.random import get_seed
+    # Cached on the seed as well as the shape. The result is a function of both,
+    # so keying on the shape alone let the cache hand back points generated under
+    # whichever seed happened to call first -- a later `set_seed` was simply
+    # ignored for any (n, k, n_steps) already seen.
+    return _lloyds_algorithm_points(n, k, n_steps, get_seed())
 
-    kmeans = KMeans(n_clusters=n, random_state=get_seed())
-    points = np.sort(np.random.random(size=(n, k)), axis=0)
+
+@lru_cache(maxsize=16)
+def _lloyds_algorithm_points(n: int, k: int, n_steps: int, seed: int | None) -> af64:
+    from sklearn.cluster import KMeans
+
+    kmeans = KMeans(n_clusters=n, random_state=seed)
+    points = np.sort(rng().random(size=(n, k)), axis=0)
 
     for step in range(n_steps):
         kmeans.fit_predict(points)

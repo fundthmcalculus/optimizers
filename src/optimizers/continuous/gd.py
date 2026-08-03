@@ -12,6 +12,7 @@ from ..core.base import (
     InputArguments,
 )
 from ..core.types import AF
+from ..core.random import rng, run_in_stream, spawn_streams
 from ..solution_deck import (
     WrappedGoalFcn,
     InputVariables,
@@ -150,7 +151,7 @@ class GradientDescentOptimizer(IOptimizer):
             if self.config.discrete_search_size < 1:
                 self.config.discrete_search_size = n_disc_vars
             # Randomly pick the which discrete variable to tweak on each run
-            rand_vars = np.random.randint(
+            rand_vars = rng().integers(
                 low=0, high=n_disc_vars, size=self.config.discrete_search_size
             )
             with tqdm_joblib(
@@ -160,11 +161,18 @@ class GradientDescentOptimizer(IOptimizer):
                     n_jobs=self.config.n_jobs,
                     prefer=self.config.joblib_prefer,
                 )
+                # One stream per restart, so each restart's draws are a function
+                # of the seed and its index rather than of scheduling order.
+                streams = spawn_streams(len(rand_vars))
                 job_output: list[OptimizerResult] = parallel(
-                    joblib.delayed(solve_gd_with_mutate)(
-                        self.variables, disc_var_idxs[r_v], self.wrapped_fcn
+                    joblib.delayed(run_in_stream)(
+                        streams[i],
+                        solve_gd_with_mutate,
+                        self.variables,
+                        disc_var_idxs[r_v],
+                        self.wrapped_fcn,
                     )
-                    for r_v in rand_vars
+                    for i, r_v in enumerate(rand_vars)
                 )
                 # Pick the best solution of the output options
                 job_output = sorted(job_output, key=lambda x: x.solution_score)

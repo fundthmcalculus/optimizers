@@ -2,7 +2,7 @@ import os
 import random as pyrandom
 import threading
 from contextlib import contextmanager
-from typing import Iterator
+from typing import Any, Callable, Iterator
 
 import numpy as np
 
@@ -98,6 +98,23 @@ def spawn_streams(n: int) -> list[np.random.Generator]:
         set_seed(None)
     assert _worker_sequence is not None
     return [np.random.default_rng(child) for child in _worker_sequence.spawn(n)]
+
+
+def run_in_stream(
+    generator: np.random.Generator,
+    fn: Callable[..., Any],
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    """Call ``fn(*args, **kwargs)`` with ``generator`` as this thread's :func:`rng`.
+
+    The dispatch-site form of :func:`use_stream`, for the optimizers that build
+    their own ``joblib.Parallel`` rather than going through
+    :class:`~optimizers.core.parallel.GenerationRunner`. Defined at module scope
+    so it pickles for the processes backend.
+    """
+    with use_stream(generator):
+        return fn(*args, **kwargs)
 
 
 @contextmanager
