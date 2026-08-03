@@ -22,6 +22,7 @@ from optimizers.continuous.optimizer_strategy import (
 from optimizers.continuous.pso import (
     ParticleSwarmOptimizerConfig,
     ParticleSwarmOptimizer,
+    clamp_velocity,
 )
 from optimizers.continuous.variables import (
     InputContinuousVariable,
@@ -338,3 +339,37 @@ def plot_solution_spiral(n_dim: int, points: AF):
         plt.show()
     else:
         plt.close(ax.figure)
+
+
+
+def test_pso_velocity_clamp_bounds_rather_than_decays():
+    """The velocity clamp must bound the magnitude, not scale it down.
+
+    Regression for GitHub #101. The clamp was written as
+    ``p_vel *= clip(p_vel / domains, -clamp, clamp)``, which multiplies the
+    velocity by a clamped *ratio*. Whenever ``|v| < domain`` -- nearly always --
+    that factor is below one, so each iteration shrank the velocity by that same
+    fraction and it collapsed geometrically to zero within a handful of the ten
+    iterations run per generation, freezing every particle where it started.
+
+    Two properties pin the intended behaviour, and the old form violated both:
+    a velocity already inside the limit must pass through untouched, and applying
+    the clamp repeatedly must be idempotent.
+    """
+    domains = np.array([10.0, 10.0, 2.0])
+    clamp = 0.5
+
+    inside = np.array([0.5, -0.5, 0.25])
+    np.testing.assert_allclose(clamp_velocity(inside, domains, clamp), inside)
+
+    # Repeated application must not decay it -- this is what the old form failed.
+    v = inside.copy()
+    for _ in range(10):
+        v = clamp_velocity(v, domains, clamp)
+    np.testing.assert_allclose(v, inside)
+
+    # Outside the limit, clip to exactly the limit, sign preserved.
+    outside = np.array([99.0, -99.0, 7.0])
+    np.testing.assert_allclose(
+        clamp_velocity(outside, domains, clamp), clamp * domains * np.array([1, -1, 1])
+    )
