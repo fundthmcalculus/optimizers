@@ -66,12 +66,9 @@ def ackley(x: AF) -> float:
     """
     d = len(x)
     a, b, c = _ACKLEY_A, _ACKLEY_B, _ACKLEY_C
-    return float(
-        -a * np.exp(-b * np.sqrt(np.sum(x**2) / d))
-        - np.exp(np.sum(np.cos(c * x)) / d)
-        + a
-        + np.e
-    )
+    sum_sq = float(np.sum(x**2))
+    sum_cos = float(np.sum(np.cos(c * x)))
+    return float(-a * np.exp(-b * np.sqrt(sum_sq / d)) - np.exp(sum_cos / d) + a + np.e)
 
 
 def ackley_batch(x: AF) -> AF:
