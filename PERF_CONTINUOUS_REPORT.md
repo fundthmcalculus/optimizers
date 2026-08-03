@@ -414,44 +414,73 @@ is O(deck_len log deck_len) per row; `np.argpartition(keys, k-1, axis=1)`
 gets the identical top-k **set** in O(deck_len). Verified to select the exact
 same winner as the argsort version over 500 randomized trials.
 
-**Measured:** at population 2000 / archive 6000, GA drops from 12.4s to
-7.1s (**1.7×**) — a real, free, zero-risk win, but notice this is a *constant-
-factor* improvement (the scaling plot's two GA lines have similar slope):
-`argpartition` is still O(deck_len) per row, so the whole call is still
-O(population × archive_size).
+**Measured (intermediate step, argpartition only):** at population 2000 /
+archive 6000, GA drops from 12.4s to 7.1s (1.7×) — real, but a *constant-
+factor* improvement, not a shape fix: `argpartition` is still O(deck_len) per
+row, so the whole call is still O(population × archive_size). Extending the
+sweep to population 8000 made the remaining shape problem unmistakable — GA
+went from 1.54s → 251.2s as population went 1000 → 8000 (roughly
+quadrupling each doubling, the O(n²) signature) while ACO/PSO (after §6a's
+fix) only doubled each time, landing at 2.4–2.6s at population 8000. GA was
+**~100× slower** than ACO/PSO on the same workload.
 
-**Left on the table, flagged rather than done:** the remaining O(n×archive)
-cost could become O(n×k) by drawing `k` indices via `rng.integers` without
-enforcing distinctness (a ~0.1% chance of a repeated candidate within one
-tournament of 3 at archive 3000 — statistically inconsequential for a
-stochastic search). This was **not** applied here because, unlike every other
-fix in this report, it is not bit-identical or even guaranteed-equivalent —
-it changes the RNG draw pattern and therefore every downstream seeded result.
-Every other change in this report was verified to preserve exact output;
-this one would trade that guarantee for a further ~2–5× at very large
-archives. Worth doing if GA at population ≥1000 is a real workload — flagged
-here rather than assumed.
+**The actual shape fix — now applied:** draw `k` candidate indices directly
+via `rng.integers(0, deck_len, size=(n, k))` instead of ranking (any way) over
+the whole archive:
 
-**How far this actually goes at scale (population up to 8000):** the
-`argpartition` fix is real but doesn't change GA's shape, only its constant —
-extending the sweep past §6a's population 2000 makes that unmistakable:
+```python
+candidates = rng.integers(0, deck_len, size=(n, k))  # O(n*k), was O(n*deck_len)
+candidate_fitness = population_fitness[candidates]
+winners = candidates[np.arange(n), np.argmin(candidate_fitness, axis=1)]
+```
+
+This drops the within-tournament distinctness guarantee every prior version
+of this function preserved — unlike every other change in this report, it is
+**not** bit-identical or even statistically-equivalent to what came before,
+because it draws different random numbers and can (rarely) pick the same
+archive row twice in one tournament. The probability of any repeat among `k`
+draws is `~k(k-1)/(2·deck_len)` (~0.05% for `k=3`, `deck_len=3000`) and — the
+key property that makes this an easy trade — it *shrinks* as the archive
+grows, the opposite of the old approach's cost, which *grew* with the
+archive. Statistically inconsequential for a stochastic search; applied here
+on that basis (not verified bit-identical, unlike everything else in this
+report).
+
+**Measured, full fix, same population sweep:**
+
+| population | GA (argsort, original) | GA (+ argpartition) | GA (+ `rng.integers`) | ACO (§6a) | PSO |
+|---:|---:|---:|---:|---:|---:|
+| 1000 | — | 1.54s | **0.26s** | 0.30s | 0.34s |
+| 2000 | — | 5.61s | **0.49s** | 0.64s | 0.67s |
+| 4000 | — | 36.4s | **1.02s** | 1.24s | 1.30s |
+| 8000 | — | 251.2s | **2.03s** | 2.42s | 2.60s |
+
+GA now scales linearly like ACO/PSO (doubling per population doubling) and is
+the **fastest of the three** at every population tested — a 124× speedup over
+the argpartition version at population 8000, and a genuine complexity-class
+fix (`benchmarks/results/scaling_timings_all_fixed.png`), not a constant-factor
+one. This is the one change in this report that trades an exact-output
+guarantee for it, and it was applied deliberately for that reason, not by
+default.
+
+Historical note — the intermediate steps above, for the record:
 
 | population | GA (after argpartition) | ACO (after §6a fix) | PSO |
 |---:|---:|---:|---:|
 | 1000 | 1.54s | 0.30s | 0.34s |
 | 2000 | 5.61s | 0.64s | 0.67s |
 | 4000 | 36.4s | 1.24s | 1.30s |
-| 8000 | **251.2s** | 2.42s | 2.60s |
+| 8000 | 251.2s | 2.42s | 2.60s |
 
 (20 dims, 15 generations, archive = 3×population, mean over 3 seeds,
 `benchmarks/run_scaling_benchmark.py --optimizers GA ACO PSO --populations
 1000 2000 4000 8000`; see `benchmarks/results/scaling_timings_ga_to_8000.png`.)
 GA roughly quadruples each time population doubles (the O(n²) signature);
 ACO and PSO roughly double, as expected after §6a's fix removed ACO's own
-O(n²) term. By population 8000, GA is **~100× slower than ACO/PSO** — it is
-now the single biggest remaining inefficiency in this codebase for any
-workload that runs GA at population ≳2000, well past the point where the
-"left on the table" trade-off above is worth reconsidering.
+O(n²) term. By population 8000, GA was **~100× slower than ACO/PSO** — this
+is the state the `rng.integers` fix above (now applied) was written against;
+see `benchmarks/results/scaling_timings_all_fixed.png` for where all three
+land afterwards.
 
 ### 6c. Where this leaves the Cython question
 

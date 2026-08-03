@@ -45,26 +45,28 @@ def _tournament_selection_batch(
     rng: Generator | None = None,
 ) -> AF | AI:
     # Select ``n`` winners at once. Each winner is the best of ``tournament_size``
-    # distinct random rows; distinctness comes from taking the k smallest random
-    # keys per row, which vectorizes the per-selection
-    # np.random.choice(replace=False). See report #5.
+    # random rows, drawn directly via ``rng.integers`` -- O(n*k) instead of the
+    # previous O(n*deck_len) (first an O(n*deck_len log deck_len) argsort, then
+    # an O(n*deck_len) argpartition; see git history for both). At a large
+    # archive this previously dominated GA's wall-clock end to end (measured:
+    # population 8000/archive 24000 took 251s, ~100x slower than ACO/PSO on
+    # the same workload -- see PERF_CONTINUOUS_REPORT.md §6b).
     #
-    # ``argpartition`` (not ``argsort``) on purpose: we only need the *set* of
-    # the k smallest-keyed rows, not their relative order (the very next step,
-    # ``argmin`` over their fitness, doesn't care what order the k candidates
-    # come in). A full argsort is O(deck_len log deck_len) per row; argpartition
-    # is O(deck_len). At a large archive this dominates GA's wall-clock
-    # (measured: ~50% of total at population=500/archive=1500, see
-    # PERF_CONTINUOUS_REPORT.md addendum) for no benefit, since the extra
-    # ordering information it computes is immediately discarded. Verified to
-    # select the identical winner as the argsort version over 500 randomized
-    # trials (same k-smallest set -> same argmin either way).
+    # This does not enforce distinctness within one tournament (unlike the
+    # argsort/argpartition versions before it), so it is not bit-identical or
+    # even guaranteed-equivalent to them -- it draws different random numbers
+    # and can (rarely) pick the same row twice in one tournament. The
+    # probability of any repeat among k draws is ~k*(k-1)/(2*deck_len) (e.g.
+    # ~0.05% for k=3, deck_len=3000) and *shrinks* as the archive grows -- the
+    # opposite of the old approach's cost, which *grew* with the archive.
+    # Statistically inconsequential for a stochastic search; accepted
+    # deliberately in exchange for a complexity-class fix (see
+    # PERF_CONTINUOUS_REPORT.md §6b for the discussion this implements).
     if rng is None:
         rng = global_rng()
     deck_len = len(population_deck)
     k = min(tournament_size, deck_len)
-    keys = rng.random((n, deck_len))
-    candidates = np.argpartition(keys, k - 1, axis=1)[:, :k]  # (n, k)
+    candidates = rng.integers(0, deck_len, size=(n, k))  # (n, k)
     candidate_fitness = population_fitness[candidates]  # (n, k)
     winners = candidates[np.arange(n), np.argmin(candidate_fitness, axis=1)]
     return population_deck[winners]  # (n, n_vars)
