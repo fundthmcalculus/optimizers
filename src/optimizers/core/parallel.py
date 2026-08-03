@@ -27,6 +27,7 @@ from joblib import cpu_count
 from joblib.externals.loky import ProcessPoolExecutor
 
 from .base import JoblibPrefer
+from .random import spawn_streams, use_stream
 
 # Per-worker cache of run-constant payloads, keyed by an opaque token. Populated
 # once per worker process by the pool initializer. This lives at module scope on
@@ -48,10 +49,20 @@ def _init_worker(token: str, payload: Any) -> None:
 
 
 def _call_with_fixed(
-    worker_fn: Callable[..., Any], token: str, args: Sequence[Any]
+    worker_fn: Callable[..., Any], token: str, args: Sequence[Any], stream: Any
 ) -> Any:
-    # Runs in the worker: resolve the once-shipped fixed payload and call through.
-    return worker_fn(_FIXED[token], *args)
+    # Runs in the worker: resolve the once-shipped fixed payload and call through,
+    # standing in this task's own random stream (see `_call_with_stream`).
+    with use_stream(stream):
+        return worker_fn(_FIXED[token], *args)
+
+
+def _call_with_stream(
+    worker_fn: Callable[..., Any], fixed: Any, args: Sequence[Any], stream: Any
+) -> Any:
+    # Threads backend: same, but `fixed` is shared memory rather than shipped.
+    with use_stream(stream):
+        return worker_fn(fixed, *args)
 
 
 class GenerationRunner:
@@ -114,20 +125,38 @@ class GenerationRunner:
         """Call ``worker_fn(fixed, *varying_args)`` ``count`` times in parallel.
 
         ``count`` defaults to ``n_jobs`` (one task per worker per generation).
+
+        Each call gets its own random stream, spawned here in the parent. Without
+        that the tasks all draw from one shared ``numpy.random.Generator``, which
+        is not thread-safe and hands out numbers in scheduler order -- so a run
+        with a fixed seed produced a different answer every time at ``n_jobs > 1``.
+        Streams are keyed by task index, and results are collected in submission
+        order, so which numbers a task sees no longer depends on when it happened
+        to run.
+
+        The guarantee is reproducibility *at a given* ``n_jobs``, not across
+        values of it: the population is split ``population_size // n_jobs`` ways,
+        so changing the worker count changes how the search is partitioned and
+        therefore where it goes. That was true before this change too, and is a
+        property of data-parallel population search rather than of the seeding.
         """
         n = self.n_jobs if count is None else count
+        streams = spawn_streams(n)
         if self.prefer == "processes":
             assert self._executor is not None
             futures = [
                 self._executor.submit(
-                    _call_with_fixed, worker_fn, self._token, varying_args
+                    _call_with_fixed, worker_fn, self._token, varying_args, streams[i]
                 )
-                for _ in range(n)
+                for i in range(n)
             ]
             return [f.result() for f in futures]
         assert self._parallel is not None
         return self._parallel(
-            joblib.delayed(worker_fn)(self._fixed, *varying_args) for _ in range(n)
+            joblib.delayed(_call_with_stream)(
+                worker_fn, self._fixed, varying_args, streams[i]
+            )
+            for i in range(n)
         )
 
     def close(self) -> None:
