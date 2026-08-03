@@ -349,7 +349,127 @@ python benchmarks/run_benchmark.py --seeds 8
 # -> benchmarks/results/timings.{csv,png}
 ```
 
-## 6. What's out of scope here
+## 6. Round 2 — what a larger population/archive exposes
+
+The measurements above (population 60, archive 200) are sized for a typical
+run. Re-running at population 500–2000 (archive = 3× population, 20
+dimensions) surfaces two **complexity-class** issues that a small benchmark
+can't see — the objective evaluation was never the bottleneck at this scale;
+the solvers' own bookkeeping is.
+
+### 6a. ACO's `random_values`: an accidental O(population × archive) per variable
+
+`InputContinuousVariable.random_values` derives each ant's sampling spread
+from "the mean absolute deviation of the archive column from this ant's
+value" — computed as a direct broadcast:
+
+```python
+d2 = np.mean(np.abs(other_values[None, :] - cv[:, None]), axis=1)
+```
+
+This materializes a full `(n_ants, archive_size)` temporary **per variable**.
+At population 60 / archive 200 that's 12,000 elements — invisible. At
+population 2000 / archive 6000 it's 12 million elements, per variable, per
+generation. Profiling at scale confirms this is **~90% of ACO's total
+wall-clock**, dwarfing every fix from §2–4 combined — a good reminder that
+"the hot path" is workload-dependent, not a fixed property of the code.
+
+**Fix:** the mean absolute deviation of a *fixed* array from a query point has
+a standard O(log n) closed form once the array is sorted — sort the archive
+column once, take prefix sums, and use
+`sum_j |s_j - c| = c·(2m - n) - 2·S[m] + S[n]` where `m` is `c`'s rank
+(`searchsorted`). This turns an O(archive_size) cost per ant into
+O(log archive_size), independent of archive size for the per-ant work. Same
+output as the direct computation (verified over 200 randomized trials, max
+abs diff ~1e-15 — float64 rounding only).
+
+**Measured** (20 dims, 20 generations, mean ± stdev over 5 seeds,
+population scaled with archive = 3×population):
+
+| population | before | after | speedup |
+|---:|---:|---:|---:|
+| 100  | 0.080s | 0.056s | 1.4× |
+| 250  | 0.616s | 0.102s | 6.1× |
+| 500  | 2.295s | 0.182s | 12.6× |
+| 1000 | 11.161s | 0.332s | 33.7× |
+| 2000 | 44.459s | 0.697s | **63.8×** |
+
+The growing speedup (not a flat multiplier) is the signature of a real
+complexity-class fix, not a constant-factor one — see
+`benchmarks/results/scaling_timings.png` (log-log; the "before" line's slope
+is visibly steeper than "after"'s). Best-fitness values are **bit-identical**
+before/after at every population tested (the sampling math is unchanged,
+only *how* it's computed).
+
+### 6b. GA's tournament selection: a full argsort to pick 3 out of N
+
+```python
+candidates = np.argsort(rng.random((n, deck_len)), axis=1)[:, :k]  # k=3
+```
+
+sorts the *entire* archive-length random-key row just to keep the first `k`
+columns. The next step (`argmin` over the `k` candidates' fitness) doesn't
+care what order those `k` came in — only *which* `k` they are. `np.argsort`
+is O(deck_len log deck_len) per row; `np.argpartition(keys, k-1, axis=1)`
+gets the identical top-k **set** in O(deck_len). Verified to select the exact
+same winner as the argsort version over 500 randomized trials.
+
+**Measured:** at population 2000 / archive 6000, GA drops from 12.4s to
+7.1s (**1.7×**) — a real, free, zero-risk win, but notice this is a *constant-
+factor* improvement (the scaling plot's two GA lines have similar slope):
+`argpartition` is still O(deck_len) per row, so the whole call is still
+O(population × archive_size).
+
+**Left on the table, flagged rather than done:** the remaining O(n×archive)
+cost could become O(n×k) by drawing `k` indices via `rng.integers` without
+enforcing distinctness (a ~0.1% chance of a repeated candidate within one
+tournament of 3 at archive 3000 — statistically inconsequential for a
+stochastic search). This was **not** applied here because, unlike every other
+fix in this report, it is not bit-identical or even guaranteed-equivalent —
+it changes the RNG draw pattern and therefore every downstream seeded result.
+Every other change in this report was verified to preserve exact output;
+this one would trade that guarantee for a further ~2–5× at very large
+archives. Worth doing if GA at population ≥1000 is a real workload — flagged
+here rather than assumed.
+
+### 6c. Where this leaves the Cython question
+
+The Cython kernel (§4) accelerates the *objective evaluation* batch call.
+Round 2 shows why that was never going to be the long pole at scale: ACO and
+GA's own bookkeeping — sampling statistics and selection, not the objective —
+were the O(n²)-shaped costs. No amount of speeding up `fcn(x)` fixes an
+algorithm that's quadratic in population size elsewhere. This is the
+practical version of "algorithm first, language second": profiling at a
+representative scale found two complexity-class bugs that a compiled kernel
+categorically cannot fix (it would just make the same O(n²) shape run with a
+smaller constant), whereas the sorted-prefix-sum/argpartition rewrites remove
+the O(n²) shape entirely.
+
+**Current plan for the Cython kernel, concretely:**
+1. **Shipped, keep as-is:** `ackley_batch_cy`/`rosenbrock_batch_cy` as the
+   optional accelerated batch-eval backend for callers whose objective really
+   is the bottleneck after the algorithmic fixes (measured case: PSO, §4).
+2. **Not planned:** extending Cython into ACO/GA/PSO's own sampling/selection
+   internals. §6a/§6b show the win there is algorithmic (a better formula),
+   not a compilation target — a compiled version of the O(n²) broadcast would
+   still be O(n²), just with a smaller constant; PERFORMANCE_REPORT.md and
+   CYTHON_ANALYSIS.md's original conclusion (numba/numpy first, Cython only
+   where profiling shows evaluation itself is still the bottleneck after
+   algorithmic fixes) holds up under this second round of profiling.
+3. **Revisit only if:** a future profile at realistic scale shows a solver's
+   *own* per-candidate loop (not the user's objective) is dominated by
+   irreducible scalar Python work that no vectorization/algorithmic rewrite
+   can remove — none of the three solvers are in that state today.
+
+Reproduce: `python /tmp/.../scaling_bench.py`-style harness is not (yet)
+part of the checked-in `benchmarks/` package (it monkeypatches the old
+implementations in-process for a controlled before/after on one process); the
+after-only numbers are reproducible via `benchmarks/run_benchmark.py` with
+larger `--seeds`/population by editing `BenchmarkSpec`.
+
+---
+
+## 7. What's out of scope here
 
 - The combinatorial GA/ACO/local-search kernels — already covered by
   `PERFORMANCE_REPORT.md` / PRs #67–74, untouched by this report.

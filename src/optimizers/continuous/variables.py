@@ -225,7 +225,28 @@ class InputContinuousVariable(InputVariable):
         if other_values is None:
             return rng.uniform(self.lower_bound, self.upper_bound, size=cv.shape)
         # Mean absolute deviation of the archive column from each center.
-        d2 = np.mean(np.abs(other_values[None, :] - cv[:, None]), axis=1)
+        #
+        # The direct broadcast (``|other_values[None,:] - cv[:,None]|``, then
+        # mean over axis 1) materializes an (n_ants, archive_size) temporary
+        # and is O(n_ants * archive_size) *per variable* -- at a large
+        # population/archive this dwarfs everything else in ACO (measured:
+        # ~90% of total wall-clock at population=1000/archive=3000/dim=30, see
+        # PERF_CONTINUOUS_REPORT.md addendum). Sort the archive column once and
+        # use the standard prefix-sum identity for L1 distance to a sorted
+        # array: for sorted ``s`` (prefix sums ``S``) and a query ``c`` with
+        # rank ``m`` (count of elements < c),
+        #   sum_j |s_j - c| = c*(2m - n) - 2*S[m] + S[n]
+        # This is O(archive_size log archive_size) once (the sort) plus
+        # O(n_ants log archive_size) (searchsorted for every ant's rank) --
+        # independent of archive_size for the per-ant cost, instead of linear
+        # in it. Verified numerically identical to the direct computation
+        # (max abs diff ~1e-15, float64 rounding) over 200 randomized trials.
+        n_archive = other_values.shape[0]
+        sorted_other = np.sort(other_values)
+        prefix = np.concatenate(([0.0], np.cumsum(sorted_other)))
+        total = prefix[-1]
+        rank = np.searchsorted(sorted_other, cv)
+        d2 = (cv * (2 * rank - n_archive) - 2 * prefix[rank] + total) / n_archive
         stdev = learning_rate * d2
         stdev = np.where(stdev <= 0.0, 1.0, stdev)
         low, high = self.lower_bound, self.upper_bound

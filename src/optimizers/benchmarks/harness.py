@@ -29,7 +29,7 @@ from .functions import TEST_FUNCTIONS, TestFunction
 
 EvalMode = Literal["scalar", "batch"]
 
-_OPTIMIZERS = {
+OPTIMIZERS = {
     "ACO": (AntColonyOptimizer, AntColonyOptimizerConfig),
     "GA": (GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig),
     "PSO": (ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig),
@@ -48,7 +48,7 @@ class BenchmarkResult:
 
 @dataclass
 class BenchmarkSpec:
-    optimizers: list[str] = field(default_factory=lambda: list(_OPTIMIZERS))
+    optimizers: list[str] = field(default_factory=lambda: list(OPTIMIZERS))
     functions: list[str] = field(default_factory=lambda: list(TEST_FUNCTIONS))
     modes: tuple[EvalMode, ...] = ("scalar", "batch")
     seeds: tuple[int, ...] = tuple(range(8))
@@ -80,7 +80,7 @@ def time_one_run(
     ``local_grad_optim`` is always ``"none"`` -- this harness is scoped to the
     GA/ACO/PSO population loop itself, not the local-search add-ons.
     """
-    optimizer_cls, config_cls = _OPTIMIZERS[optimizer_name]
+    optimizer_cls, config_cls = OPTIMIZERS[optimizer_name]
     set_seed(seed)
     variables = _make_variables(test_fn, n_dim)
     config: IOptimizerConfig = config_cls(

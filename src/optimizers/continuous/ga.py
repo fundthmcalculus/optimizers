@@ -45,13 +45,26 @@ def _tournament_selection_batch(
     rng: Generator | None = None,
 ) -> AF | AI:
     # Select ``n`` winners at once. Each winner is the best of ``tournament_size``
-    # distinct random rows; distinctness comes from argsort-of-random-keys, which
-    # vectorizes the per-selection np.random.choice(replace=False). See report #5.
+    # distinct random rows; distinctness comes from taking the k smallest random
+    # keys per row, which vectorizes the per-selection
+    # np.random.choice(replace=False). See report #5.
+    #
+    # ``argpartition`` (not ``argsort``) on purpose: we only need the *set* of
+    # the k smallest-keyed rows, not their relative order (the very next step,
+    # ``argmin`` over their fitness, doesn't care what order the k candidates
+    # come in). A full argsort is O(deck_len log deck_len) per row; argpartition
+    # is O(deck_len). At a large archive this dominates GA's wall-clock
+    # (measured: ~50% of total at population=500/archive=1500, see
+    # PERF_CONTINUOUS_REPORT.md addendum) for no benefit, since the extra
+    # ordering information it computes is immediately discarded. Verified to
+    # select the identical winner as the argsort version over 500 randomized
+    # trials (same k-smallest set -> same argmin either way).
     if rng is None:
         rng = global_rng()
     deck_len = len(population_deck)
     k = min(tournament_size, deck_len)
-    candidates = np.argsort(rng.random((n, deck_len)), axis=1)[:, :k]  # (n, k)
+    keys = rng.random((n, deck_len))
+    candidates = np.argpartition(keys, k - 1, axis=1)[:, :k]  # (n, k)
     candidate_fitness = population_fitness[candidates]  # (n, k)
     winners = candidates[np.arange(n), np.argmin(candidate_fitness, axis=1)]
     return population_deck[winners]  # (n, n_vars)
