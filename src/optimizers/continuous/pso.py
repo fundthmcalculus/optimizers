@@ -105,7 +105,7 @@ def run_particles(
         )
 
     # Native PSO path: global best is the archive's top entry (best-first).
-    global_best_position = solution_archive[0, :]
+    global_best_position = np.asarray(solution_archive[0, :], dtype=float)
     global_best_value = solution_values[0]
     # Per-variable domains, used to clamp velocity (constant across the run).
     domains = np.array([v.domain for v in variables])
@@ -117,6 +117,18 @@ def run_particles(
     for d, v in enumerate(variables):
         p_best_pos[:, d] = v.initial_random_values(n_particles, rng=rng)
         p_vel[:, d] = v.initial_random_velocities(n_particles, rng=rng)
+    # Seed one particle directly from the archived incumbent (GitHub #101,
+    # defect 2). Without this, the incumbent -- the archive's current best --
+    # only ever acts as an external attractor (``swarm_best_pos`` below) and
+    # never becomes a particle position itself. Since this routine is
+    # stateless across generations (a fresh uniform draw every call), a warm
+    # start written into the archive before the run never actually enters the
+    # swarm: nothing here ever moves *from* it, only *towards* it. Zero
+    # initial velocity so the seeded particle starts exactly at the incumbent
+    # rather than being displaced before its first update.
+    if n_particles > 0:
+        p_best_pos[0, :] = global_best_position
+        p_vel[0, :] = 0.0
     p_pos = p_best_pos.copy()  # Current Position starts at the initial best
     p_best_val = _eval_batch(p_best_pos)
 
@@ -139,10 +151,17 @@ def run_particles(
             + r_p * cognitive * (p_best_pos - p_pos)
             + social * r_g * (swarm_best_pos[None, :] - p_pos)
         )
-        # Clamp the velocity (same per-dimension ratio clamp as before).
-        p_vel *= np.minimum(
-            np.maximum(p_vel / domains, -velocity_clamp), velocity_clamp
-        )
+        # Clamp the velocity magnitude to a fraction of each variable's domain
+        # (GitHub #101, defect 1). The previous ``p_vel *= clip(p_vel/domains,
+        # -clamp, clamp)`` multiplied the velocity by a clamped *ratio*
+        # instead of clamping it: whenever |v| < domain -- nearly always --
+        # the factor is < 1, so velocity shrinks by that same fraction every
+        # iteration and collapses geometrically to zero within a handful of
+        # steps (measured: ~1e-83 of its initial value by iteration 6 with the
+        # default clamp=0.5), well inside the 10 iterations run per
+        # generation. A real clamp bounds the magnitude instead of decaying it.
+        limit = velocity_clamp * domains
+        p_vel = np.clip(p_vel, -limit, limit)
         # Update the particle position for this time step.
         p_pos += p_vel
         # Evaluate all particles, then update personal/swarm bests vectorized.
