@@ -2,35 +2,44 @@ name: PR Checks
 on:
   pull_request:
     branches: [ main ]
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.14'
+          cache: 'pip'
+
       - name: Install dependencies
         run: |
           pip install .[dev]
+
+      - name: Install build dependencies for Cython
+        run: |
+          pip install "setuptools>=42" wheel "Cython>=3.0"
+
       - name: Build compiled extensions in place
         # so the src-layout tests (PYTHONPATH=./src) import the compiled
         # _tsp_cython kernels rather than skipping them. setuptools is no longer
         # bundled with Python >=3.12, and pip's build isolation for the step
         # above doesn't leave the build deps importable, so install them here.
-        run: |
-          pip install "setuptools>=42" wheel "Cython>=3.0"
-          python setup.py build_ext --inplace
+        run: python setup.py build_ext --inplace
+
       - name: Check code formatting with black
-        run: |
-          pip install black
-          black --check .
+        run: black --check .
+
       - name: Lint with flake8
         run: flake8 ./src ./tests
+
       - name: Type-check with mypy
         run: MYPYPATH=src mypy -p optimizers
-      - name: Run tests
+
+      - name: Run tests (skipping long-running performance tests)
         # --fast caps optimizer workloads (generations/population) so the
         # pipeline finishes in a reasonable timeline; correctness assertions
         # still run in full. Drop the flag to run the full-fidelity workloads.

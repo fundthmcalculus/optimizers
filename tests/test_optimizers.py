@@ -341,7 +341,6 @@ def plot_solution_spiral(n_dim: int, points: AF):
         plt.close(ax.figure)
 
 
-
 def test_pso_velocity_clamp_bounds_rather_than_decays():
     """The velocity clamp must bound the magnitude, not scale it down.
 
