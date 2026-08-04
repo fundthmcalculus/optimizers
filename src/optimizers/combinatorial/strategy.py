@@ -449,7 +449,7 @@ class TwoOptTSP(TSPBase):
                 back_to_start=self.config.back_to_start, name=self.config.name
             )
             nn_solver = NearestNeighborTSP(
-                nn_config,
+                config=nn_config,
                 network_routes=self.network_routes,
                 city_locations=self.city_locations,
             )
