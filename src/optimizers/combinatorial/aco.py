@@ -128,7 +128,7 @@ class AntColonyTSP(TSPBase):
                 back_to_start=self.config.back_to_start, name=self.config.name
             )
             two_opt_optimize = TwoOptTSP(
-                two_opt_config,
+                config=two_opt_config,
                 initial_route=optimal_city_order,
                 initial_value=optimal_tour_length,
                 network_routes=self.network_routes,

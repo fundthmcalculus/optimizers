@@ -126,7 +126,7 @@ class GeneticAlgorithmTSP(TSPBase):
                 back_to_start=self.config.back_to_start, name=self.config.name
             )
             two_opt_optimize = TwoOptTSP(
-                two_opt_config,
+                config=two_opt_config,
                 initial_route=genome[0, :],
                 initial_value=genome_value[0],
                 network_routes=self.network_routes,
