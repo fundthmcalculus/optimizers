@@ -228,7 +228,7 @@ def test_aco_local_optimize_respects_back_to_start(back_to_start):
         local_optimize=True,
     )
     optimizer = AntColonyTSP(
-        config, network_routes=distances, city_locations=all_cities
+        config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
 
