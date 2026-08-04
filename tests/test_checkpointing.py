@@ -40,7 +40,7 @@ def simple_ga_setup():
 
 def test_save_and_load_checkpoint_single_run(tmp_path: Path, simple_ga_setup):
     fcn, variables, cfg = simple_ga_setup
-    opt = GeneticAlgorithmOptimizer(cfg, fcn, variables)
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=fcn, variables=variables)
     res = opt.solve()
 
     # Save checkpoint
@@ -78,7 +78,7 @@ def test_run_multiple_and_summary_and_plot(
     def build_optimizer():
         # Fresh config/optimizer per run
         cfg = GeneticAlgorithmOptimizerConfig(**{**base_cfg.__dict__})
-        opt = GeneticAlgorithmOptimizer(cfg, fcn, variables)
+        opt = GeneticAlgorithmOptimizer(config=cfg, fcn=fcn, variables=variables)
 
         def runner():
             result = opt.solve()

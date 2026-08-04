@@ -137,6 +137,7 @@ class IOptimizer(abc.ABC):
 
     def __init__(
         self,
+        *,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,

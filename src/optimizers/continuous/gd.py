@@ -110,6 +110,7 @@ def _count_discrete_vars(variables: InputVariables) -> tuple[int, list[int]]:
 class GradientDescentOptimizer(IOptimizer):
     def __init__(
         self,
+        *,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
@@ -117,10 +118,10 @@ class GradientDescentOptimizer(IOptimizer):
         nested: bool = False,
     ):
         super().__init__(
-            config,
-            fcn,
-            variables,
-            args,
+            config=config,
+            fcn=fcn,
+            variables=variables,
+            args=args,
         )
         self.config: GradientDescentOptimizerConfig = GradientDescentOptimizerConfig(
             **{**config.__dict__}

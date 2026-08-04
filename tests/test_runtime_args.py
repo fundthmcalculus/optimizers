@@ -69,9 +69,9 @@ def test_metadata_injection_into_goal_and_constraints(tiny_ga_cfg):
     ]
 
     opt = GeneticAlgorithmOptimizer(
-        tiny_ga_cfg,
-        obj,
-        variables,
+        config=tiny_ga_cfg,
+        fcn=obj,
+        variables=variables,
         args=user_args,
     )
 
@@ -212,7 +212,7 @@ def test_eval_count_global_under_processes_backend(monkeypatch):
         InputContinuousVariable("x0", -5.0, 5.0),
         InputContinuousVariable("x1", -5.0, 5.0),
     ]
-    opt = GeneticAlgorithmOptimizer(cfg, obj, variables)
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=obj, variables=variables)
     # Guard: the process backend must actually be in effect for this to be a
     # meaningful test (fast mode would otherwise silently downgrade to threads).
     assert opt.config.joblib_prefer == "processes"

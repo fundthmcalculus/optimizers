@@ -21,6 +21,7 @@ class StepWiseOptimizerConfig(IOptimizerConfig):
 class StepWiseOptimizer(IOptimizer):
     def __init__(
         self,
+        *,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
@@ -28,11 +29,11 @@ class StepWiseOptimizer(IOptimizer):
         existing_soln_deck: SolutionDeck | None = None,
     ):
         super().__init__(
-            config,
-            fcn,
-            variables,
-            args,
-            existing_soln_deck,
+            config=config,
+            fcn=fcn,
+            variables=variables,
+            args=args,
+            existing_soln_deck=existing_soln_deck,
         )
         self.config: StepWiseOptimizerConfig = StepWiseOptimizerConfig(
             **{**config.__dict__}

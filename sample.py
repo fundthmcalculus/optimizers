@@ -29,8 +29,8 @@ def main():
     )
     optimizer = AntColonyOptimizer(
         config=config,
-        variables=input_variables,
         fcn=optim_ackley,
+        variables=input_variables,
     )
 
     # Process-based execution

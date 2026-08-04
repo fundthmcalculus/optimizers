@@ -33,6 +33,7 @@ class AntColonyTSPConfig(IOptimizerConfig):
 class AntColonyTSP(TSPBase):
     def __init__(
         self,
+        *,
         config: AntColonyTSPConfig,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,

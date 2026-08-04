@@ -51,7 +51,7 @@ def test_scalar_mode_tracks_nothing():
         joblib_prefer="threads",
         solution_archive_size=20,
     )
-    opt = GeneticAlgorithmOptimizer(cfg, _sphere, _vars(), args={})
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={})
     opt.solve()
     assert opt.soln_deck.solution_outputs is None
 
@@ -83,7 +83,7 @@ def test_scalar_mode_bit_identical_to_untracked_config():
             joblib_prefer="threads",
             solution_archive_size=20,
         )
-        return GeneticAlgorithmOptimizer(cfg, _sphere, _vars(), args={}).solve()
+        return GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={}).solve()
 
     a, b = run(), run()
     assert a.solution_score == b.solution_score

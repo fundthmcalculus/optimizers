@@ -209,9 +209,13 @@ def test_gd_nested_flag_forces_serial():
         joblib_prefer="processes",
         parallel_discrete_search=True,
     )
-    standalone = GradientDescentOptimizer(cfg, optim_ackley, variables)
+    standalone = GradientDescentOptimizer(
+        config=cfg, fcn=optim_ackley, variables=variables
+    )
     assert standalone.config.n_jobs == 4  # top-level GD keeps its parallelism
-    nested = GradientDescentOptimizer(cfg, optim_ackley, variables, nested=True)
+    nested = GradientDescentOptimizer(
+        config=cfg, fcn=optim_ackley, variables=variables, nested=True
+    )
     assert nested.config.n_jobs == 1  # nested GD is forced serial
 
 

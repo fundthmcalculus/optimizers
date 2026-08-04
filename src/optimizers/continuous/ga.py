@@ -198,6 +198,7 @@ def run_ga(
 class GeneticAlgorithmOptimizer(IOptimizer):
     def __init__(
         self,
+        *,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
@@ -206,12 +207,12 @@ class GeneticAlgorithmOptimizer(IOptimizer):
         batch_fcn: BatchGoalFcn | None = None,
     ):
         super().__init__(
-            config,
-            fcn,
-            variables,
-            args,
-            existing_soln_deck,
-            batch_fcn,
+            config=config,
+            fcn=fcn,
+            variables=variables,
+            args=args,
+            existing_soln_deck=existing_soln_deck,
+            batch_fcn=batch_fcn,
         )
         self.config: GeneticAlgorithmOptimizerConfig = GeneticAlgorithmOptimizerConfig(
             **{**config.__dict__}

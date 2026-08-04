@@ -88,7 +88,7 @@ def test_qd_report_map_elites_no_objectives():
         archive_cells=32,
         stop_after_iterations=999,
     )
-    opt = GeneticAlgorithmOptimizer(cfg, _sphere, _vars(), args={})
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={})
     opt.solve()
     rep = opt.qd_report()
     assert isinstance(rep, QDReport)
@@ -113,7 +113,7 @@ def test_qd_report_with_tracked_objectives_has_pareto_front():
         n_outputs=2,
         stop_after_iterations=999,
     )
-    opt = GeneticAlgorithmOptimizer(cfg, _biobj, _vars(8), args={})
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=_biobj, variables=_vars(8), args={})
     opt.solve()
     rep = opt.qd_report()
     assert rep.all_objectives is not None
@@ -145,7 +145,7 @@ def test_qd_plots_build():
         archive_cells=24,
         stop_after_iterations=999,
     )
-    opt = GeneticAlgorithmOptimizer(cfg, _sphere, _vars(), args={})
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={})
     opt.solve()
     fig2 = plot_map_elites(opt.soln_deck)
     assert fig2.axes and fig2.axes[0].collections

@@ -30,6 +30,7 @@ class GeneticAlgorithmTSPConfig(IOptimizerConfig):
 class GeneticAlgorithmTSP(TSPBase):
     def __init__(
         self,
+        *,
         config: GeneticAlgorithmTSPConfig,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
