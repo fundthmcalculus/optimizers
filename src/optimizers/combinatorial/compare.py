@@ -54,24 +54,24 @@ def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
     n = min(6, distances.shape[0])
     d = np.ascontiguousarray(distances[:n, :n])
     seed = NearestNeighborTSP(
-        NearestNeighborTSPConfig(name="w"), network_routes=d.copy()
+        config=NearestNeighborTSPConfig(name="w"), network_routes=d.copy()
     ).solve()
     seed_route = cast(AI, np.ascontiguousarray(seed.optimal_path))
     seed_value = seed.optimal_value
     TwoOptTSP(
-        TwoOptTSPConfig(name="w", local_search_backend=backend),
+        config=TwoOptTSPConfig(name="w", local_search_backend=backend),
         network_routes=d.copy(),
         initial_route=seed_route.copy(),
         initial_value=seed_value,
     ).solve()
     ThreeOptTSP(
-        TwoOptTSPConfig(name="w", num_iterations=1, local_search_backend=backend),
+        config=TwoOptTSPConfig(name="w", num_iterations=1, local_search_backend=backend),
         network_routes=d.copy(),
         initial_route=seed_route.copy(),
         initial_value=seed_value,
     ).solve()
     LinKernighanTSP(
-        LinKernighanTSPConfig(name="w", local_search_backend=backend),
+        config=LinKernighanTSPConfig(name="w", local_search_backend=backend),
         network_routes=d.copy(),
         initial_route=seed_route.copy(),
         initial_value=seed_value,
@@ -102,7 +102,7 @@ def compare_tsp_heuristics(
 
     t0 = time.perf_counter()
     nn = NearestNeighborTSP(
-        NearestNeighborTSPConfig(name="nn", back_to_start=back_to_start),
+        config=NearestNeighborTSPConfig(name="nn", back_to_start=back_to_start),
         network_routes=distances.copy(),
     ).solve()
     records.append(("Nearest Neighbor", nn, time.perf_counter() - t0))
@@ -112,7 +112,7 @@ def compare_tsp_heuristics(
     def _timed(cls: Any, config: Any) -> tuple[CombinatoricsResult, float]:
         t = time.perf_counter()
         result = cls(
-            config,
+            config=config,
             initial_route=seed_route.copy(),
             initial_value=seed_val,
             network_routes=distances.copy(),
