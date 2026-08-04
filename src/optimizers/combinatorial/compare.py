@@ -65,7 +65,9 @@ def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
         initial_value=seed_value,
     ).solve()
     ThreeOptTSP(
-        config=TwoOptTSPConfig(name="w", num_iterations=1, local_search_backend=backend),
+        config=TwoOptTSPConfig(
+            name="w", num_iterations=1, local_search_backend=backend
+        ),
         network_routes=d.copy(),
         initial_route=seed_route.copy(),
         initial_value=seed_value,

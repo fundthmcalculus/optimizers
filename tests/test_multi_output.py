@@ -83,7 +83,9 @@ def test_scalar_mode_bit_identical_to_untracked_config():
             joblib_prefer="threads",
             solution_archive_size=20,
         )
-        return GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={}).solve()
+        return GeneticAlgorithmOptimizer(
+            config=cfg, fcn=_sphere, variables=_vars(), args={}
+        ).solve()
 
     a, b = run(), run()
     assert a.solution_score == b.solution_score
