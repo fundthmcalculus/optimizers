@@ -142,7 +142,7 @@ def test_three_opt_batch_matches_singles():
 def test_solver_backend_parity(solver_cls, extra):
     D = _distances(120, seed=3)
     nn = NearestNeighborTSP(
-        NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
+        config=NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
     ).solve()
     kw = dict(
         initial_route=nn.optimal_path.copy(),
@@ -150,10 +150,10 @@ def test_solver_backend_parity(solver_cls, extra):
         network_routes=D.copy(),
     )
     r_nb = solver_cls(
-        TwoOptTSPConfig(name="x", local_search_backend="numba", **extra), **kw
+        config=TwoOptTSPConfig(name="x", local_search_backend="numba", **extra), **kw
     ).solve()
     r_cy = solver_cls(
-        TwoOptTSPConfig(name="x", local_search_backend="cython", **extra), **kw
+        config=TwoOptTSPConfig(name="x", local_search_backend="cython", **extra), **kw
     ).solve()
     assert np.array_equal(r_nb.optimal_path, r_cy.optimal_path)
     assert np.isclose(r_nb.optimal_value, r_cy.optimal_value)
@@ -257,7 +257,7 @@ def test_lk_batch_matches_singles():
 def test_lk_solver_backend_parity():
     D = _distances(150, seed=3)
     nn = NearestNeighborTSP(
-        NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
+        config=NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
     ).solve()
     kw = dict(
         initial_route=nn.optimal_path.copy(),
@@ -265,10 +265,10 @@ def test_lk_solver_backend_parity():
         network_routes=D.copy(),
     )
     r_nb = LinKernighanTSP(
-        LinKernighanTSPConfig(name="lk", local_search_backend="numba"), **kw
+        config=LinKernighanTSPConfig(name="lk", local_search_backend="numba"), **kw
     ).solve()
     r_cy = LinKernighanTSP(
-        LinKernighanTSPConfig(name="lk", local_search_backend="cython"), **kw
+        config=LinKernighanTSPConfig(name="lk", local_search_backend="cython"), **kw
     ).solve()
     assert np.array_equal(r_nb.optimal_path, r_cy.optimal_path)
     assert np.isclose(r_nb.optimal_value, r_cy.optimal_value)

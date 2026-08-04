@@ -48,10 +48,10 @@ def test_candidate_lists_shape_and_excludes_self():
 def test_lin_kernighan_valid_and_improves(seed):
     D = pairwise_distances(_cities(100, seed))
     nn = NearestNeighborTSP(
-        NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
+        config=NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
     ).solve()
     lk = LinKernighanTSP(
-        LinKernighanTSPConfig(name="lk"),
+        config=LinKernighanTSPConfig(name="lk"),
         initial_route=nn.optimal_path.copy(),
         initial_value=nn.optimal_value,
         network_routes=D.copy(),
@@ -64,7 +64,7 @@ def test_lin_kernighan_from_scratch_builds_nn_start():
     # No initial_route → setup_local_search runs NN internally.
     D = pairwise_distances(_cities(60, 7))
     lk = LinKernighanTSP(
-        LinKernighanTSPConfig(name="lk"), network_routes=D.copy()
+        config=LinKernighanTSPConfig(name="lk"), network_routes=D.copy()
     ).solve()
     assert _is_valid_tour(lk.optimal_path, 60)
 
@@ -77,7 +77,7 @@ def test_lin_kernighan_reported_length_matches_tour(seed):
     # 0 and 6 at N=40 are cases where the depot actually moves.)
     D = pairwise_distances(_cities(40, seed))
     lk = LinKernighanTSP(
-        LinKernighanTSPConfig(name="lk"), network_routes=D.copy()
+        config=LinKernighanTSPConfig(name="lk"), network_routes=D.copy()
     ).solve()
     path = lk.optimal_path
     # Depot-first, consistent with the 2-opt/3-opt solvers.
