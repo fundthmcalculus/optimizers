@@ -51,7 +51,7 @@ def test_all_solvers_map_elites(opt_cls, cfg_cls, variation):
         qd_variation=variation,
         stop_after_iterations=999,
     )
-    opt = opt_cls(cfg, _sphere, _vars(), args={})
+    opt = opt_cls(config=cfg, fcn=_sphere, variables=_vars(), args={})
     opt.solve()
     assert isinstance(opt.soln_deck, CVTArchive)
     assert opt.soln_deck.coverage > 0.2
