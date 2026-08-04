@@ -384,6 +384,7 @@ def _lk_kernel(distances: AF, tour: AI, cand: AI, max_passes: int) -> int:  # no
 class TwoOptTSP(TSPBase):
     def __init__(
         self,
+        *,
         config: TwoOptTSPConfig,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
@@ -448,7 +449,7 @@ class TwoOptTSP(TSPBase):
                 back_to_start=self.config.back_to_start, name=self.config.name
             )
             nn_solver = NearestNeighborTSP(
-                nn_config,
+                config=nn_config,
                 network_routes=self.network_routes,
                 city_locations=self.city_locations,
             )
@@ -464,6 +465,7 @@ class TwoOptTSP(TSPBase):
 class ThreeOptTSP(TwoOptTSP):
     def __init__(
         self,
+        *,
         config: TwoOptTSPConfig,
         initial_route: Optional[AI] = None,
         initial_value: Optional[F] = None,
@@ -471,7 +473,7 @@ class ThreeOptTSP(TwoOptTSP):
         city_locations: Optional[AF] = None,
     ):
         super().__init__(
-            config,
+            config=config,
             initial_route=initial_route,
             initial_value=initial_value,
             network_routes=network_routes,
@@ -596,6 +598,7 @@ class NearestNeighborTSPConfig(IOptimizerConfig):
 class NearestNeighborTSP(TSPBase):
     def __init__(
         self,
+        *,
         config: NearestNeighborTSPConfig,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
@@ -654,6 +657,7 @@ class ConvexHullTSPConfig(IOptimizerConfig):
 class ConvexHullTSP(TSPBase):
     def __init__(
         self,
+        *,
         config: ConvexHullTSPConfig,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,

@@ -51,7 +51,7 @@ def test_all_solvers_map_elites(opt_cls, cfg_cls, variation):
         qd_variation=variation,
         stop_after_iterations=999,
     )
-    opt = opt_cls(cfg, _sphere, _vars(), args={})
+    opt = opt_cls(config=cfg, fcn=_sphere, variables=_vars(), args={})
     opt.solve()
     assert isinstance(opt.soln_deck, CVTArchive)
     assert opt.soln_deck.coverage > 0.2
@@ -169,7 +169,7 @@ def test_ga_map_elites_end_to_end_builds_cvt_and_covers():
         archive_cells=32,
         stop_after_iterations=999,
     )
-    opt = GeneticAlgorithmOptimizer(cfg, _sphere, _vars(), args={})
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={})
     res = opt.solve()
     assert isinstance(opt.soln_deck, CVTArchive)
     assert opt.soln_deck.coverage > 0.2
@@ -192,7 +192,7 @@ def test_ga_map_elites_iso_line_variation_runs():
         qd_variation="iso_line",
         stop_after_iterations=999,
     )
-    opt = GeneticAlgorithmOptimizer(cfg, _sphere, _vars(), args={})
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={})
     opt.solve()
     assert opt.soln_deck.coverage > 0.2
 
@@ -210,7 +210,7 @@ def test_aco_map_elites_end_to_end():
         archive_cells=32,
         stop_after_iterations=999,
     )
-    opt = AntColonyOptimizer(cfg, _sphere, _vars(), args={})
+    opt = AntColonyOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={})
     opt.solve()
     assert isinstance(opt.soln_deck, CVTArchive)
     assert opt.soln_deck.coverage > 0.0
@@ -225,7 +225,7 @@ def test_scalar_mode_uses_solution_deck_not_cvt():
         n_jobs=1,
         joblib_prefer="threads",
     )
-    opt = GeneticAlgorithmOptimizer(cfg, _sphere, _vars(), args={})
+    opt = GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={})
     opt.solve()
     assert isinstance(opt.soln_deck, SolutionDeck)
     assert not isinstance(opt.soln_deck, CVTArchive)
@@ -244,7 +244,7 @@ def test_outputs_descriptor_source_not_yet_supported():
         n_outputs=2,
     )
     try:
-        GeneticAlgorithmOptimizer(cfg, _sphere, _vars(), args={})
+        GeneticAlgorithmOptimizer(config=cfg, fcn=_sphere, variables=_vars(), args={})
         raise AssertionError("expected NotImplementedError for outputs source")
     except NotImplementedError:
         pass

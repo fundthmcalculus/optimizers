@@ -100,7 +100,7 @@ def test_aco_mst():
         joblib_prefer="threads",
     )
     optimizer = AntColonyTSP(
-        config, network_routes=distances, city_locations=all_cities
+        config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
     plot_convergence(result.value_history)
@@ -120,7 +120,7 @@ def test_aco_tsp():
         joblib_prefer="threads",
     )
     optimizer = AntColonyTSP(
-        config, network_routes=distances, city_locations=all_cities
+        config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
     plot_convergence(result.value_history)
@@ -139,7 +139,7 @@ def test_ga_tsp():
         joblib_prefer="threads",
     )
     optimizer = GeneticAlgorithmTSP(
-        config, network_routes=distances, city_locations=all_cities
+        config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
     plot_convergence(result.value_history)
@@ -152,11 +152,11 @@ def test_nn_tsp():
     distances: AF = pairwise_distances(all_cities)
     # Compute TSP optimized distance
     config = NearestNeighborTSPConfig(name="Test NN", back_to_start=True)
-    optimizer = NearestNeighborTSP(config, distances)
+    optimizer = NearestNeighborTSP(config=config, network_routes=distances)
     result = optimizer.solve()
     topt_config = TwoOptTSPConfig(name="2opt TSP", back_to_start=True)
     topt_optimizer = TwoOptTSP(
-        topt_config,
+        config=topt_config,
         initial_route=result.optimal_path,
         initial_value=result.optimal_value,
         network_routes=distances,
@@ -166,7 +166,7 @@ def test_nn_tsp():
         name="2opt TSP", back_to_start=True, nearest_neighbors=5
     )
     topt_optimizer2 = ThreeOptTSP(
-        topt_config2,
+        config=topt_config2,
         initial_route=result.optimal_path,
         initial_value=result.optimal_value,
         network_routes=distances,
@@ -197,7 +197,7 @@ def test_ga_local_optimize_respects_back_to_start(back_to_start):
         local_optimize=True,
     )
     optimizer = GeneticAlgorithmTSP(
-        config, network_routes=distances, city_locations=all_cities
+        config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
 
@@ -228,7 +228,7 @@ def test_aco_local_optimize_respects_back_to_start(back_to_start):
         local_optimize=True,
     )
     optimizer = AntColonyTSP(
-        config, network_routes=distances, city_locations=all_cities
+        config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
 
@@ -244,7 +244,7 @@ def test_convex_hull_tsp():
     all_cities = circle_random_clusters()
     # Compute TSP optimized distance
     config = ConvexHullTSPConfig(name="Test Convex Hull", back_to_start=True)
-    optimizer = ConvexHullTSP(config, city_locations=all_cities)
+    optimizer = ConvexHullTSP(config=config, city_locations=all_cities)
     result = optimizer.solve()
     plot_cities_and_route(all_cities, result.optimal_path)
 

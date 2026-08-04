@@ -74,7 +74,7 @@ def solve_once(kind, *, seed=0, n_jobs=1, prefer="threads", local_grad_optim="no
         contextlib.redirect_stdout(io.StringIO()),
         contextlib.redirect_stderr(io.StringIO()),
     ):
-        result = optimizer_cls(config, goal, variables).solve()
+        result = optimizer_cls(config=config, fcn=goal, variables=variables).solve()
     return round(float(result.solution_score), 12), len(evaluations)
 
 

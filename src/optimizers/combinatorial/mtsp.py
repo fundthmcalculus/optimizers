@@ -56,7 +56,7 @@ class AntColonyMTSP:
                     continue
                 tsp_config.name = f"{tsp_config.name}-{cluster_id + 1}"
                 tsp_solve = AntColonyTSP(
-                    tsp_config,
+                    config=tsp_config,
                     city_locations=cluster_cities,
                 )
                 tsp_result = tsp_solve.solve()
@@ -81,7 +81,9 @@ class AntColonyMTSP:
             cluster_cities = self.city_locations[cluster, :]
             cluster_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
             cluster_config.name = f"{self.config.name}-{cluster_id + 1}"
-            tsp_solve = AntColonyTSP(cluster_config, city_locations=cluster_cities)
+            tsp_solve = AntColonyTSP(
+                config=cluster_config, city_locations=cluster_cities
+            )
             cluster_result = tsp_solve.solve()
             # Map cluster indices back to original indices
             cluster_result.optimal_path = np.array(

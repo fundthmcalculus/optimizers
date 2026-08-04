@@ -72,6 +72,7 @@ class RandomOptimizerSelection(IOptimizerSelection):
 class MultiTypeOptimizer(IOptimizer):
     def __init__(
         self,
+        *,
         config: IOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
@@ -79,7 +80,12 @@ class MultiTypeOptimizer(IOptimizer):
         initial_optimizer: OptimizationType = "aco",
         optimizer_selector: IOptimizerSelection = RandomOptimizerSelection(),
     ):
-        super().__init__(config, fcn, variables, args)
+        super().__init__(
+            config=config,
+            fcn=fcn,
+            variables=variables,
+            args=args,
+        )
         self.initial_optimizer = initial_optimizer
         self.optimizer_selector = optimizer_selector
         self.fcn = fcn
@@ -111,21 +117,34 @@ class MultiTypeOptimizer(IOptimizer):
         optimizer: IOptimizer
         if selected_type == "aco":
             optimizer = AntColonyOptimizer(
-                converted_config, self.fcn, self.variables, self.args
+                config=converted_config,
+                fcn=self.fcn,
+                variables=self.variables,
+                args=self.args,
             )
         elif selected_type == "pso":
             optimizer = ParticleSwarmOptimizer(
-                converted_config, self.fcn, self.variables, self.args
+                config=converted_config,
+                fcn=self.fcn,
+                variables=self.variables,
+                args=self.args,
             )
         elif selected_type == "ga":
             optimizer = GeneticAlgorithmOptimizer(
-                converted_config, self.fcn, self.variables, self.args
+                config=converted_config,
+                fcn=self.fcn,
+                variables=self.variables,
+                args=self.args,
             )
         elif selected_type == "gd":
             # Nested local search: this strategy owns the higher-level search, so
             # GD runs serially (see GradientDescentOptimizer's ``nested`` flag).
             optimizer = GradientDescentOptimizer(
-                converted_config, self.fcn, self.variables, self.args, nested=True
+                config=converted_config,
+                fcn=self.fcn,
+                variables=self.variables,
+                args=self.args,
+                nested=True,
             )
         else:
             # Should be unreachable due to ensure_literal_choice
@@ -167,12 +186,18 @@ class GroupedVariableOptimizerConfig(IOptimizerConfig):
 class GroupedVariableOptimizer(IOptimizer):
     def __init__(
         self,
+        *,
         config: GroupedVariableOptimizerConfig,
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
     ):
-        super().__init__(config, fcn, variables, args)
+        super().__init__(
+            config=config,
+            fcn=fcn,
+            variables=variables,
+            args=args,
+        )
         self.config: GroupedVariableOptimizerConfig = config
         if config.groups is None:
             raise ValueError("Group order and groups must be provided")
@@ -203,17 +228,23 @@ class GroupedVariableOptimizer(IOptimizer):
                 config = config_to_type(self.config, group.optimizer_type)
                 optim: IOptimizer
                 if group.optimizer_type == "aco":
-                    optim = AntColonyOptimizer(config, new_fcn, group_vars)
+                    optim = AntColonyOptimizer(
+                        config=config, fcn=new_fcn, variables=group_vars
+                    )
                 elif group.optimizer_type == "pso":
-                    optim = ParticleSwarmOptimizer(config, new_fcn, group_vars)
+                    optim = ParticleSwarmOptimizer(
+                        config=config, fcn=new_fcn, variables=group_vars
+                    )
                 elif group.optimizer_type == "ga":
-                    optim = GeneticAlgorithmOptimizer(config, new_fcn, group_vars)
+                    optim = GeneticAlgorithmOptimizer(
+                        config=config, fcn=new_fcn, variables=group_vars
+                    )
                 elif group.optimizer_type == "gd":
                     # Nested local search: the grouped optimizer owns the outer
                     # loop over groups/rounds, so GD runs serially (see its
                     # ``nested`` flag).
                     optim = GradientDescentOptimizer(
-                        config, new_fcn, group_vars, nested=True
+                        config=config, fcn=new_fcn, variables=group_vars, nested=True
                     )
                 else:
                     raise NotImplementedError("Optimizer not implemented")
