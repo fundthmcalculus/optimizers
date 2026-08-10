@@ -48,7 +48,9 @@ class TestSamplerBasics:
         with pytest.raises(ValueError, match="Unknown sampler type"):
             create_sampler("invalid")
 
-    @pytest.mark.parametrize("sampler_type", ["uniform", "sobol", "halton", "lhs"])
+    @pytest.mark.parametrize(  # noqa: E501
+        "sampler_type", ["uniform", "sobol", "halton", "lhs"]
+    )
     def test_sampler_shape_and_range(self, sampler_type):
         """Test samplers produce correct shape and stay in [0,1]^d."""
         set_seed(42)
@@ -59,7 +61,9 @@ class TestSamplerBasics:
         assert np.all(points >= 0.0), f"{sampler_type}: points < 0"
         assert np.all(points <= 1.0), f"{sampler_type}: points > 1"
 
-    @pytest.mark.parametrize("sampler_type", ["uniform", "sobol", "halton", "lhs"])
+    @pytest.mark.parametrize(  # noqa: E501
+        "sampler_type", ["uniform", "sobol", "halton", "lhs"]
+    )
     def test_sampler_reproducibility(self, sampler_type):
         """Test seeded runs produce identical results."""
         sampler = create_sampler(sampler_type)
@@ -83,12 +87,14 @@ class TestSamplerBasics:
         assert not np.allclose(points1, points2)
 
 
-class TestDiscreteVariableMapping:
+class TestDiscreteVariableMapping:  # noqa: E501
     """Test samplers work with discrete variables via range_value."""
 
     def test_discrete_variable_range_mapping(self):
         """Test range_value maps [0,1] to discrete choices uniformly."""
-        discrete_var = InputDiscreteVariable("color", values=np.array([10, 20, 30, 40]))
+        discrete_var = InputDiscreteVariable(  # noqa: E501
+            "color", values=np.array([10, 20, 30, 40])
+        )
 
         # Test boundary cases
         assert discrete_var.range_value(0.0) == 10
@@ -98,7 +104,9 @@ class TestDiscreteVariableMapping:
     def test_sampler_with_discrete_variable(self):
         """Test sampler output can be mapped through discrete variable."""
         sampler = create_sampler("sobol")
-        discrete_var = InputDiscreteVariable("category", values=np.array([1, 2, 3]))
+        discrete_var = InputDiscreteVariable(  # noqa: E501
+            "category", values=np.array([1, 2, 3])
+        )
 
         points = sampler.sample(n=50, d=1, seed=42)
         mapped = np.array([discrete_var.range_value(p[0]) for p in points])
@@ -108,7 +116,9 @@ class TestDiscreteVariableMapping:
 
     def test_continuous_variable_range_mapping(self):
         """Test range_value maps [0,1] to [lower, upper]."""
-        cont_var = InputContinuousVariable("x", lower_bound=-10.0, upper_bound=20.0)
+        cont_var = InputContinuousVariable(  # noqa: E501
+            "x", lower_bound=-10.0, upper_bound=20.0
+        )
 
         assert cont_var.range_value(0.0) == pytest.approx(-10.0)
         assert cont_var.range_value(0.5) == pytest.approx(5.0)
@@ -123,7 +133,9 @@ class TestDiscrepancy:
     and check coverage uniformity.
     """
 
-    def compute_discrepancy_2d(self, points: np.ndarray, n_cells: int = 5) -> float:
+    def compute_discrepancy_2d(  # noqa: E501
+        self, points: np.ndarray, n_cells: int = 5
+    ) -> float:
         """Approximate discrepancy by counting occupancy in grid cells.
 
         For 2D points in [0,1]^2, divide into n_cells x n_cells grid and
@@ -226,7 +238,9 @@ class TestConvergencePerformance:
             + np.exp(1)
         )
 
-    @pytest.mark.parametrize("sampler_type", ["uniform", "sobol", "halton", "lhs"])
+    @pytest.mark.parametrize(  # noqa: E501
+        "sampler_type", ["uniform", "sobol", "halton", "lhs"]
+    )
     def test_ga_with_sampler(self, sampler_type):
         """Test GA converges with each sampler type."""
         set_seed(42)
