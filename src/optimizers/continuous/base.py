@@ -348,8 +348,14 @@ class IOptimizer(abc.ABC):
         self, preserve_percent: float
     ) -> tuple[list[F], tqdm.tqdm, int, int, int, joblib.Parallel, StopReason]:
         self.validate_config()
+        init_type = getattr(self.config, "init_type", "random")
+        sampler_type = getattr(self.config, "sampler_type", "uniform")
         self.soln_deck.initialize_solution_deck(
-            self.variables, self.wrapped_fcn, preserve_percent
+            self.variables,
+            self.wrapped_fcn,
+            preserve_percent,
+            init_type=init_type,
+            sampler_type=sampler_type,
         )
         self.soln_deck.sort()
         # QD add-on: seed tracked outputs for the initial archive so the deck's
