@@ -172,9 +172,9 @@ class TestDiscrepancy:
         sobol_disc = self.compute_discrepancy_2d(sobol_points)
 
         # Sobol should have better (lower) discrepancy
-        assert sobol_disc < uniform_disc, (
-            f"Sobol discrepancy {sobol_disc:.4f} not < uniform {uniform_disc:.4f}"
-        )
+        assert (
+            sobol_disc < uniform_disc
+        ), f"Sobol discrepancy {sobol_disc:.4f} not < uniform {uniform_disc:.4f}"
 
     def test_halton_vs_uniform_coverage(self):
         """Test Halton has better coverage than uniform in 2D."""
