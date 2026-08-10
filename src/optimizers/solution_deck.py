@@ -10,6 +10,7 @@ from .core.base import WrappedGoalFcn as WrappedGoalFcn  # re-exported
 from .core.random import get_seed
 from .core.types import f64, af64, ab8, b8
 from .core.variables import InputVariables as InputVariables  # re-exported
+from .core.samplers import SamplerType, create_sampler
 
 # Some type hinting
 InitializationType = Literal["random", "fibonacci", "spiral"]
@@ -81,6 +82,7 @@ class SolutionDeck:
         eval_fcn: WrappedGoalFcn,
         preserve_percent: float = 0.0,
         init_type: InitializationType = "random",
+        sampler_type: SamplerType = "uniform",
     ) -> None:
         if len(variables) != self.num_vars:
             raise ValueError(
@@ -89,28 +91,35 @@ class SolutionDeck:
         # Validate initialization type early
         ensure_literal_choice(init_type, InitializationType)
         num_preserve = int(self.archive_size * preserve_percent)
-        if init_type == "fibonacci" and num_preserve < self.archive_size:
-            fibb_spiral_points = fibonacci_sphere_points(
+
+        # Generate initial sample points if using sampler-based initialization
+        sample_points = None
+        if init_type == "random":
+            # Use sampler for uniform/quasi-random initialization
+            if num_preserve < self.archive_size:
+                seed = get_seed()
+                sampler = create_sampler(sampler_type)
+                sample_points = sampler.sample(
+                    self.archive_size - num_preserve,
+                    self.num_vars,
+                    seed=seed,
+                )
+        elif init_type == "fibonacci" and num_preserve < self.archive_size:
+            sample_points = fibonacci_sphere_points(
                 self.archive_size - num_preserve, self.num_vars
             )
         elif init_type == "spiral" and num_preserve < self.archive_size:
-            fibb_spiral_points = spiral_points(
+            sample_points = spiral_points(
                 self.archive_size - num_preserve, self.num_vars
             )
 
         for k in range(self.archive_size):
             for i, variable in enumerate(variables):
                 if k >= num_preserve:
-                    if init_type == "random":
-                        self.solution_archive[k, i] = variable.initial_random_value()
-                    elif init_type == "fibonacci":
-                        # http://www.math.vanderbilt.edu/saffeb/texts/161.pdf
+                    if sample_points is not None:
+                        # Use sampled point (mapped through variable's range_value)
                         self.solution_archive[k, i] = variable.range_value(
-                            fibb_spiral_points[k - num_preserve, i]
-                        )
-                    elif init_type == "spiral":
-                        self.solution_archive[k, i] = variable.range_value(
-                            fibb_spiral_points[k - num_preserve, i]
+                            sample_points[k - num_preserve, i]
                         )
         # TODO - Parallelize this across cores?
         for k in range(self.archive_size):

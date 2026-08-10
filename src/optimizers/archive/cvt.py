@@ -25,6 +25,7 @@ from sklearn.cluster import KMeans
 from ..core.types import AF, af64, f64, b8
 from ..core.random import get_seed
 from ..core.variables import InputVariables
+from ..core.samplers import SamplerType, create_sampler
 from .descriptor import RandomProjectionDescriptor
 
 
@@ -128,11 +129,26 @@ class CVTArchive:
         eval_fcn: Callable[[AF], Any],
         preserve_percent: float = 0.0,
         init_type: str = "random",
+        sampler_type: SamplerType = "uniform",
     ) -> None:
         n = self.init_samples
         batch: af64 = np.empty((n, len(variables)), dtype=self._dtype)
-        for d, v in enumerate(variables):
-            batch[:, d] = v.initial_random_values(n)
+
+        # Generate sample points based on init_type
+        if init_type == "random":
+            seed = get_seed()
+            sampler = create_sampler(sampler_type)
+            sample_points = sampler.sample(n, len(variables), seed=seed)
+            # Map through variable.range_value for both continuous and discrete
+            for d, v in enumerate(variables):
+                batch[:, d] = np.array(
+                    [v.range_value(sample_points[i, d]) for i in range(n)]
+                )
+        else:
+            # Fallback to initial_random_values for other init_type values
+            for d, v in enumerate(variables):
+                batch[:, d] = v.initial_random_values(n)
+
         values = np.array([eval_fcn(batch[i]) for i in range(n)], dtype=f64)
         self.add_generation(batch, values)
 

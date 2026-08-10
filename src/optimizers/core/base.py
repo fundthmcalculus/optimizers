@@ -6,6 +6,7 @@ from joblib import cpu_count, Parallel
 from tqdm import trange, tqdm
 
 from .types import AF, F
+from .samplers import SamplerType
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
@@ -181,6 +182,15 @@ class IOptimizerConfig:
     """Iso+LineDD isotropic std-dev, as a fraction of each variable's domain."""
     line_sigma: float = 0.2
     """Iso+LineDD directional (line) std-dev (dimensionless)."""
+    init_type: Literal["random", "fibonacci", "spiral"] = "random"
+    """Initialization type for the solution deck.
+    ``"random"`` (default) uses the sampler_type to fill the initial archive.
+    ``"fibonacci"`` and ``"spiral"`` use space-filling curves."""
+    sampler_type: SamplerType = "uniform"
+    """Sampler for generating initial population points in [0,1]^d.
+    ``"uniform"`` (default) uses i.i.d. uniform sampling (current behavior).
+    ``"sobol"``, ``"halton"``, ``"lhs"`` use quasi-random designs for better
+    space-filling and coverage."""
 
     def __post_init__(self) -> None:
         # When fast mode is on, cap the dominant runtime drivers so the pipeline
