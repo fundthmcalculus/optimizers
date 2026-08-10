@@ -55,7 +55,7 @@ class SobolSampler(Sampler):
         (automatically scrambled if n is not a power of 2).
         """
         sampler = qmc.Sobol(d=d, seed=seed, scramble=True)
-        return sampler.random(n)
+        return np.asarray(sampler.random(n))
 
 
 class HaltonSampler(Sampler):
@@ -68,7 +68,7 @@ class HaltonSampler(Sampler):
         They work well even in higher dimensions compared to Sobol.
         """
         sampler = qmc.Halton(d=d, seed=seed, scramble=True)
-        return sampler.random(n)
+        return np.asarray(sampler.random(n))
 
 
 class LatinHypercubeSampler(Sampler):
@@ -81,7 +81,7 @@ class LatinHypercubeSampler(Sampler):
         from each interval per dimension, ensuring good marginal coverage.
         """
         sampler = qmc.LatinHypercube(d=d, seed=seed, scramble=True)
-        return sampler.random(n)
+        return np.asarray(sampler.random(n))
 
 
 def create_sampler(sampler_type: SamplerType) -> Sampler:
