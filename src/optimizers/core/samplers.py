@@ -86,7 +86,7 @@ class LatinHypercubeSampler(Sampler):
 
 def create_sampler(sampler_type: SamplerType) -> Sampler:
     """Factory function to create a sampler of the specified type."""
-    samplers = {
+    samplers: dict[SamplerType, type[Sampler]] = {
         "uniform": UniformSampler,
         "sobol": SobolSampler,
         "halton": HaltonSampler,
@@ -97,4 +97,5 @@ def create_sampler(sampler_type: SamplerType) -> Sampler:
             f"Unknown sampler type '{sampler_type}'. "
             f"Must be one of {list(samplers.keys())}"
         )
-    return samplers[sampler_type]()
+    sampler_class = samplers[sampler_type]
+    return sampler_class()
