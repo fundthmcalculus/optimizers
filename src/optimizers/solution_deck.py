@@ -268,7 +268,7 @@ class SolutionDeck:
         seed = get_seed()
         k_modes_model = KModes(n_clusters=n_clusters, random_state=seed)
         cluster_labels = k_modes_model.fit_predict(self.solution_archive)
-        return cluster_labels, k_modes_model.mode_indicies_
+        return cluster_labels.astype(f64), k_modes_model.cluster_centroids_.astype(f64)
 
     # ----- Serialization helpers for checkpointing -----
     def to_dict(self) -> dict[str, Any]:
