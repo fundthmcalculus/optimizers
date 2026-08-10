@@ -1,13 +1,12 @@
-"""Samplers for generating initial populations in the unit hypercube [0,1]^d.
+"""Samplers for generating initial populations in unit hypercube [0,1]^d.
 
-Supports both pseudo-uniform (i.i.d.) and quasi-random (low-discrepancy) designs
-for improved space-filling and reproducibility of initial archives.
+Supports both pseudo-uniform (i.i.d.) and quasi-random (low-discrepancy)
+designs for improved space-filling and reproducibility of initial archives.
 """
 
 from abc import ABC, abstractmethod
 from typing import Literal
 import numpy as np
-from numpy.random import Generator
 from scipy.stats import qmc
 
 from .random import rng as global_rng
@@ -51,9 +50,9 @@ class SobolSampler(Sampler):
     def sample(self, n: int, d: int, seed: int | None = None) -> np.ndarray:
         """Generate n Sobol points in [0,1]^d.
 
-        Sobol sequences have excellent uniformity properties (low star-discrepancy)
-        especially in lower dimensions. Works for any n (automatically scrambled
-        if n is not a power of 2).
+        Sobol sequences have excellent uniformity properties (low
+        star-discrepancy) especially in lower dimensions. Works for any n
+        (automatically scrambled if n is not a power of 2).
         """
         sampler = qmc.Sobol(d=d, seed=seed, scramble=True)
         return sampler.random(n)
