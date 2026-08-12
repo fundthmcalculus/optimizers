@@ -54,13 +54,13 @@ def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
     n = min(6, distances.shape[0])
     d = np.ascontiguousarray(distances[:n, :n])
     seed = NearestNeighborTSP(
-        config=NearestNeighborTSPConfig(name="w"), network_routes=d.copy()
+        config=NearestNeighborTSPConfig(name="w"), network_routes=cast(AF, d.copy())
     ).solve()
     seed_route = cast(AI, np.ascontiguousarray(seed.optimal_path))
     seed_value = seed.optimal_value
     TwoOptTSP(
         config=TwoOptTSPConfig(name="w", local_search_backend=backend),
-        network_routes=d.copy(),
+        network_routes=cast(AF, d.copy()),
         initial_route=seed_route.copy(),
         initial_value=seed_value,
     ).solve()
@@ -68,13 +68,13 @@ def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
         config=TwoOptTSPConfig(
             name="w", num_iterations=1, local_search_backend=backend
         ),
-        network_routes=d.copy(),
+        network_routes=cast(AF, d.copy()),
         initial_route=seed_route.copy(),
         initial_value=seed_value,
     ).solve()
     LinKernighanTSP(
         config=LinKernighanTSPConfig(name="w", local_search_backend=backend),
-        network_routes=d.copy(),
+        network_routes=cast(AF, d.copy()),
         initial_route=seed_route.copy(),
         initial_value=seed_value,
     ).solve()

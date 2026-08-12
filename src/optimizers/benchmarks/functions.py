@@ -30,8 +30,7 @@ def sphere(x: AF) -> float:
 
 
 def sphere_batch(x: AF) -> AF:
-    result: AF = np.sum(x**2, axis=-1)
-    return result
+    return np.asarray(np.sum(x**2, axis=-1), dtype=np.float64)
 
 
 def rosenbrock(x: AF) -> float:
@@ -44,11 +43,13 @@ def rosenbrock(x: AF) -> float:
 
 
 def rosenbrock_batch(x: AF) -> AF:
-    result: AF = np.sum(
-        100.0 * (x[..., 1:] - x[..., :-1] ** 2) ** 2 + (1.0 - x[..., :-1]) ** 2,
-        axis=-1,
+    return np.asarray(
+        np.sum(
+            100.0 * (x[..., 1:] - x[..., :-1] ** 2) ** 2 + (1.0 - x[..., :-1]) ** 2,
+            axis=-1,
+        ),
+        dtype=np.float64,
     )
-    return result
 
 
 _ACKLEY_A, _ACKLEY_B, _ACKLEY_C = 20.0, 0.2, 2 * np.pi
@@ -74,13 +75,13 @@ def ackley(x: AF) -> float:
 def ackley_batch(x: AF) -> AF:
     d = x.shape[-1]
     a, b, c = _ACKLEY_A, _ACKLEY_B, _ACKLEY_C
-    result: AF = (
+    return np.asarray(
         -a * np.exp(-b * np.sqrt(np.sum(x**2, axis=-1) / d))
         - np.exp(np.sum(np.cos(c * x), axis=-1) / d)
         + a
-        + np.e
+        + np.e,
+        dtype=np.float64,
     )
-    return result
 
 
 def rastrigin(x: AF) -> float:
@@ -93,8 +94,10 @@ def rastrigin(x: AF) -> float:
 def rastrigin_batch(x: AF) -> AF:
     d = x.shape[-1]
     a = _RASTRIGIN_A
-    result: AF = a * d + np.sum(x**2 - a * np.cos(2 * np.pi * x), axis=-1)
-    return result
+    return np.asarray(
+        a * d + np.sum(x**2 - a * np.cos(2 * np.pi * x), axis=-1),
+        dtype=np.float64,
+    )
 
 
 @dataclass(frozen=True)
