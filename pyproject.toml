@@ -152,3 +152,10 @@ module = [
     "optimizers.archive.variation",
 ]
 disable_error_code = ["no-any-return"]
+
+# Suppress numpy's type stub syntax errors (Python 3.14 compatibility issue
+# when mypy is configured for Python 3.10 but numpy is installed for 3.14+).
+# This is a pre-existing CI infrastructure issue unrelated to this codebase.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+ignore_errors = true
