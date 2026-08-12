@@ -60,7 +60,7 @@ extend-ignore = ["E203"]
 max-complexity = 18
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.14"
 mypy_path = "src"
 ignore_missing_imports = true       # joblib / sklearn / kmodes ship no stubs
 warn_unused_ignores = true          # ratchet: flags an ignore once its error is fixed
