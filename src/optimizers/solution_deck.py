@@ -427,7 +427,7 @@ def spiral_points(n: int, k: int) -> af64:
         raise ValueError("Number of points n must be at least 1.")
     points = np.ones((n, k), dtype=np.float64)
 
-    def r_theta_ij(ij: int, jk: int, theta: float) -> np.ndarray:
+    def r_theta_ij(ij: int, jk: int, theta: float) -> af64:
         # Create the rotation matrix in k-dimensional space
         r = np.eye(k)
         r[jk, jk] = r[ij, ij] = np.cos(theta)
@@ -436,7 +436,7 @@ def spiral_points(n: int, k: int) -> af64:
         return r
 
     @cache
-    def r_theta_n(theta: float) -> np.ndarray:
+    def r_theta_n(theta: float) -> af64:
         r1 = np.eye(k)
         for ii in range(k):
             for jj in range(ii):

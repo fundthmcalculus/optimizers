@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 
-from ..core.types import AF, AI  # noqa: E402
+from ..core.types import AF, AI, af64  # noqa: E402
 
 # Global runtime toggle. Defaults to the env var, but can be flipped at runtime
 # via ``set_show_plots`` (e.g. from a pytest fixture) without touching the env.
@@ -54,7 +54,7 @@ def _finish(fig: Figure) -> Figure:
 
 
 def plot_convergence(
-    tour_lengths: np.ndarray | list[np.ndarray], trace_names: list[str] | None = None
+    tour_lengths: af64 | list[af64], trace_names: list[str] | None = None
 ) -> Figure:
     if not isinstance(tour_lengths, list):
         tour_lengths = tour_lengths.reshape(1, -1)
@@ -131,8 +131,8 @@ def plot_cities_and_route(
 
 
 def plot_run_statistics(
-    summary_or_scores: dict[str, Any] | np.ndarray | list[float],
-    runtimes: np.ndarray | list[float] | None = None,
+    summary_or_scores: dict[str, Any] | af64 | list[float],
+    runtimes: af64 | list[float] | None = None,
     title_prefix: str = "Run Statistics",
 ) -> Figure:
     """Render box-and-whisker plots for final scores and total runtimes across runs.

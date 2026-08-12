@@ -22,7 +22,7 @@ import numpy as np
 from scipy.spatial import cKDTree
 from sklearn.cluster import KMeans
 
-from ..core.types import AF, af64, f64, b8
+from ..core.types import AF, af64, f64, b8, ai64
 from ..core.random import get_seed
 from ..core.variables import InputVariables
 from ..core.samplers import SamplerType, create_sampler
@@ -85,14 +85,14 @@ class CVTArchive:
         self.archive_size = n_cells
 
     # ---- MAP-Elites insertion ----
-    def _cells_for(self, solutions: AF, outputs: AF | None) -> AF:
+    def _cells_for(self, solutions: AF, outputs: AF | None) -> ai64:
         if self.descriptor_source == "outputs":
             assert outputs is not None, "descriptor_source='outputs' needs outputs"
             desc = np.asarray(self.descriptor_fn(outputs), dtype=float)
         else:
             desc = np.asarray(self.descriptor_fn(solutions), dtype=float)
         _, cells = self._kdtree.query(desc)
-        return np.atleast_1d(cells)
+        return np.asarray(np.atleast_1d(cells), dtype=np.int64)
 
     def add_generation(
         self,
@@ -158,7 +158,7 @@ class CVTArchive:
         if occ.size == 0:
             raise RuntimeError("archive is empty; nothing to select parents from")
         idx = occ[rng.integers(0, occ.size, size=n)]
-        return self._cell_solution[idx]
+        return np.asarray(self._cell_solution[idx], dtype=self._dtype)
 
     @property
     def coverage(self) -> float:

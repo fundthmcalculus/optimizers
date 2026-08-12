@@ -5,7 +5,7 @@ from joblib import delayed
 
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from ..core.base import setup_for_generations
-from ..core.types import AI, AF, F, ab8, i32, i16
+from ..core.types import AI, AF, F, ab8, i32, i16, ai64
 from .aco import AntColonyTSPConfig
 
 # NOTE - MST is the same as TSP parameters, except the "back to start" is ignored.
@@ -31,7 +31,7 @@ class AntColonyMST(TSPBase):
         # Pheromone matrix
         tau = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
-        optimal_city_order: Optional[np.ndarray] = None
+        optimal_city_order: Optional[ai64] = None
         tour_lengths = []
         optimal_tour_length = np.inf
         if self.config.hot_start is not None:

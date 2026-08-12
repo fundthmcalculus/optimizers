@@ -288,9 +288,7 @@ class InputContinuousVariable(InputVariable):
         return self.__upper_bound
 
 
-def print_optimal_solution(
-    x: np.ndarray, variables: list[InputContinuousVariable]
-) -> None:
+def print_optimal_solution(x: AF, variables: list[InputContinuousVariable]) -> None:
     print("Optimal solution:")
     for ij, var in enumerate(variables):
         print(f"{var.name}: {x[ij]}")
