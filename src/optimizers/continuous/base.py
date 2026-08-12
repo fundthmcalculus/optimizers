@@ -208,7 +208,7 @@ class IOptimizer(abc.ABC):
                     result = _f(x)
                 # Multi-output goal fns return (fitness, outputs); solvers only
                 # ever need the scalar fitness.
-                return result[0] if self._returns_outputs else result
+                return result[0] if self._returns_outputs else result  # type: ignore[call-overload]
 
             return __wrapped
 
