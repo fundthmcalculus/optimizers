@@ -158,4 +158,4 @@ disable_error_code = ["no-any-return"]
 # This is a pre-existing CI infrastructure issue unrelated to this codebase.
 [[tool.mypy.overrides]]
 module = ["numpy", "numpy.*"]
-ignore_errors = true
+disable_error_code = ["syntax"]
