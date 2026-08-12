@@ -7,7 +7,7 @@ from joblib import delayed
 from .base import CombinatoricsResult, TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, setup_for_generations
-from ..core.types import AI, AF, F, ab8, i32, i16
+from ..core.types import AI, AF, F, ab8, i32, i16, ai64
 
 
 @dataclass
@@ -24,7 +24,7 @@ class AntColonyTSPConfig(IOptimizerConfig):
     """Whether to return to the start node"""
     local_optimize: bool = False
     """Local optimization using 2OPT method"""
-    hot_start: Optional[np.ndarray] = None
+    hot_start: Optional[ai64] = None
     """Hot start solution"""
     hot_start_length: Optional[float] = None
     """Hot start length"""
@@ -54,7 +54,7 @@ class AntColonyTSP(TSPBase):
         # Pheromone matrix
         tau = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
-        optimal_city_order: Optional[np.ndarray] = None
+        optimal_city_order: Optional[ai64] = None
         tour_lengths = []
         optimal_tour_length = np.inf
         if self.config.hot_start is not None:

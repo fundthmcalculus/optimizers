@@ -10,6 +10,7 @@ import numpy as np
 from scipy.stats import qmc
 
 from .random import rng as global_rng
+from .types import AF
 
 SamplerType = Literal["uniform", "sobol", "halton", "lhs"]
 
@@ -18,7 +19,7 @@ class Sampler(ABC):
     """Base class for samplers generating points in [0,1]^d."""
 
     @abstractmethod
-    def sample(self, n: int, d: int, seed: int | None = None) -> np.ndarray:
+    def sample(self, n: int, d: int, seed: int | None = None) -> AF:
         """Generate n points in d-dimensional unit hypercube [0,1]^d.
 
         Args:
@@ -35,7 +36,7 @@ class Sampler(ABC):
 class UniformSampler(Sampler):
     """I.i.d. uniform sampling (current default behavior)."""
 
-    def sample(self, n: int, d: int, seed: int | None = None) -> np.ndarray:
+    def sample(self, n: int, d: int, seed: int | None = None) -> AF:
         """Generate n random uniform points in [0,1]^d."""
         if seed is not None:
             rng = np.random.default_rng(seed)
@@ -47,7 +48,7 @@ class UniformSampler(Sampler):
 class SobolSampler(Sampler):
     """Sobol sequence (space-filling, good for moderate dimensions)."""
 
-    def sample(self, n: int, d: int, seed: int | None = None) -> np.ndarray:
+    def sample(self, n: int, d: int, seed: int | None = None) -> AF:
         """Generate n Sobol points in [0,1]^d.
 
         Sobol sequences have excellent uniformity properties (low
@@ -61,7 +62,7 @@ class SobolSampler(Sampler):
 class HaltonSampler(Sampler):
     """Halton sequence (low-discrepancy, works well in higher dimensions)."""
 
-    def sample(self, n: int, d: int, seed: int | None = None) -> np.ndarray:
+    def sample(self, n: int, d: int, seed: int | None = None) -> AF:
         """Generate n Halton points in [0,1]^d.
 
         Halton sequences use coprime bases to generate low-discrepancy points.
@@ -74,7 +75,7 @@ class HaltonSampler(Sampler):
 class LatinHypercubeSampler(Sampler):
     """Latin Hypercube Sampling (stratified, good for optimization)."""
 
-    def sample(self, n: int, d: int, seed: int | None = None) -> np.ndarray:
+    def sample(self, n: int, d: int, seed: int | None = None) -> AF:
         """Generate n Latin hypercube samples in [0,1]^d.
 
         LHS divides each dimension into n equal intervals and samples one point

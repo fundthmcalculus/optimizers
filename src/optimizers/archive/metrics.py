@@ -10,10 +10,10 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ..core.types import AF
+from ..core.types import AF, ab8, ai64
 
 
-def non_dominated_mask(objectives: AF) -> np.ndarray:
+def non_dominated_mask(objectives: AF) -> ab8:
     """Boolean mask of Pareto-non-dominated rows (minimization).
 
     Row ``i`` is dominated by ``j`` if ``j`` is ``<=`` on every objective and
@@ -35,7 +35,7 @@ def non_dominated_mask(objectives: AF) -> np.ndarray:
     return keep
 
 
-def pareto_front(objectives: AF) -> np.ndarray:
+def pareto_front(objectives: AF) -> ai64:
     """Indices of the non-dominated rows (the Pareto front), best-spread first."""
     mask = non_dominated_mask(objectives)
     idx = np.flatnonzero(mask)

@@ -289,7 +289,7 @@ class InputContinuousVariable(InputVariable):
 
 
 def print_optimal_solution(
-    x: np.ndarray, variables: list[InputContinuousVariable]
+    x: AF, variables: list[InputContinuousVariable]
 ) -> None:
     print("Optimal solution:")
     for ij, var in enumerate(variables):
