@@ -16,7 +16,7 @@ import numpy as np
 from sklearn.metrics import pairwise_distances
 
 from ..core.types import AF, AI
-from .base import CombinatoricsResult
+from ..core.base import OptimizerResult
 from .strategy import (
     NearestNeighborTSP,
     NearestNeighborTSPConfig,
@@ -56,8 +56,8 @@ def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
     seed = NearestNeighborTSP(
         config=NearestNeighborTSPConfig(name="w"), network_routes=cast(AF, d.copy())
     ).solve()
-    seed_route = cast(AI, np.ascontiguousarray(seed.optimal_path))
-    seed_value = seed.optimal_value
+    seed_route = cast(AI, np.ascontiguousarray(seed.solution_vector))
+    seed_value = seed.solution_score
     TwoOptTSP(
         config=TwoOptTSPConfig(name="w", local_search_backend=backend),
         network_routes=cast(AF, d.copy()),
@@ -100,7 +100,7 @@ def compare_tsp_heuristics(
     if warmup:
         _warmup(distances, backend)
 
-    records: list[tuple[str, CombinatoricsResult, float]] = []
+    records: list[tuple[str, OptimizerResult, float]] = []
 
     t0 = time.perf_counter()
     nn = NearestNeighborTSP(
@@ -109,9 +109,9 @@ def compare_tsp_heuristics(
     ).solve()
     records.append(("Nearest Neighbor", nn, time.perf_counter() - t0))
 
-    seed_route, seed_val = nn.optimal_path, nn.optimal_value
+    seed_route, seed_val = nn.solution_vector, nn.solution_score
 
-    def _timed(cls: Any, config: Any) -> tuple[CombinatoricsResult, float]:
+    def _timed(cls: Any, config: Any) -> tuple[OptimizerResult, float]:
         t = time.perf_counter()
         result = cls(
             config=config,
@@ -152,17 +152,17 @@ def compare_tsp_heuristics(
     )
     records.append(("Lin-Kernighan", r, dt))
 
-    best = min(float(res.optimal_value) for _, res, _ in records)
+    best = min(float(res.solution_score) for _, res, _ in records)
     return [
         HeuristicResult(
             name=name,
-            tour_length=float(res.optimal_value),
+            tour_length=float(res.solution_score),
             runtime_s=dt,
             gap_pct=(
-                100.0 * (float(res.optimal_value) - best) / best if best > 0 else 0.0
+                100.0 * (float(res.solution_score) - best) / best if best > 0 else 0.0
             ),
             # These heuristics all return a single tour (never a list of tours).
-            optimal_path=cast(AI, res.optimal_path),
+            optimal_path=cast(AI, res.solution_vector),
         )
         for name, res, dt in records
     ]

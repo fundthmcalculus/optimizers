@@ -1,9 +1,9 @@
 from .gd import solve_gd_for_1var, solve_gd_from_x0
 from ..core.base import LocalOptimType, ensure_literal_choice
-from ..solution_deck import WrappedGoalFcn
+from ..core import WrappedGoalFcn
 from .variables import InputVariable, InputDiscreteVariable
 from ..core.types import AF, F
-from typing import get_args
+from typing import cast, get_args
 
 
 def apply_local_optimization(
@@ -64,7 +64,7 @@ def full_grad_optim(
     # Configure a continuous only gradient optimizer around this (ACO handles the discrete variable searching already)
     # Don't fire this off on another process, to prevent overloading the OS.
     result, _ = solve_gd_from_x0(new_solution, variables, fcn)
-    new_solution = result.solution_vector
+    new_solution = cast(AF, result.solution_vector)
     # Re-evaluate at the returned vector so the stored score is exactly the
     # objective at the stored solution. scipy's res.fun can differ from
     # fcn(res.x) by ~1e-10 near an optimum (line-search artifact), which would
@@ -81,7 +81,7 @@ def single_var_grad_optim(
         if isinstance(variable, InputDiscreteVariable):
             continue
         result = solve_gd_for_1var(new_solution, variables, var_idx, fcn)
-        new_solution = result.solution_vector
+        new_solution = cast(AF, result.solution_vector)
     # Re-evaluate once at the final vector so the stored (vector, value) pair is
     # exactly consistent (see full_grad_optim for the rationale).
     new_value = fcn(new_solution)

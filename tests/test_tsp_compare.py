@@ -52,12 +52,12 @@ def test_lin_kernighan_valid_and_improves(seed):
     ).solve()
     lk = LinKernighanTSP(
         config=LinKernighanTSPConfig(name="lk"),
-        initial_route=nn.optimal_path.copy(),
-        initial_value=nn.optimal_value,
+        initial_route=nn.solution_vector.copy(),
+        initial_value=nn.solution_score,
         network_routes=D.copy(),
     ).solve()
-    assert _is_valid_tour(lk.optimal_path, 100)
-    assert lk.optimal_value <= nn.optimal_value  # never worse than the NN start
+    assert _is_valid_tour(lk.solution_vector, 100)
+    assert lk.solution_score <= nn.solution_score  # never worse than the NN start
 
 
 def test_lin_kernighan_from_scratch_builds_nn_start():
@@ -66,26 +66,26 @@ def test_lin_kernighan_from_scratch_builds_nn_start():
     lk = LinKernighanTSP(
         config=LinKernighanTSPConfig(name="lk"), network_routes=D.copy()
     ).solve()
-    assert _is_valid_tour(lk.optimal_path, 60)
+    assert _is_valid_tour(lk.solution_vector, 60)
 
 
 @pytest.mark.parametrize("seed", range(8))
 def test_lin_kernighan_reported_length_matches_tour(seed):
     # Regression: Or-opt can relocate the depot (city 0) off index 0. The
-    # reported optimal_value must equal the true closed-tour length recomputed
+    # reported solution_score must equal the true closed-tour length recomputed
     # independently — not overshoot by a spurious return-to-depot edge. (Seeds
     # 0 and 6 at N=40 are cases where the depot actually moves.)
     D = pairwise_distances(_cities(40, seed))
     lk = LinKernighanTSP(
         config=LinKernighanTSPConfig(name="lk"), network_routes=D.copy()
     ).solve()
-    path = lk.optimal_path
+    path = lk.solution_vector
     # Depot-first, consistent with the 2-opt/3-opt solvers.
     assert path[0] == 0
     cyc = path[:-1] if path[0] == path[-1] else path
     closed = np.append(cyc, cyc[0])
     true_len = float(D[closed[:-1], closed[1:]].sum())
-    assert np.isclose(lk.optimal_value, true_len)
+    assert np.isclose(lk.solution_score, true_len)
 
 
 # --------------------------- comparison report ---------------------------

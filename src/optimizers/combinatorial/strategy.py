@@ -5,7 +5,8 @@ import numpy as np
 from numba import njit
 
 from ..core import IOptimizerConfig
-from .base import TSPBase, CombinatoricsResult, check_path_distance
+from ..core.base import OptimizerResult
+from .base import TSPBase, check_path_distance
 from ..core.types import AI, F, AF
 
 # Optional compiled backend (2-opt / 3-opt). Built via `setup.py build_ext`
@@ -382,6 +383,8 @@ def _lk_kernel(distances: AF, tour: AI, cand: AI, max_passes: int) -> int:  # no
 
 
 class TwoOptTSP(TSPBase):
+    config: TwoOptTSPConfig
+
     def __init__(
         self,
         *,
@@ -391,12 +394,13 @@ class TwoOptTSP(TSPBase):
         initial_route: Optional[AI] = None,
         initial_value: Optional[F] = None,
     ):
-        super().__init__(network_routes, city_locations)
-        self.config = config
+        super().__init__(
+            config=config, network_routes=network_routes, city_locations=city_locations
+        )
         self.initial_value = initial_value
         self.initial_route = initial_route
 
-    def solve(self) -> CombinatoricsResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         N, new_route = self.setup_local_search()
         # Compiled 2-opt (report item #13); logic identical across backends.
         new_route = np.ascontiguousarray(new_route)
@@ -435,10 +439,10 @@ class TwoOptTSP(TSPBase):
         out = np.append(tour, tour[0]) if self.config.back_to_start else tour
         history = [value]
 
-        return CombinatoricsResult(
-            optimal_path=np.array(out),
-            optimal_value=value,
-            value_history=np.array(history),
+        return OptimizerResult(
+            solution_vector=np.array(out),
+            solution_score=value,
+            solution_history=np.array(history),
             stop_reason="no_improvement" if no_moves else "max_iterations",
         )
 
@@ -454,8 +458,8 @@ class TwoOptTSP(TSPBase):
                 city_locations=self.city_locations,
             )
             solution = nn_solver.solve()
-            self.initial_route = solution.optimal_path
-            self.initial_value = solution.optimal_value
+            self.initial_route = solution.solution_vector
+            self.initial_value = solution.solution_score
         assert self.initial_route is not None
         new_route = self.initial_route.copy()
         N = self.network_routes.shape[0]
@@ -480,7 +484,7 @@ class ThreeOptTSP(TwoOptTSP):
             city_locations=city_locations,
         )
 
-    def solve(self) -> CombinatoricsResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         N, new_route = self.setup_local_search()
         # Compiled 3-opt (report item #13); num_iterations=-1 is a no-op pass.
         new_route = np.ascontiguousarray(new_route)
@@ -515,10 +519,10 @@ class ThreeOptTSP(TwoOptTSP):
         out = np.append(tour, tour[0]) if self.config.back_to_start else tour
         history = [value]
 
-        return CombinatoricsResult(
-            optimal_path=np.array(out),
-            optimal_value=value,
-            value_history=np.array(history),
+        return OptimizerResult(
+            solution_vector=np.array(out),
+            solution_score=value,
+            solution_history=np.array(history),
             stop_reason="no_improvement" if no_moves else "max_iterations",
         )
 
@@ -543,7 +547,7 @@ class LinKernighanTSP(TwoOptTSP):
 
     config: LinKernighanTSPConfig
 
-    def solve(self) -> CombinatoricsResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         _, new_route = self.setup_local_search()
         route = np.ascontiguousarray(new_route)
         N = self.network_routes.shape[0]
@@ -581,10 +585,10 @@ class LinKernighanTSP(TwoOptTSP):
         if self.config.back_to_start:
             out = np.append(tour, tour[0])
         value = check_path_distance(self.network_routes, out, self.config.back_to_start)
-        return CombinatoricsResult(
-            optimal_path=np.array(out),
-            optimal_value=value,
-            value_history=np.array([value]),
+        return OptimizerResult(
+            solution_vector=np.array(out),
+            solution_score=value,
+            solution_history=np.array([value]),
             stop_reason="no_improvement" if n_moves == 0 else "max_iterations",
         )
 
@@ -596,6 +600,8 @@ class NearestNeighborTSPConfig(IOptimizerConfig):
 
 
 class NearestNeighborTSP(TSPBase):
+    config: NearestNeighborTSPConfig
+
     def __init__(
         self,
         *,
@@ -603,10 +609,11 @@ class NearestNeighborTSP(TSPBase):
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
     ):
-        super().__init__(network_routes, city_locations)
-        self.config = config
+        super().__init__(
+            config=config, network_routes=network_routes, city_locations=city_locations
+        )
 
-    def solve(self) -> CombinatoricsResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         # Start at the first node, pick the nearest neighbor. Uses a boolean
         # visited mask + argmin over the current row (report item #13) instead of
         # a Python ``set`` membership scan; argmin's first-min tie-break matches
@@ -640,10 +647,10 @@ class NearestNeighborTSP(TSPBase):
             total_distance += self.network_routes[current_node][0]
             route.append(0)
 
-        return CombinatoricsResult(
-            optimal_path=np.array(route),
-            optimal_value=total_distance,
-            value_history=np.array([total_distance]),
+        return OptimizerResult(
+            solution_vector=np.array(route),
+            solution_score=total_distance,
+            solution_history=np.array([total_distance]),
             stop_reason="none",
         )
 
@@ -655,6 +662,8 @@ class ConvexHullTSPConfig(IOptimizerConfig):
 
 
 class ConvexHullTSP(TSPBase):
+    config: ConvexHullTSPConfig
+
     def __init__(
         self,
         *,
@@ -662,10 +671,11 @@ class ConvexHullTSP(TSPBase):
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
     ):
-        super().__init__(network_routes, city_locations)
-        self.config = config
+        super().__init__(
+            config=config, network_routes=network_routes, city_locations=city_locations
+        )
 
-    def solve(self) -> CombinatoricsResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         # Use the windmill method starting at point-0.
         # NOTE - This will give us the convex hull PLUS the sequence required to get there.
         current_node = 0
@@ -711,9 +721,9 @@ class ConvexHullTSP(TSPBase):
                 break
             visited.add(current_node)
 
-        return CombinatoricsResult(
-            optimal_path=np.array(tour),
-            optimal_value=total_distance,
-            value_history=np.array([total_distance]),
+        return OptimizerResult(
+            solution_vector=np.array(tour),
+            solution_score=total_distance,
+            solution_history=np.array([total_distance]),
             stop_reason="none",
         )

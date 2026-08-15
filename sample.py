@@ -2,7 +2,7 @@ import sys
 import time
 
 from optimizers.continuous.variables import InputContinuousVariable
-from src.optimizers import AntColonyOptimizerConfig, AntColonyOptimizer
+from optimizers import AntColonyOptimizerConfig, AntColonyOptimizer
 from tests.test_optimizers import optim_ackley
 
 

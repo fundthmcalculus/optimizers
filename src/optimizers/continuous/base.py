@@ -1,4 +1,3 @@
-import abc
 import tqdm
 import joblib
 import numpy as np
@@ -7,10 +6,10 @@ import uuid
 import inspect
 from typing import Optional, Any, Callable
 
-from ..core import InputVariables
+from ..core import InputVariables, WrappedGoalFcn
 from ..core.base import (
+    BaseOptimizer,
     IOptimizerConfig,
-    OptimizerResult,
     OptimizerRun,
     StopReason,
     ensure_literal_choice,
@@ -24,10 +23,7 @@ from ..core.base import (
 )
 from ..core.types import AF, F
 from ..core.random import get_seed
-from ..solution_deck import (
-    SolutionDeck,
-    WrappedGoalFcn,
-)
+from ..solution_deck import SolutionDeck
 from ..archive.cvt import CVTArchive
 from ..archive.descriptor import RandomProjectionDescriptor
 from ..archive.metrics import QDReport, qd_score, pareto_front, hypervolume
@@ -132,7 +128,7 @@ class _ArgProvider:
         self.meta["eval_count"] = self.eval_base
 
 
-class IOptimizer(abc.ABC):
+class IOptimizer(BaseOptimizer):
     """Base class for all optimizer implementations"""
 
     def __init__(
@@ -194,7 +190,7 @@ class IOptimizer(abc.ABC):
 
             def __wrapped(
                 x: AF,
-                _f: Callable[..., F] = func,
+                _f: Callable[..., Any] = func,
                 _ap: "_ArgProvider" = self._arg_provider,
             ) -> F:
                 # Only pay the runtime-metadata bookkeeping (a time.time() call
@@ -207,8 +203,14 @@ class IOptimizer(abc.ABC):
                 else:
                     result = _f(x)
                 # Multi-output goal fns return (fitness, outputs); solvers only
-                # ever need the scalar fitness.
-                return result[0] if self._returns_outputs else result  # type: ignore[call-overload]
+                # ever need the scalar fitness. Unpacking (rather than indexing
+                # a value mypy sees as the scalar type F) keeps this checkable
+                # across numpy versions -- some numpy typeshed releases don't
+                # offer a generic.__getitem__(int) overload.
+                if self._returns_outputs:
+                    fitness, _outputs = result
+                    return fitness
+                return result
 
             return __wrapped
 
@@ -336,13 +338,6 @@ class IOptimizer(abc.ABC):
 
     def _set_generation(self, generation: int) -> None:
         self._arg_provider.meta["generation"] = generation
-
-    @abc.abstractmethod
-    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
-        """
-        Solve the given problem.
-        """
-        raise NotImplementedError("This method should be overridden by subclasses.")
 
     def initialize(
         self, preserve_percent: float

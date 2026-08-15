@@ -34,10 +34,10 @@ def main():
         stop_after_iterations=15,
         local_optimize=True,
     )
-    optimizer = AntColonyMTSP(config, city_locations)
+    optimizer = AntColonyMTSP(config=config, city_locations=city_locations)
     result = optimizer.solve()
-    plot_convergence(result.value_history)
-    plot_cities_and_route(city_locations, result.optimal_path)
+    plot_convergence(result.solution_history)
+    plot_cities_and_route(city_locations, result.solution_vector)
 
 
 def part1():
@@ -51,10 +51,10 @@ def part1():
         "Ant Colony",
         "Ant Colony MST",
     ]
-    plot_convergence([x.value_history for x in results], trace_names)
+    plot_convergence([x.solution_history for x in results], trace_names)
     plot_cities_and_route(
         city_locations,
-        [x.optimal_path for x in results],
+        [x.solution_vector for x in results],
         trace_names,
     )
 
@@ -66,7 +66,7 @@ def compute_tsp_bounds(cities: AF):
     # Time Nearest Neighbor
     start_time = time.time()
     nn_config = NearestNeighborTSPConfig(name="NN TSP", back_to_start=True)
-    nn_optimizer = NearestNeighborTSP(nn_config, distances)
+    nn_optimizer = NearestNeighborTSP(config=nn_config, network_routes=distances)
     nn_result = nn_optimizer.solve()
     nn_time = time.time() - start_time
 
@@ -76,9 +76,9 @@ def compute_tsp_bounds(cities: AF):
         name="2-OPT TSP", back_to_start=True, num_iterations=cities.shape[0]
     )
     topt_optimizer = TwoOptTSP(
-        topt_config,
-        initial_route=nn_result.optimal_path,
-        initial_value=nn_result.optimal_value,
+        config=topt_config,
+        initial_route=nn_result.solution_vector,
+        initial_value=nn_result.solution_score,
         network_routes=distances,
     )
     topt_result = topt_optimizer.solve()
@@ -87,7 +87,7 @@ def compute_tsp_bounds(cities: AF):
     # Time Convex Hull
     start_time = time.time()
     ch_config = ConvexHullTSPConfig(name="CH TSP", back_to_start=True)
-    ch_optimizer = ConvexHullTSP(ch_config, city_locations=cities)
+    ch_optimizer = ConvexHullTSP(config=ch_config, city_locations=cities)
     ch_result = ch_optimizer.solve()
     ch_time = time.time() - start_time
 
@@ -108,7 +108,7 @@ def compute_tsp_bounds(cities: AF):
         stop_after_iterations=n_generations * 4,  # No early stopping!
     )
     ga_optimizer = GeneticAlgorithmTSP(
-        ga_config, network_routes=distances, city_locations=cities
+        config=ga_config, network_routes=distances, city_locations=cities
     )
     ga_result = ga_optimizer.solve()
     ga_time = time.time() - start_time
@@ -125,7 +125,7 @@ def compute_tsp_bounds(cities: AF):
         stop_after_iterations=n_generations,  # No early stopping!
     )
     aco_optimizer = AntColonyTSP(
-        aco_config, network_routes=distances, city_locations=cities
+        config=aco_config, network_routes=distances, city_locations=cities
     )
     aco_result = aco_optimizer.solve()
     aco_time = time.time() - start_time
@@ -133,25 +133,25 @@ def compute_tsp_bounds(cities: AF):
     # Compute the MST
     start_time = time.time()
     aco_optimizer = AntColonyMST(
-        aco_config, network_routes=distances, city_locations=cities
+        config=aco_config, network_routes=distances, city_locations=cities
     )
     aco_mst_result = aco_optimizer.solve()
     aco_mst_time = time.time() - start_time
 
     print("\n")
     print(
-        f"TSP Upper Bound (Nearest Neighbor): {nn_result.optimal_value:.2f} (Time: {nn_time:.2f}s)"
+        f"TSP Upper Bound (Nearest Neighbor): {nn_result.solution_score:.2f} (Time: {nn_time:.2f}s)"
     )
     print(
-        f"TSP 2-OPT Solution: {topt_result.optimal_value:.2f} (Time: {topt_time:.2f}s)"
+        f"TSP 2-OPT Solution: {topt_result.solution_score:.2f} (Time: {topt_time:.2f}s)"
     )
     print(
-        f"TSP Lower Bound (Convex Hull): {ch_result.optimal_value:.2f} (Time: {ch_time:.2f}s)"
+        f"TSP Lower Bound (Convex Hull): {ch_result.solution_score:.2f} (Time: {ch_time:.2f}s)"
     )
-    print(f"TSP GA Solution: {ga_result.optimal_value:.2f} (Time: {ga_time:.2f}s)")
-    print(f"TSP ACO Solution: {aco_result.optimal_value:.2f} (Time: {aco_time:.2f}s)")
+    print(f"TSP GA Solution: {ga_result.solution_score:.2f} (Time: {ga_time:.2f}s)")
+    print(f"TSP ACO Solution: {aco_result.solution_score:.2f} (Time: {aco_time:.2f}s)")
     print(
-        f"MST ACO Solution: {aco_mst_result.optimal_value:.2f} (Time: {aco_mst_time:.2f}s)"
+        f"MST ACO Solution: {aco_mst_result.solution_score:.2f} (Time: {aco_mst_time:.2f}s)"
     )
 
     return (
