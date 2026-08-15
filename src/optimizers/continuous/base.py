@@ -190,7 +190,7 @@ class IOptimizer(BaseOptimizer):
 
             def __wrapped(
                 x: AF,
-                _f: Callable[..., F] = func,
+                _f: Callable[..., Any] = func,
                 _ap: "_ArgProvider" = self._arg_provider,
             ) -> F:
                 # Only pay the runtime-metadata bookkeeping (a time.time() call
@@ -203,8 +203,14 @@ class IOptimizer(BaseOptimizer):
                 else:
                     result = _f(x)
                 # Multi-output goal fns return (fitness, outputs); solvers only
-                # ever need the scalar fitness.
-                return result[0] if self._returns_outputs else result
+                # ever need the scalar fitness. Unpacking (rather than indexing
+                # a value mypy sees as the scalar type F) keeps this checkable
+                # across numpy versions -- some numpy typeshed releases don't
+                # offer a generic.__getitem__(int) overload.
+                if self._returns_outputs:
+                    fitness, _outputs = result
+                    return fitness
+                return result
 
             return __wrapped
 
