@@ -103,8 +103,8 @@ def test_aco_mst():
         config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
-    plot_convergence(result.value_history)
-    plot_cities_and_route(all_cities, result.optimal_path)
+    plot_convergence(result.solution_history)
+    plot_cities_and_route(all_cities, result.solution_vector)
 
 
 def test_aco_tsp():
@@ -123,8 +123,8 @@ def test_aco_tsp():
         config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
-    plot_convergence(result.value_history)
-    plot_cities_and_route(all_cities, result.optimal_path)
+    plot_convergence(result.solution_history)
+    plot_cities_and_route(all_cities, result.solution_vector)
 
 
 def test_ga_tsp():
@@ -142,8 +142,8 @@ def test_ga_tsp():
         config=config, network_routes=distances, city_locations=all_cities
     )
     result = optimizer.solve()
-    plot_convergence(result.value_history)
-    plot_cities_and_route(all_cities, result.optimal_path)
+    plot_convergence(result.solution_history)
+    plot_cities_and_route(all_cities, result.solution_vector)
 
 
 def test_nn_tsp():
@@ -157,8 +157,8 @@ def test_nn_tsp():
     topt_config = TwoOptTSPConfig(name="2opt TSP", back_to_start=True)
     topt_optimizer = TwoOptTSP(
         config=topt_config,
-        initial_route=result.optimal_path,
-        initial_value=result.optimal_value,
+        initial_route=result.solution_vector,
+        initial_value=result.solution_score,
         network_routes=distances,
     )
     result2 = topt_optimizer.solve()
@@ -167,14 +167,14 @@ def test_nn_tsp():
     )
     topt_optimizer2 = ThreeOptTSP(
         config=topt_config2,
-        initial_route=result.optimal_path,
-        initial_value=result.optimal_value,
+        initial_route=result.solution_vector,
+        initial_value=result.solution_score,
         network_routes=distances,
     )
     result3 = topt_optimizer2.solve()
     plot_cities_and_route(
         all_cities,
-        [result.optimal_path, result2.optimal_path, result3.optimal_path],
+        [result.solution_vector, result2.solution_vector, result3.solution_vector],
     )
 
 
@@ -201,7 +201,7 @@ def test_ga_local_optimize_respects_back_to_start(back_to_start):
     )
     result = optimizer.solve()
 
-    path = np.asarray(result.optimal_path)
+    path = np.asarray(result.solution_vector)
     # Closed tours return depot-first AND depot-last (the return leg); the open
     # form omits the return leg. Strip it before checking the city set.
     cities = path[:-1] if back_to_start else path
@@ -209,7 +209,7 @@ def test_ga_local_optimize_respects_back_to_start(back_to_start):
     assert path[0] == 0
     # The reported value is measured with the run's own back_to_start setting.
     expected = check_path_distance(distances, path, back_to_start)
-    assert np.isclose(result.optimal_value, expected)
+    assert np.isclose(result.solution_score, expected)
 
 
 @pytest.mark.parametrize("back_to_start", [True, False])
@@ -232,12 +232,12 @@ def test_aco_local_optimize_respects_back_to_start(back_to_start):
     )
     result = optimizer.solve()
 
-    path = np.asarray(result.optimal_path)
+    path = np.asarray(result.solution_vector)
     cities = path[:-1] if back_to_start else path
     assert sorted(cities.tolist()) == list(range(distances.shape[0]))
     assert path[0] == 0
     expected = check_path_distance(distances, path, back_to_start)
-    assert np.isclose(result.optimal_value, expected)
+    assert np.isclose(result.solution_score, expected)
 
 
 def test_convex_hull_tsp():
@@ -246,7 +246,7 @@ def test_convex_hull_tsp():
     config = ConvexHullTSPConfig(name="Test Convex Hull", back_to_start=True)
     optimizer = ConvexHullTSP(config=config, city_locations=all_cities)
     result = optimizer.solve()
-    plot_cities_and_route(all_cities, result.optimal_path)
+    plot_cities_and_route(all_cities, result.solution_vector)
 
 
 def test_mtsp():
@@ -261,7 +261,7 @@ def test_mtsp():
         stop_after_iterations=5,
         local_optimize=True,
     )
-    optimizer = AntColonyMTSP(config, all_cities)
+    optimizer = AntColonyMTSP(config=config, city_locations=all_cities)
     result = optimizer.solve()
-    plot_convergence(result.value_history)
-    plot_cities_and_route(all_cities, result.optimal_path)
+    plot_convergence(result.solution_history)
+    plot_cities_and_route(all_cities, result.solution_vector)

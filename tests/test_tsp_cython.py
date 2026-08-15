@@ -145,8 +145,8 @@ def test_solver_backend_parity(solver_cls, extra):
         config=NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
     ).solve()
     kw = dict(
-        initial_route=nn.optimal_path.copy(),
-        initial_value=nn.optimal_value,
+        initial_route=nn.solution_vector.copy(),
+        initial_value=nn.solution_score,
         network_routes=D.copy(),
     )
     r_nb = solver_cls(
@@ -155,8 +155,8 @@ def test_solver_backend_parity(solver_cls, extra):
     r_cy = solver_cls(
         config=TwoOptTSPConfig(name="x", local_search_backend="cython", **extra), **kw
     ).solve()
-    assert np.array_equal(r_nb.optimal_path, r_cy.optimal_path)
-    assert np.isclose(r_nb.optimal_value, r_cy.optimal_value)
+    assert np.array_equal(r_nb.solution_vector, r_cy.solution_vector)
+    assert np.isclose(r_nb.solution_score, r_cy.solution_score)
 
 
 # ------------------------------ performance ------------------------------
@@ -260,8 +260,8 @@ def test_lk_solver_backend_parity():
         config=NearestNeighborTSPConfig(name="nn"), network_routes=D.copy()
     ).solve()
     kw = dict(
-        initial_route=nn.optimal_path.copy(),
-        initial_value=nn.optimal_value,
+        initial_route=nn.solution_vector.copy(),
+        initial_value=nn.solution_score,
         network_routes=D.copy(),
     )
     r_nb = LinKernighanTSP(
@@ -270,8 +270,8 @@ def test_lk_solver_backend_parity():
     r_cy = LinKernighanTSP(
         config=LinKernighanTSPConfig(name="lk", local_search_backend="cython"), **kw
     ).solve()
-    assert np.array_equal(r_nb.optimal_path, r_cy.optimal_path)
-    assert np.isclose(r_nb.optimal_value, r_cy.optimal_value)
+    assert np.array_equal(r_nb.solution_vector, r_cy.solution_vector)
+    assert np.isclose(r_nb.solution_score, r_cy.solution_score)
 
 
 def test_lk_cython_vs_numba_benchmark(capsys):

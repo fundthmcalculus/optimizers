@@ -1,3 +1,4 @@
+import abc
 import os
 from typing import Literal, Optional, TypeVar, get_args, Callable, Union, Any
 from dataclasses import dataclass, fields
@@ -5,7 +6,7 @@ import numpy as np
 from joblib import cpu_count, Parallel
 from tqdm import trange, tqdm
 
-from .types import AF, F
+from .types import AF, AI, F
 from .samplers import SamplerType
 
 _TRUTHY = {"1", "true", "yes", "on"}
@@ -207,18 +208,25 @@ class IOptimizerConfig:
             self.joblib_prefer = "threads"
 
 
+# A solution is a real-valued decision vector for continuous solvers (GA/PSO/
+# ACO/GD), or a city permutation -- one tour (``AI``) or several (``list[AI]``,
+# e.g. one per vehicle/cluster in ``AntColonyMTSP``) -- for combinatorial ones.
+Solution = Union[AF, AI, "list[AI]"]
+SolutionHistory = Union[AF, "list[AF]"]
+
+
 @dataclass
 class OptimizerResult:
-    """Base class for optimizer results.
+    """Result returned by every solver's ``solve()`` -- continuous and combinatorial alike.
 
     Extended to include optional constraint violation information and an unconstrained-best result.
     """
 
     solution_score: F
     """The score of the best solution found by the optimizer (respecting deck ordering)."""
-    solution_vector: AF
+    solution_vector: Solution
     """The best solution found by the optimizer (respecting deck ordering)."""
-    solution_history: Optional[AF] = None
+    solution_history: Optional[SolutionHistory] = None
     """The history of the best solutions found by the optimizer."""
     stop_reason: StopReason = "none"
     """Whether the optimizer stopped early due to convergence criteria."""
@@ -273,3 +281,37 @@ class OptimizerResult:
             generations_completed=self.generations_completed
             + other.generations_completed,
         )
+
+
+class BaseOptimizer(abc.ABC):
+    """Shared contract for every solver in this library.
+
+    Both the continuous ``IOptimizer`` hierarchy (GA/PSO/ACO/GD searching a
+    real-valued decision vector) and the combinatorial ``TSPBase`` hierarchy
+    (GA/ACO/2-opt/3-opt/Lin-Kernighan searching over city permutations)
+    implement this: a ``config`` and a ``solve()`` that returns an
+    ``OptimizerResult``. That is as far as the two families are unified --
+    decision-variable handling, goal-function wrapping, and parallel
+    generation dispatch differ enough between "evaluate an arbitrary black-box
+    function" and "search over permutations of a distance matrix" that they
+    are not merged further; forcing one implementation over both would cost
+    readability without buying real sharing.
+    """
+
+    config: IOptimizerConfig
+
+    @abc.abstractmethod
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
+        """Solve the given problem and return the best solution found.
+
+        ``preserve_percent`` is only meaningful for solvers whose initial
+        population can be partially seeded from an existing solution deck
+        (the continuous GA/PSO/ACO/GD family); solvers without that concept
+        (e.g. the combinatorial local-search/construction heuristics) accept
+        and ignore it. Every solver in the library exposes this same call
+        shape so callers can treat any of them polymorphically.
+        """
+        raise NotImplementedError("This method should be overridden by subclasses.")
+
+    def __str__(self) -> str:
+        return f"Solver(name={self.config.name})"

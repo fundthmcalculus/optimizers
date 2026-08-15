@@ -39,7 +39,7 @@ class StepWiseOptimizer(IOptimizer):
             **{**config.__dict__}
         )
 
-    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         best_soln_value: list[F] = list()
         # Start with the initial value from the input variables, and stepwise refine solve
         if not self.config.optimize_whole_solution_deck:

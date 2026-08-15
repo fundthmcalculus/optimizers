@@ -1,19 +1,8 @@
-from abc import ABC, abstractmethod
-
 import numpy as np
 from sklearn.metrics import pairwise_distances
 
 from ..core.types import AF, AI, F
-from ..core.base import StopReason, IOptimizerConfig
-from dataclasses import dataclass
-
-
-@dataclass
-class CombinatoricsResult:
-    optimal_path: AI | list[AI]
-    optimal_value: F
-    value_history: AF | list[AF]
-    stop_reason: StopReason
+from ..core.base import BaseOptimizer, StopReason, IOptimizerConfig
 
 
 def check_path_distance(
@@ -45,7 +34,7 @@ def _check_stop_early(config: IOptimizerConfig, soln_history: list[F]) -> StopRe
     return "none"
 
 
-class TSPBase(ABC):
+class TSPBase(BaseOptimizer):
     # ``network_routes`` is always populated by ``set_network_routes`` during
     # __init__ (the None branch asserts city_locations is present), so it is a
     # non-Optional distance matrix for the lifetime of the solver.
@@ -54,9 +43,12 @@ class TSPBase(ABC):
 
     def __init__(
         self,
+        *,
+        config: IOptimizerConfig,
         network_routes: AF | None = None,
         city_locations: AF | None = None,
     ):
+        self.config = config
         self.city_locations = None
         self.set_network_routes(network_routes, city_locations)
 
@@ -74,9 +66,3 @@ class TSPBase(ABC):
             self.network_routes = pairwise_distances(city_locations)
         else:
             self.network_routes = network_routes.copy()
-
-    @abstractmethod
-    def solve(self) -> CombinatoricsResult:
-        raise NotImplementedError(
-            "This method should be implemented in the base classes"
-        )

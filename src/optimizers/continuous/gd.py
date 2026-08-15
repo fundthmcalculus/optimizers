@@ -12,10 +12,7 @@ from ..core.base import (
     InputArguments,
 )
 from ..core.types import AF
-from ..solution_deck import (
-    WrappedGoalFcn,
-    InputVariables,
-)
+from ..core import WrappedGoalFcn, InputVariables
 from ..core.tqdm_joblib import tqdm_joblib
 from .base import IOptimizer
 from .variables import InputContinuousVariable, InputDiscreteVariable
@@ -135,7 +132,7 @@ class GradientDescentOptimizer(IOptimizer):
         if nested:
             self.config.n_jobs = 1
 
-    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         """Solve the optimization problem using gradient descent.
 
         Args:

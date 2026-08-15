@@ -1,17 +1,19 @@
 from dataclasses import dataclass
-from typing import Literal, NoReturn
+from typing import Literal
 
 import numpy as np
 from sklearn.cluster import KMeans, SpectralClustering
 
-from .base import CombinatoricsResult
+from .base import TSPBase
 from .aco import AntColonyTSPConfig, AntColonyTSP
-from ..continuous.aco import AntColonyOptimizer, AntColonyOptimizerConfig
-from ..continuous.variables import InputDiscreteVariable
-from ..core.base import create_from_dict, literal_options
+from ..core.base import OptimizerResult, create_from_dict, literal_options
 from ..core.types import AF
 
-ClusterMethod = Literal["kmeans", "spectral", "FCM", "TSP"]
+# NOTE: "FCM" is accepted but always raises NotImplementedError (see
+# do_clustering) -- the fuzzy c-means dependency was unreliable enough that the
+# implementation was pulled, but the option is left here (rather than removed)
+# as a documented placeholder for whoever restores it.
+ClusterMethod = Literal["kmeans", "spectral", "FCM"]
 
 
 @dataclass
@@ -21,59 +23,16 @@ class AntColonyMTSPConfig(AntColonyTSPConfig):
     clustering_method: ClusterMethod = "kmeans"
 
 
-class AntColonyMTSP:
-    def __init__(self, config: AntColonyMTSPConfig, city_locations: AF):
-        self.config = config
-        self.city_locations: AF = city_locations.copy()
+class AntColonyMTSP(TSPBase):
+    """Multiple-TSP: cluster cities, then solve an independent ACO tour per cluster."""
 
-    def solve(self) -> CombinatoricsResult:
+    config: AntColonyMTSPConfig
+
+    def __init__(self, *, config: AntColonyMTSPConfig, city_locations: AF):
+        super().__init__(config=config, city_locations=city_locations)
+
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         # TODO - Handle the number of processors based upon parallel clusters?
-        if self.config.clustering_method == "TSP":
-            return self.solve_tsp()
-        else:
-            return self.solve_clustering()
-
-    def solve_tsp(self) -> NoReturn:
-        # Create n_cities DiscreteVariable with the options being each cluster
-        cluster_ids = np.arange(self.config.n_clusters)
-        variables = [
-            InputDiscreteVariable(f"cluster_{i}", cluster_ids)
-            for i in range(self.city_locations.shape[0])
-        ]
-        solver_config = create_from_dict(self.config.__dict__, AntColonyOptimizerConfig)
-        tsp_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
-        # Because this is a multi-level optimization, don't parallelize here.
-        # (was ``joblib_num_procs``, a no-op typo — the config field is ``n_jobs``.)
-        solver_config.n_jobs = 1
-
-        def goal_fcn(x: AF) -> float:
-            x = np.int32(x)
-            # Iterate over the number of clusters, and do each cluster's TSP optimization separately.
-            total_value = 0.0
-            for cluster_id in range(self.config.n_clusters):
-                cluster_cities = self.city_locations[x == cluster_id, :]
-                if len(cluster_cities) == 0:
-                    continue
-                tsp_config.name = f"{tsp_config.name}-{cluster_id + 1}"
-                tsp_solve = AntColonyTSP(
-                    config=tsp_config,
-                    city_locations=cluster_cities,
-                )
-                tsp_result = tsp_solve.solve()
-                total_value += tsp_result.optimal_value
-            return total_value
-
-        solver = AntColonyOptimizer(
-            config=solver_config,
-            variables=variables,
-            fcn=goal_fcn,
-        )
-        solver.solve()
-
-        raise ValueError("TSP clustering is not yet supported")
-
-    def solve_clustering(self) -> CombinatoricsResult:
-        # Perform k-means clustering
         clusters = self.do_clustering()
 
         results = []
@@ -86,19 +45,19 @@ class AntColonyMTSP:
             )
             cluster_result = tsp_solve.solve()
             # Map cluster indices back to original indices
-            cluster_result.optimal_path = np.array(
-                [cluster[i] for i in cluster_result.optimal_path]
+            cluster_result.solution_vector = np.array(
+                [cluster[i] for i in cluster_result.solution_vector]
             )
 
             results.append(cluster_result)
 
-        optimal_paths = [result.optimal_path for result in results]
+        optimal_paths = [result.solution_vector for result in results]
 
-        return CombinatoricsResult(
-            value_history=[result.value_history for result in results],
-            optimal_value=np.sum([result.optimal_value for result in results]),
+        return OptimizerResult(
+            solution_history=[result.solution_history for result in results],
+            solution_score=np.sum([result.solution_score for result in results]),
             stop_reason="max_iterations",
-            optimal_path=optimal_paths,
+            solution_vector=optimal_paths,
         )
 
     def do_clustering(self) -> list[list[int]]:

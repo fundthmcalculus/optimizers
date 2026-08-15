@@ -12,10 +12,8 @@ from ..core.base import (
     BatchGoalFcn,
 )
 from ..core.types import AF
-from ..solution_deck import (
-    InputVariables,
-    SolutionDeck,
-)
+from ..core import InputVariables
+from ..solution_deck import SolutionDeck
 from .base import (
     IOptimizer,
     check_stop_early,
@@ -223,7 +221,7 @@ class ParticleSwarmOptimizer(IOptimizer):
             **{**config.__dict__}
         )
 
-    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         (
             best_soln_history,
             generation_pbar,

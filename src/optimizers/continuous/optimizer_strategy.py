@@ -16,7 +16,7 @@ from ..core.base import (
     InputArguments,
 )
 from .base import IOptimizer
-from ..solution_deck import InputVariables
+from ..core import InputVariables
 from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from .pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
 from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
@@ -91,13 +91,21 @@ class MultiTypeOptimizer(IOptimizer):
         self.fcn = fcn
         self.optimizer_choice_history: list[OptimizationType] = []
 
-    def solve(
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
+        return self._solve_with_restarts(preserve_percent=preserve_percent)
+
+    def _solve_with_restarts(
         self,
+        *,
         preserve_percent: float = 0.0,
         restart_count: int = 0,
         max_restart: int = 5,
         generations_completed: int = 0,
     ) -> OptimizerResult:
+        # ``preserve_percent`` is accepted for parity with ``solve()``'s public
+        # signature but not threaded through here: each restart's delegate
+        # optimizer picks its own preserve_percent below (0.0 on the first
+        # attempt, 0.1 on restarts, to warm-start from the previous archive).
         selected_type = (
             self.optimizer_selector.select(self.optimizer_choice_history[-1])
             if restart_count > 0
@@ -160,7 +168,7 @@ class MultiTypeOptimizer(IOptimizer):
                 f"Optimizer {selected_type} stopped early, selecting a new optimizer."
             )
 
-            return result + self.solve(
+            return result + self._solve_with_restarts(
                 restart_count=restart_count + 1,
                 generations_completed=generations_completed
                 + result.generations_completed,
@@ -210,7 +218,7 @@ class GroupedVariableOptimizer(IOptimizer):
                 x_i += 1
         return y
 
-    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         # TODO - Progress bar?
         # TODO - Pass in previous best solution deck
         # TODO - Support for check-pointing!

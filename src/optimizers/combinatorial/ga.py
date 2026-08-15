@@ -4,18 +4,18 @@ from typing import Optional
 import numpy as np
 from joblib import delayed
 
-from .base import TSPBase, CombinatoricsResult, _check_stop_early, check_path_distance
+from .base import TSPBase, _check_stop_early, check_path_distance
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core import IOptimizerConfig
-from ..core.base import setup_for_generations
+from ..core.base import OptimizerResult, setup_for_generations
 from ..core.types import AF, AI, F
 
 
 @dataclass
 class GeneticAlgorithmTSPConfig(IOptimizerConfig):
-    mutation_rate: float = 0.105  # 0.1
+    mutation_rate: float = 0.105
     """Probability of mutation"""
-    crossover_rate: float = 0.190  # 0.8
+    crossover_rate: float = 0.190
     """Probability of crossover"""
     back_to_start: bool = True
     """Whether to return to the start node"""
@@ -28,6 +28,8 @@ class GeneticAlgorithmTSPConfig(IOptimizerConfig):
 
 
 class GeneticAlgorithmTSP(TSPBase):
+    config: GeneticAlgorithmTSPConfig
+
     def __init__(
         self,
         *,
@@ -35,10 +37,11 @@ class GeneticAlgorithmTSP(TSPBase):
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
     ):
-        super().__init__(network_routes, city_locations)
-        self.config = config
+        super().__init__(
+            config=config, network_routes=network_routes, city_locations=city_locations
+        )
 
-    def solve(self) -> CombinatoricsResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         self.network_routes[self.network_routes == 0] = -1
         # Allocate the genome candidates
         genome = np.zeros(
@@ -133,20 +136,22 @@ class GeneticAlgorithmTSP(TSPBase):
                 city_locations=self.city_locations,
             )
             result = two_opt_optimize.solve()
-            tour_lengths.append(result.optimal_value)
+            tour_lengths.append(result.solution_score)
 
-            return CombinatoricsResult(
-                optimal_path=result.optimal_path,
-                optimal_value=result.optimal_value,
-                value_history=np.array(tour_lengths),
+            return OptimizerResult(
+                solution_vector=result.solution_vector,
+                solution_score=result.solution_score,
+                solution_history=np.array(tour_lengths),
                 stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
+                generations_completed=generations_completed + 1,
             )
         else:
-            return CombinatoricsResult(
-                optimal_path=genome[0, :],
-                optimal_value=genome_value[0],
-                value_history=np.array(tour_lengths),
+            return OptimizerResult(
+                solution_vector=genome[0, :],
+                solution_score=genome_value[0],
+                solution_history=np.array(tour_lengths),
                 stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
+                generations_completed=generations_completed + 1,
             )
 
 

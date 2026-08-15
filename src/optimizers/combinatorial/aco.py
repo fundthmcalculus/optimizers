@@ -4,21 +4,21 @@ from typing import Optional
 import numpy as np
 from joblib import delayed
 
-from .base import CombinatoricsResult, TSPBase, _check_stop_early
+from .base import TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
-from ..core.base import IOptimizerConfig, setup_for_generations
+from ..core.base import IOptimizerConfig, OptimizerResult, setup_for_generations
 from ..core.types import AI, AF, F, ab8, i32, i16, ai64
 
 
 @dataclass
 class AntColonyTSPConfig(IOptimizerConfig):
-    rho: float = 0.2  # 0.451  # 0.5
+    rho: float = 0.2
     """Pheromone decay parameter"""
-    alpha: float = 0.8  # 1.88  # 1.0
+    alpha: float = 0.8
     """Pheromone deposit parameter"""
-    beta: float = 2  # 1.88  # 1.0
+    beta: float = 2
     """Pheromone evaporation parameter"""
-    q: float = 1  # 2.17  # 1.0
+    q: float = 1
     """Weighting parameter for selecting better ranked solutions"""
     back_to_start: bool = True
     """Whether to return to the start node"""
@@ -31,6 +31,8 @@ class AntColonyTSPConfig(IOptimizerConfig):
 
 
 class AntColonyTSP(TSPBase):
+    config: AntColonyTSPConfig
+
     def __init__(
         self,
         *,
@@ -38,10 +40,11 @@ class AntColonyTSP(TSPBase):
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
     ):
-        super().__init__(network_routes, city_locations)
-        self.config = config
+        super().__init__(
+            config=config, network_routes=network_routes, city_locations=city_locations
+        )
 
-    def solve(self) -> CombinatoricsResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         self.network_routes[self.network_routes == 0] = -1
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes
@@ -135,20 +138,22 @@ class AntColonyTSP(TSPBase):
                 city_locations=self.city_locations,
             )
             result = two_opt_optimize.solve()
-            tour_lengths.append(result.optimal_value)
+            tour_lengths.append(result.solution_score)
 
-            return CombinatoricsResult(
-                optimal_path=result.optimal_path,
-                optimal_value=result.optimal_value,
-                value_history=np.array(tour_lengths),
+            return OptimizerResult(
+                solution_vector=result.solution_vector,
+                solution_score=result.solution_score,
+                solution_history=np.array(tour_lengths),
                 stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
+                generations_completed=generations_completed + 1,
             )
         else:
-            return CombinatoricsResult(
-                optimal_path=optimal_city_order,
-                optimal_value=optimal_tour_length,
-                value_history=np.array(tour_lengths),
+            return OptimizerResult(
+                solution_vector=optimal_city_order,
+                solution_score=optimal_tour_length,
+                solution_history=np.array(tour_lengths),
                 stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
+                generations_completed=generations_completed + 1,
             )
 
 

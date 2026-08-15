@@ -5,11 +5,10 @@ import numpy as np
 import scipy
 from kmodes.kmodes import KModes
 
-from .core.base import ensure_literal_choice
-from .core.base import WrappedGoalFcn as WrappedGoalFcn  # re-exported
+from .core.base import ensure_literal_choice, WrappedGoalFcn
 from .core.random import get_seed
 from .core.types import f64, af64, ab8, b8
-from .core.variables import InputVariables as InputVariables  # re-exported
+from .core.variables import InputVariables
 from .core.samplers import SamplerType, create_sampler
 
 # Some type hinting

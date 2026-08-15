@@ -1,4 +1,3 @@
-import abc
 import tqdm
 import joblib
 import numpy as np
@@ -7,10 +6,10 @@ import uuid
 import inspect
 from typing import Optional, Any, Callable
 
-from ..core import InputVariables
+from ..core import InputVariables, WrappedGoalFcn
 from ..core.base import (
+    BaseOptimizer,
     IOptimizerConfig,
-    OptimizerResult,
     OptimizerRun,
     StopReason,
     ensure_literal_choice,
@@ -24,10 +23,7 @@ from ..core.base import (
 )
 from ..core.types import AF, F
 from ..core.random import get_seed
-from ..solution_deck import (
-    SolutionDeck,
-    WrappedGoalFcn,
-)
+from ..solution_deck import SolutionDeck
 from ..archive.cvt import CVTArchive
 from ..archive.descriptor import RandomProjectionDescriptor
 from ..archive.metrics import QDReport, qd_score, pareto_front, hypervolume
@@ -132,7 +128,7 @@ class _ArgProvider:
         self.meta["eval_count"] = self.eval_base
 
 
-class IOptimizer(abc.ABC):
+class IOptimizer(BaseOptimizer):
     """Base class for all optimizer implementations"""
 
     def __init__(
@@ -208,7 +204,7 @@ class IOptimizer(abc.ABC):
                     result = _f(x)
                 # Multi-output goal fns return (fitness, outputs); solvers only
                 # ever need the scalar fitness.
-                return result[0] if self._returns_outputs else result  # type: ignore[call-overload]
+                return result[0] if self._returns_outputs else result
 
             return __wrapped
 
@@ -336,13 +332,6 @@ class IOptimizer(abc.ABC):
 
     def _set_generation(self, generation: int) -> None:
         self._arg_provider.meta["generation"] = generation
-
-    @abc.abstractmethod
-    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
-        """
-        Solve the given problem.
-        """
-        raise NotImplementedError("This method should be overridden by subclasses.")
 
     def initialize(
         self, preserve_percent: float

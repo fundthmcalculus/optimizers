@@ -18,15 +18,13 @@ from .base import (
     check_stop_early,
     sync_worker_meta,
 )
-from ..core.variables import InputVariables
+from ..core import InputVariables
 from ..core.random import rng as global_rng
 from ..core.parallel import GenerationRunner
 from ..archive.variation import iso_line_offspring
 from .base import IOptimizer
 
-from ..solution_deck import (
-    SolutionDeck,
-)
+from ..solution_deck import SolutionDeck
 
 
 @dataclass
@@ -218,7 +216,7 @@ class GeneticAlgorithmOptimizer(IOptimizer):
             **{**config.__dict__}
         )
 
-    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         (
             best_soln_history,
             generation_pbar,

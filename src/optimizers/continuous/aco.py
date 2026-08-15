@@ -15,14 +15,12 @@ from ..core.base import (
 from ..continuous.base import check_stop_early, cdf, sync_worker_meta
 from ..core.parallel import GenerationRunner
 from ..core.types import af64
-from ..solution_deck import (
-    SolutionDeck,
-)
+from ..solution_deck import SolutionDeck
 from ..core.random import rng as global_rng
 from ..archive.variation import iso_line_offspring
 
 from .base import IOptimizer
-from ..core.variables import InputVariables
+from ..core import InputVariables
 
 
 @dataclass
@@ -138,7 +136,7 @@ class AntColonyOptimizer(IOptimizer):
             **{**config.__dict__}
         )
 
-    def solve(self, preserve_percent: float = 0.0) -> OptimizerResult:
+    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
         (
             best_soln_history,
             generation_pbar,

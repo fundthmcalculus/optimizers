@@ -3,8 +3,8 @@ from typing import Optional
 import numpy as np
 from joblib import delayed
 
-from .base import CombinatoricsResult, TSPBase, _check_stop_early
-from ..core.base import setup_for_generations
+from .base import TSPBase, _check_stop_early
+from ..core.base import OptimizerResult, setup_for_generations
 from ..core.types import AI, AF, F, ab8, i32, i16, ai64
 from .aco import AntColonyTSPConfig
 
@@ -12,16 +12,22 @@ from .aco import AntColonyTSPConfig
 
 
 class AntColonyMST(TSPBase):
+    config: AntColonyTSPConfig
+
     def __init__(
         self,
+        *,
         config: AntColonyTSPConfig,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
     ):
-        super().__init__(network_routes, city_locations)
-        self.config = config
+        super().__init__(
+            config=config, network_routes=network_routes, city_locations=city_locations
+        )
 
-    def solve(self, start_idx: int = 0) -> CombinatoricsResult:
+    def solve(
+        self, *, preserve_percent: float = 0.0, start_idx: int = 0
+    ) -> OptimizerResult:
         self.network_routes[self.network_routes == 0] = -1
         # TODO - Should we not cache this for memory efficiency?
         eta = 1.0 / self.network_routes
@@ -97,11 +103,12 @@ class AntColonyMST(TSPBase):
                 if stop_reason != "none":
                     break
 
-            return CombinatoricsResult(
-                optimal_path=optimal_city_order,
-                optimal_value=optimal_tour_length,
-                value_history=np.array(tour_lengths),
+            return OptimizerResult(
+                solution_vector=optimal_city_order,
+                solution_score=optimal_tour_length,
+                solution_history=np.array(tour_lengths),
                 stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
+                generations_completed=generations_completed + 1,
             )
 
 
