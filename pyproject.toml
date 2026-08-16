@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=42", "wheel", "Cython>=3.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "Cython>=3.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "optimizers"
@@ -21,7 +21,9 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "scipy",
     "pandas>=2.0.0",
-    "numba"
+    "numba",
+    "cloudpickle",
+    "sympy"
 ]
 
 [project.optional-dependencies]
@@ -36,14 +38,8 @@ dev = [
     "Cython>=3.0",
 ]
 
-[tool.setuptools]
-package-dir = { "" = "src" }
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.setuptools.package-data]
-"*" = ["*.*"] # <-- this changed
+[tool.hatch.build.targets.wheel]
+packages = ["src/optimizers", "src/fuzzy"]
 
 [project.scripts]
 optimizers = "optimizers.__init__:main"
