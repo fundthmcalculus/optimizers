@@ -5,6 +5,7 @@ from joblib import delayed
 
 from .base import TSPBase, _check_stop_early
 from ..core.base import OptimizerResult, setup_for_generations
+from ..core.random import rng, spawn_streams, use_stream
 from ..core.types import AI, AF, F, ab8, i32, i16, ai64
 from .aco import AntColonyTSPConfig
 
@@ -59,22 +60,27 @@ class AntColonyMST(TSPBase):
                 # Pheromone raised to alpha once per generation (report item #6).
                 tau_alpha = np.power(tau, self.config.alpha)
 
-                def parallel_ant(local_ant: int) -> list[tuple[AI, F]]:
-                    results = []
-                    for _ in range(individuals_per_job):
-                        results.append(
-                            run_ant_mst(
-                                self.network_routes,
-                                eta_beta,
-                                tau_alpha,
-                                self.config,
-                                start_idx,
+                # Independent per-task streams for reproducibility under threads.
+                streams = spawn_streams(n_jobs)
+
+                def parallel_ant(local_ant: int, stream) -> list[tuple[AI, F]]:
+                    with use_stream(stream):
+                        results = []
+                        for _ in range(individuals_per_job):
+                            results.append(
+                                run_ant_mst(
+                                    self.network_routes,
+                                    eta_beta,
+                                    tau_alpha,
+                                    self.config,
+                                    start_idx,
+                                )
                             )
-                        )
-                    return results
+                        return results
 
                 all_results = parallel(
-                    delayed(parallel_ant)(i_ant) for i_ant in range(n_jobs)
+                    delayed(parallel_ant)(i_ant, streams[i_ant])
+                    for i_ant in range(n_jobs)
                 )
 
                 for ant, result_gen in enumerate(all_results):
@@ -169,7 +175,7 @@ def run_ant_mst(
             break
         # Choose the next city-pair, must flatten probability matrix first
         cum_p = np.cumsum(p.flatten())
-        new_p = np.random.random()
+        new_p = rng().random()
         # searchsorted (not argmin(new_p>cum_p), which returns 0 when new_p exceeds
         # every cumulative bin from float round-off) with a clip to the last bin.
         choice_idx = min(int(np.searchsorted(cum_p, new_p)), len(cum_p) - 1)
