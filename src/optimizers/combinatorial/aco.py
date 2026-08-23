@@ -7,6 +7,7 @@ from joblib import delayed
 from .base import TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, OptimizerResult, setup_for_generations
+from ..core.random import rng, spawn_streams, use_stream
 from ..core.types import AI, AF, F, ab8, i32, i16, ai64
 
 
@@ -81,18 +82,30 @@ class AntColonyTSP(TSPBase):
                 # (report item #6) instead of recomputing it per ant per step.
                 tau_alpha = np.power(tau, self.config.alpha)
 
-                def parallel_ant(local_ant: int) -> list[tuple[AI, F]]:
-                    results = []
-                    for _ in range(individuals_per_job):
-                        results.append(
-                            run_ant(
-                                self.network_routes, eta_beta, tau_alpha, self.config
+                # Independent per-task streams so a seeded run is reproducible
+                # regardless of worker scheduling / thread count (np.random's global
+                # Generator is not thread-safe under joblib(prefer="threads")).
+                streams = spawn_streams(n_jobs)
+
+                def parallel_ant(
+                    local_ant: int, stream: np.random.Generator
+                ) -> list[tuple[AI, F]]:
+                    with use_stream(stream):
+                        results = []
+                        for _ in range(individuals_per_job):
+                            results.append(
+                                run_ant(
+                                    self.network_routes,
+                                    eta_beta,
+                                    tau_alpha,
+                                    self.config,
+                                )
                             )
-                        )
-                    return results
+                        return results
 
                 all_results = parallel(
-                    delayed(parallel_ant)(i_ant) for i_ant in range(n_jobs)
+                    delayed(parallel_ant)(i_ant, streams[i_ant])
+                    for i_ant in range(n_jobs)
                 )
 
                 for ant, result_gen in enumerate(all_results):
@@ -211,7 +224,7 @@ def run_ant(
         # Choose the next city via inverse-CDF sampling (report item #10):
         # cheaper than np.random.choice(..., p=p), which re-validates and
         # re-cumsums p on every call and takes a global lock.
-        cur_city = int(np.searchsorted(np.cumsum(p), np.random.random()))
+        cur_city = int(np.searchsorted(np.cumsum(p), rng().random()))
         if cur_city >= eta_shape_:
             cur_city = eta_shape_ - 1
         total_length += network_routes[city_order[idx], cur_city]
