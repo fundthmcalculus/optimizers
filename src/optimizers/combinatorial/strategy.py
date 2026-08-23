@@ -709,6 +709,7 @@ class ConvexHullTSP(TSPBase):
             if min_idx == -1:
                 if not restarted:
                     # Retry this once for the mod 2pi issue
+                    restarted = True
                     start_theta -= 2.0 * np.pi
                     continue
                 else:
