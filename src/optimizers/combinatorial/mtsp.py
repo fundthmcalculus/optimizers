@@ -82,7 +82,8 @@ class AntColonyMTSP(TSPBase):
             raise NotImplementedError("FCM package is unreliable")
         elif self.config.clustering_method == "spectral":
             sc = SpectralClustering(
-                n_clusters=self.config.n_clusters, assign_labels="discretize",
+                n_clusters=self.config.n_clusters,
+                assign_labels="discretize",
                 random_state=get_seed(),
             )
             cluster_labels = sc.fit_predict(self.city_locations)

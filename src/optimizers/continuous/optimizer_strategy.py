@@ -88,7 +88,9 @@ class MultiTypeOptimizer(IOptimizer):
         )
         self.initial_optimizer = initial_optimizer
         self.optimizer_selector = (
-            optimizer_selector if optimizer_selector is not None else RandomOptimizerSelection()
+            optimizer_selector
+            if optimizer_selector is not None
+            else RandomOptimizerSelection()
         )
         self.fcn = fcn
         self.optimizer_choice_history: list[OptimizationType] = []
