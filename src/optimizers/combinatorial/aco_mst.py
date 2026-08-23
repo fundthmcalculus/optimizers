@@ -63,7 +63,7 @@ class AntColonyMST(TSPBase):
                 # Independent per-task streams for reproducibility under threads.
                 streams = spawn_streams(n_jobs)
 
-                def parallel_ant(local_ant: int, stream) -> list[tuple[AI, F]]:
+                def parallel_ant(local_ant: int, stream: np.random.Generator) -> list[tuple[AI, F]]:
                     with use_stream(stream):
                         results = []
                         for _ in range(individuals_per_job):
