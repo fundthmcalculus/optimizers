@@ -192,10 +192,11 @@ def _2opt_refine(new_route: AI, network_routes: AF, nearest_neighbors: int = 10)
             + network_routes[new_route[ij + 1], new_route[jk + 1]]
         )
         if d1 > d2:
-            new_route[jk], new_route[ij + 1] = (
-                new_route[ij + 1],
-                new_route[jk],
-            )
+            # d1/d2 are the 2-opt segment-reversal deltas, so the accepted move is
+            # to REVERSE new_route[ij+1 .. jk], not swap the two endpoints (an
+            # endpoint swap does not realize that delta for interior length > 1 and
+            # could lengthen the tour).
+            new_route[ij + 1 : jk + 1] = new_route[ij + 1 : jk + 1][::-1]
     return new_route
 
 
@@ -251,11 +252,14 @@ def _crossover(
         child2 = np.concatenate(
             [parent2[:crossover_idx], parent1[crossover_idx:], all_entries], axis=0
         )
-        # Deduplicate entries
+        # Deduplicate entries, preserving first-occurrence order. np.unique's
+        # return_index is sorted by VALUE, so indexing by it directly rebuilt the
+        # tour as [0,1,..,N-1] every time -- discarding both parents. Sorting the
+        # indices restores the order the entries actually appear in the child.
         _, child1_indices = np.unique(child1, return_index=True)
         _, child2_indices = np.unique(child2, return_index=True)
-        child1 = child1[child1_indices]
-        child2 = child2[child2_indices]
+        child1 = child1[np.sort(child1_indices)]
+        child2 = child2[np.sort(child2_indices)]
         # Make sure 0 is always first
         child1 = np.concatenate([np.array([0]), child1[child1 > 0]], axis=0)
         child2 = np.concatenate([np.array([0]), child2[child2 > 0]], axis=0)

@@ -170,7 +170,9 @@ def run_ant_mst(
         # Choose the next city-pair, must flatten probability matrix first
         cum_p = np.cumsum(p.flatten())
         new_p = np.random.random()
-        choice_idx = np.argmin(new_p > cum_p)
+        # searchsorted (not argmin(new_p>cum_p), which returns 0 when new_p exceeds
+        # every cumulative bin from float round-off) with a clip to the last bin.
+        choice_idx = min(int(np.searchsorted(cum_p, new_p)), len(cum_p) - 1)
         from_row = choice_idx // order_len
         from_col = choice_idx % order_len
         city_order[idx, 0] = from_row
