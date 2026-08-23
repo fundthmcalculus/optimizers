@@ -13,6 +13,7 @@ from ..core.base import (
 )
 from ..core.types import AF
 from ..core import WrappedGoalFcn, InputVariables
+from ..core.random import rng
 from ..core.tqdm_joblib import tqdm_joblib
 from .base import IOptimizer
 from .variables import InputContinuousVariable, InputDiscreteVariable
@@ -148,7 +149,7 @@ class GradientDescentOptimizer(IOptimizer):
             if self.config.discrete_search_size < 1:
                 self.config.discrete_search_size = n_disc_vars
             # Randomly pick the which discrete variable to tweak on each run
-            rand_vars = np.random.randint(
+            rand_vars = rng().integers(
                 low=0, high=n_disc_vars, size=self.config.discrete_search_size
             )
             with tqdm_joblib(

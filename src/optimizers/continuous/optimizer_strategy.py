@@ -1,11 +1,11 @@
 import logging
-import random
 from dataclasses import dataclass
 from typing import Literal, get_args, Optional, List
 from abc import ABC, abstractmethod
 
 import numpy as np
 
+from ..core.random import rng
 from ..core.base import (
     IOptimizerConfig,
     OptimizerResult,
@@ -66,7 +66,7 @@ class RandomOptimizerSelection(IOptimizerSelection):
         if existing_optim is not None:
             choices.remove(existing_optim)
         # TODO - Find a better way to select optimizers
-        return random.choice(choices)
+        return choices[int(rng().integers(len(choices)))]
 
 
 class MultiTypeOptimizer(IOptimizer):
@@ -78,7 +78,7 @@ class MultiTypeOptimizer(IOptimizer):
         variables: InputVariables,
         args: InputArguments | None = None,
         initial_optimizer: OptimizationType = "aco",
-        optimizer_selector: IOptimizerSelection = RandomOptimizerSelection(),
+        optimizer_selector: IOptimizerSelection | None = None,
     ):
         super().__init__(
             config=config,
@@ -87,7 +87,9 @@ class MultiTypeOptimizer(IOptimizer):
             args=args,
         )
         self.initial_optimizer = initial_optimizer
-        self.optimizer_selector = optimizer_selector
+        self.optimizer_selector = (
+            optimizer_selector if optimizer_selector is not None else RandomOptimizerSelection()
+        )
         self.fcn = fcn
         self.optimizer_choice_history: list[OptimizationType] = []
 
