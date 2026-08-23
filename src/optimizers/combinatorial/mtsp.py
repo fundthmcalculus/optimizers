@@ -7,6 +7,7 @@ from sklearn.cluster import KMeans, SpectralClustering
 from .base import TSPBase
 from .aco import AntColonyTSPConfig, AntColonyTSP
 from ..core.base import OptimizerResult, create_from_dict, literal_options
+from ..core.random import get_seed
 from ..core.types import AF
 
 # NOTE: "FCM" is accepted but always raises NotImplementedError (see
@@ -62,7 +63,7 @@ class AntColonyMTSP(TSPBase):
 
     def do_clustering(self) -> list[list[int]]:
         if self.config.clustering_method == "kmeans":
-            kmeans = KMeans(n_clusters=self.config.n_clusters)
+            kmeans = KMeans(n_clusters=self.config.n_clusters, random_state=get_seed())
             cluster_labels = kmeans.fit_predict(self.city_locations)
             # Group cities by cluster
             clusters: list[list[int]] = [[] for _ in range(self.config.n_clusters)]
@@ -81,7 +82,8 @@ class AntColonyMTSP(TSPBase):
             raise NotImplementedError("FCM package is unreliable")
         elif self.config.clustering_method == "spectral":
             sc = SpectralClustering(
-                n_clusters=self.config.n_clusters, assign_labels="discretize"
+                n_clusters=self.config.n_clusters, assign_labels="discretize",
+                random_state=get_seed(),
             )
             cluster_labels = sc.fit_predict(self.city_locations)
             clusters = [[] for _ in range(self.config.n_clusters)]
