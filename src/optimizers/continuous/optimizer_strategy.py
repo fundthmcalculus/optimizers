@@ -1,4 +1,6 @@
 import logging
+import os
+import uuid
 from dataclasses import dataclass
 from typing import Literal, get_args, Optional, List
 from abc import ABC, abstractmethod
@@ -15,6 +17,7 @@ from ..core.base import (
     GoalFcn,
     InputArguments,
 )
+from ..checkpoint import CheckpointConfig, load_checkpoint, save_checkpoint
 from .base import IOptimizer
 from ..core import InputVariables
 from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
@@ -203,6 +206,7 @@ class GroupedVariableOptimizer(IOptimizer):
         fcn: GoalFcn,
         variables: InputVariables,
         args: InputArguments | None = None,
+        checkpoint_cfg: Optional[CheckpointConfig] = None,
     ):
         super().__init__(
             config=config,
@@ -213,6 +217,10 @@ class GroupedVariableOptimizer(IOptimizer):
         self.config: GroupedVariableOptimizerConfig = config
         if config.groups is None:
             raise ValueError("Group order and groups must be provided")
+        # Opt-in checkpointing (see ``solve``'s ``resume_from``): one JSON
+        # blob saved per completed round, under one run_id for the whole run.
+        self.checkpoint_cfg = checkpoint_cfg
+        self._checkpoint_run_id = uuid.uuid4().hex if checkpoint_cfg else None
 
     def interleave_variables(self, group: InputVariableGroup, x: AF, y: AF) -> AF:
         x_i = 0
@@ -222,13 +230,30 @@ class GroupedVariableOptimizer(IOptimizer):
                 x_i += 1
         return y
 
-    def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
+    def solve(
+        self,
+        *,
+        preserve_percent: float = 0.0,
+        resume_from: str | os.PathLike[str] | None = None,
+    ) -> OptimizerResult:
         # TODO - Progress bar?
         # TODO - Pass in previous best solution deck
-        # TODO - Support for check-pointing!
         default_values = [var.initial_value for var in self.variables]
+        start_round = 0
+        if resume_from is not None:
+            checkpoint = load_checkpoint(resume_from)
+            saved_result = checkpoint.get("result")
+            if saved_result and saved_result.get("solution_vector") is not None:
+                default_values = list(saved_result["solution_vector"])
+            start_round = int(checkpoint.get("metadata", {}).get("round", -1)) + 1
+            logging.info(
+                f"Resuming GroupedVariableOptimizer from round {start_round} "
+                f"(checkpoint {resume_from})"
+            )
+
         assert self.config.groups is not None  # validated in __init__
-        for cur_round in range(self.config.num_rounds):
+        last_score: Optional[F] = None
+        for cur_round in range(start_round, self.config.num_rounds):
             for group in self.config.groups:
                 group_vars = [v for v in self.variables if v.name in group.variables]
 
@@ -267,9 +292,32 @@ class GroupedVariableOptimizer(IOptimizer):
                         group, result.solution_vector, default_values
                     )
                 )
+
+            is_last_round = cur_round == self.config.num_rounds - 1
+            if self.checkpoint_cfg is not None and self.checkpoint_cfg.enabled:
+                last_score = self.wrapped_fcn(np.array(default_values))
+                save_checkpoint(
+                    self.checkpoint_cfg,
+                    optimizer_name=self.config.name or "grouped-variable",
+                    config=self.config,
+                    result=OptimizerResult(
+                        solution_vector=np.array(default_values),
+                        solution_score=last_score,
+                        stop_reason="none",
+                        generations_completed=cur_round + 1,
+                    ),
+                    run_id=self._checkpoint_run_id,
+                    metadata={"round": cur_round},
+                )
+            elif is_last_round:
+                last_score = self.wrapped_fcn(np.array(default_values))
+
+        if last_score is None:
+            # resume_from started at or past num_rounds -- nothing left to run.
+            last_score = self.wrapped_fcn(np.array(default_values))
         return OptimizerResult(
             solution_vector=np.array(default_values),
-            solution_score=self.wrapped_fcn(np.array(default_values)),
+            solution_score=last_score,
             solution_history=None,
             stop_reason="max_iterations",
         )
