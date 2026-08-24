@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-from joblib import delayed
 
 from .base import TSPBase, _check_stop_early
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, OptimizerResult, setup_for_generations
-from ..core.random import rng, spawn_streams, use_stream
+from ..core.parallel import GenerationRunner
+from ..core.random import rng
 from ..core.types import AI, AF, F, ab8, i32, i16, ai64
 
 
@@ -69,11 +69,18 @@ class AntColonyTSP(TSPBase):
                     10 * self.config.q / self.config.hot_start_length
                 )
 
-        generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
+        generation_pbar, individuals_per_job, n_jobs, _ = setup_for_generations(
             self.config
         )
 
-        with parallel:
+        # Fixed data (distance matrix, desirability, config) is shipped to each
+        # worker exactly once via GenerationRunner -- the same copy-once path
+        # the continuous solvers use (report item #2) -- instead of every
+        # joblib.delayed dispatch re-pickling it every generation. Only the
+        # pheromone-derived ``tau_alpha`` varies per generation.
+        fixed = (self.network_routes, eta_beta, self.config, individuals_per_job)
+        runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
+        try:
             for generations_completed in generation_pbar:
                 # Compute the change in pheromone!
                 delta_tau = np.zeros(tau.shape)
@@ -82,31 +89,7 @@ class AntColonyTSP(TSPBase):
                 # (report item #6) instead of recomputing it per ant per step.
                 tau_alpha = np.power(tau, self.config.alpha)
 
-                # Independent per-task streams so a seeded run is reproducible
-                # regardless of worker scheduling / thread count (np.random's global
-                # Generator is not thread-safe under joblib(prefer="threads")).
-                streams = spawn_streams(n_jobs)
-
-                def parallel_ant(
-                    local_ant: int, stream: np.random.Generator
-                ) -> list[tuple[AI, F]]:
-                    with use_stream(stream):
-                        results = []
-                        for _ in range(individuals_per_job):
-                            results.append(
-                                run_ant(
-                                    self.network_routes,
-                                    eta_beta,
-                                    tau_alpha,
-                                    self.config,
-                                )
-                            )
-                        return results
-
-                all_results = parallel(
-                    delayed(parallel_ant)(i_ant, streams[i_ant])
-                    for i_ant in range(n_jobs)
-                )
+                all_results = runner.run(_run_ants_batch, (tau_alpha,))
 
                 for ant, result_gen in enumerate(all_results):
                     for city_order, tour_length in result_gen:
@@ -135,6 +118,8 @@ class AntColonyTSP(TSPBase):
                 stop_reason = _check_stop_early(self.config, tour_lengths)
                 if stop_reason != "none":
                     break
+        finally:
+            runner.close()
 
         if self.config.local_optimize:
             # Propagate back_to_start so the 2-opt refinement optimizes (and
@@ -168,6 +153,22 @@ class AntColonyTSP(TSPBase):
                 stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
                 generations_completed=generations_completed + 1,
             )
+
+
+def _run_ants_batch(
+    fixed: tuple[AF, AF, AntColonyTSPConfig, int], tau_alpha: AF
+) -> list[tuple[AI, F]]:
+    """Run one worker's share of ants for a generation.
+
+    ``fixed`` (shipped once, see ``GenerationRunner``) is
+    ``(network_routes, eta_beta, config, individuals_per_job)``; ``tau_alpha``
+    is the only per-generation argument.
+    """
+    network_routes, eta_beta, config, individuals_per_job = fixed
+    return [
+        run_ant(network_routes, eta_beta, tau_alpha, config)
+        for _ in range(individuals_per_job)
+    ]
 
 
 def pheromone_update(tau_xy: AF, delta_tau_xy: AF, rho: float) -> AF:

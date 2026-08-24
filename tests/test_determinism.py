@@ -23,7 +23,11 @@ import contextlib
 
 import numpy as np
 import pytest
+from sklearn.metrics import pairwise_distances
 
+from optimizers.combinatorial.aco import AntColonyTSP, AntColonyTSPConfig
+from optimizers.combinatorial.aco_mst import AntColonyMST
+from optimizers.combinatorial.ga import GeneticAlgorithmTSP, GeneticAlgorithmTSPConfig
 from optimizers.continuous.aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from optimizers.continuous.ga import (
     GeneticAlgorithmOptimizer,
@@ -284,3 +288,100 @@ def test_mtsp_parallel_clusters_are_reproducible():
 
 def test_mtsp_different_seeds_still_differ():
     assert solve_mtsp_once(3) != solve_mtsp_once(4)
+
+
+# ---------------------------------------------------------------------------
+# Combinatorial solvers (ACO-TSP, ACO-MST, GA-TSP): these dispatch their
+# per-generation worker fan-out through core.parallel.GenerationRunner (the
+# same copy-fixed-data-once machinery the continuous solvers use), so they
+# inherit the same reproducibility guarantee this module pins above -- pin it
+# directly here too, since it's the part of the combinatorial solvers most
+# likely to regress silently if that dispatch is ever touched again.
+# ---------------------------------------------------------------------------
+
+
+def _small_distance_matrix(n=12, seed=42):
+    points = np.random.default_rng(seed).uniform(0.0, 10.0, size=(n, 2))
+    return pairwise_distances(points)
+
+
+def solve_aco_tsp_once(seed, *, n_jobs=3):
+    set_seed(seed)
+    config = AntColonyTSPConfig(
+        name="determinism-aco-tsp",
+        num_generations=3,
+        population_size=8,
+        n_jobs=n_jobs,
+        joblib_prefer="threads",
+        stop_after_iterations=8,
+    )
+    with (
+        contextlib.redirect_stdout(io.StringIO()),
+        contextlib.redirect_stderr(io.StringIO()),
+    ):
+        result = AntColonyTSP(
+            config=config, network_routes=_small_distance_matrix()
+        ).solve()
+    return round(float(result.solution_score), 9)
+
+
+def solve_aco_mst_once(seed, *, n_jobs=3):
+    set_seed(seed)
+    config = AntColonyTSPConfig(
+        name="determinism-aco-mst",
+        num_generations=3,
+        population_size=8,
+        n_jobs=n_jobs,
+        joblib_prefer="threads",
+        stop_after_iterations=8,
+    )
+    with (
+        contextlib.redirect_stdout(io.StringIO()),
+        contextlib.redirect_stderr(io.StringIO()),
+    ):
+        result = AntColonyMST(
+            config=config, network_routes=_small_distance_matrix()
+        ).solve()
+    return round(float(result.solution_score), 9)
+
+
+def solve_ga_tsp_once(seed, *, n_jobs=3):
+    set_seed(seed)
+    config = GeneticAlgorithmTSPConfig(
+        name="determinism-ga-tsp",
+        num_generations=3,
+        population_size=8,
+        solution_archive_size=8,
+        n_jobs=n_jobs,
+        joblib_prefer="threads",
+        stop_after_iterations=8,
+    )
+    with (
+        contextlib.redirect_stdout(io.StringIO()),
+        contextlib.redirect_stderr(io.StringIO()),
+    ):
+        result = GeneticAlgorithmTSP(
+            config=config, network_routes=_small_distance_matrix()
+        ).solve()
+    return round(float(result.solution_score), 9)
+
+
+COMBINATORIAL_SOLVERS = {
+    "aco-tsp": solve_aco_tsp_once,
+    "aco-mst": solve_aco_mst_once,
+    "ga-tsp": solve_ga_tsp_once,
+}
+
+
+@pytest.mark.parametrize("kind", list(COMBINATORIAL_SOLVERS))
+@pytest.mark.parametrize("n_jobs", [1, 3])
+def test_combinatorial_solver_same_seed_same_result(kind, n_jobs):
+    solve_once = COMBINATORIAL_SOLVERS[kind]
+    runs = [solve_once(5, n_jobs=n_jobs) for _ in range(3)]
+    assert len(set(runs)) == 1, f"{kind} at n_jobs={n_jobs} varied across runs: {runs}"
+
+
+@pytest.mark.parametrize("kind", list(COMBINATORIAL_SOLVERS))
+def test_combinatorial_solver_different_seeds_still_differ(kind):
+    solve_once = COMBINATORIAL_SOLVERS[kind]
+    assert solve_once(5, n_jobs=3) != solve_once(6, n_jobs=3)

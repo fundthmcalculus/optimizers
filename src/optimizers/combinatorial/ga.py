@@ -2,13 +2,13 @@ from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
-from joblib import delayed
 
 from .base import TSPBase, _check_stop_early, check_path_distance
 from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core import IOptimizerConfig
 from ..core.base import OptimizerResult, setup_for_generations
-from ..core.random import rng, spawn_streams, use_stream
+from ..core.parallel import GenerationRunner
+from ..core.random import rng
 from ..core.types import AF, AI, F
 
 
@@ -71,36 +71,18 @@ class GeneticAlgorithmTSP(TSPBase):
 
         tour_lengths = []
 
-        generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(
+        generation_pbar, individuals_per_job, n_jobs, _ = setup_for_generations(
             self.config
         )
 
-        with parallel:
+        # Fixed data (distance matrix, config) is shipped to each worker
+        # exactly once via GenerationRunner (report item #2); the genome and
+        # its values are the per-generation varying arguments.
+        fixed = (self.network_routes, self.config, individuals_per_job)
+        runner = GenerationRunner(n_jobs, self.config.joblib_prefer, fixed)
+        try:
             for generations_completed in generation_pbar:
-
-                # Independent per-task streams for reproducibility under threads.
-                streams = spawn_streams(n_jobs)
-
-                def parallel_ga(
-                    local_ant: int, stream: np.random.Generator
-                ) -> list[tuple[AI, F]]:
-                    with use_stream(stream):
-                        results = []
-                        for _ in range(individuals_per_job):
-                            results.append(
-                                run_ga(
-                                    genome,
-                                    genome_value,
-                                    self.network_routes,
-                                    self.config,
-                                )
-                            )
-                        return results
-
-                all_results = parallel(
-                    delayed(parallel_ga)(i_ant, streams[i_ant])
-                    for i_ant in range(n_jobs)
-                )
+                all_results = runner.run(_run_ga_batch, (genome, genome_value))
 
                 # Collect this generation's offspring, then grow the genome with a
                 # SINGLE vstack/concatenate instead of reallocating the whole
@@ -131,6 +113,8 @@ class GeneticAlgorithmTSP(TSPBase):
                 stop_reason = _check_stop_early(self.config, tour_lengths)
                 if stop_reason != "none":
                     break
+        finally:
+            runner.close()
 
         if self.config.local_optimize:
             # Propagate back_to_start so the 2-opt refinement optimizes (and
@@ -164,6 +148,21 @@ class GeneticAlgorithmTSP(TSPBase):
                 stop_reason="max_iterations" if stop_reason == "none" else stop_reason,
                 generations_completed=generations_completed + 1,
             )
+
+
+def _run_ga_batch(
+    fixed: tuple[AF, GeneticAlgorithmTSPConfig, int], genome: AI, genome_value: AF
+) -> list[tuple[AI, F]]:
+    """Run one worker's share of offspring for a generation.
+
+    ``fixed`` is ``(network_routes, config, individuals_per_job)``; ``genome``
+    and ``genome_value`` are the per-generation varying arguments.
+    """
+    network_routes, config, individuals_per_job = fixed
+    return [
+        run_ga(genome, genome_value, network_routes, config)
+        for _ in range(individuals_per_job)
+    ]
 
 
 def run_ga(
