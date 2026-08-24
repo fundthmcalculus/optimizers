@@ -1,4 +1,4 @@
-"""CVT-MAP-Elites archive (QD_PARETO_PLAN.md §4.1, §4.2).
+"""CVT-MAP-Elites archive (docs/history/QD_PARETO_PLAN.md §4.1, §4.2).
 
 A MAP-Elites archive whose cells are the Voronoi regions of ``n_cells`` centroids
 (CVT-MAP-Elites, Vassiliades et al. 2018). Centroids are placed by k-means over a
@@ -105,12 +105,29 @@ class CVTArchive:
         solutions = np.atleast_2d(np.asarray(solutions, dtype=self._dtype))
         values = np.atleast_1d(np.asarray(values, dtype=f64))
         cells = self._cells_for(solutions, outputs)
-        for i in range(solutions.shape[0]):
-            c = int(cells[i])
-            if (not self._cell_occupied[c]) or values[i] < self._cell_value[c]:
-                self._cell_solution[c] = solutions[i]
-                self._cell_value[c] = values[i]
-                self._cell_occupied[c] = True
+
+        # Reduce the batch to one candidate per cell -- its lowest value, ties
+        # broken by original row order -- before comparing against the
+        # incumbent, instead of a scalar compare-and-write per row. Equivalent
+        # to the previous sequential loop: within a batch, a later row can only
+        # replace an already-updated cell by strictly improving on it, so the
+        # surviving value per cell is always the batch minimum (first
+        # occurrence, in a stable sort, wins ties).
+        order = np.argsort(values, kind="stable")
+        sorted_cells = cells[order]
+        _, first_idx = np.unique(sorted_cells, return_index=True)
+        best_positions = order[first_idx]
+        best_cells = cells[best_positions]
+        best_values = values[best_positions]
+
+        improves = (~self._cell_occupied[best_cells]) | (
+            best_values < self._cell_value[best_cells]
+        )
+        update_cells = best_cells[improves]
+        update_positions = best_positions[improves]
+        self._cell_solution[update_cells] = solutions[update_positions]
+        self._cell_value[update_cells] = best_values[improves]
+        self._cell_occupied[update_cells] = True
         self._rebuild_views()
 
     def _rebuild_views(self) -> None:

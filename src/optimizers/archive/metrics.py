@@ -1,4 +1,4 @@
-"""Quality-diversity & multi-objective metrics + the run report (QD_PARETO_PLAN.md §4.5).
+"""Quality-diversity & multi-objective metrics + the run report (docs/history/QD_PARETO_PLAN.md §4.5).
 
 All objectives follow the library's **minimization** convention (smaller is
 better), matching ``solution_value`` ordering.

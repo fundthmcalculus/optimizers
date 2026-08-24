@@ -6,7 +6,7 @@ Mirrors the fallback pattern already used for the TSP local-search kernels
 compiler), ``HAS_CYTHON`` is ``True`` and the compiled kernels are exposed;
 otherwise this module degrades to the pure-NumPy batch functions from
 ``functions.py``, so nothing here is a hard dependency. See
-PERF_CONTINUOUS_REPORT.md for the measured Cython-vs-NumPy comparison -- the
+docs/history/PERF_CONTINUOUS_REPORT.md for the measured Cython-vs-NumPy comparison -- the
 honest finding is that it is a modest, not dramatic, win on top of the
 algorithmic (batching) speedup.
 """

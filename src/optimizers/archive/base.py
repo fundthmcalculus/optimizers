@@ -3,7 +3,7 @@
 Every optimizer (GA / PSO / ACO / GD) delegates its memory of good solutions to a
 single object. Historically that object is the :class:`~optimizers.solution_deck.SolutionDeck`
 (a scalar, elitist, best-first deck). The quality-diversity / multi-objective
-add-on (see ``QD_PARETO_PLAN.md``) works by swapping that object for archives with
+add-on (see ``docs/history/QD_PARETO_PLAN.md``) works by swapping that object for archives with
 richer selection semantics — a MAP-Elites grid, a Pareto non-dominated set —
 *without* changing the solvers, because they all program against this one
 interface.

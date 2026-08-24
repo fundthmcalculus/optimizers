@@ -32,7 +32,7 @@ class SolutionDeck:
         # Quality-diversity add-on: when ``n_outputs > 0`` the deck tracks a vector
         # of outputs per solution (kept row-aligned with ``solution_archive``
         # through every append/sort/dedup/truncate). ``None`` == classic scalar
-        # deck, so the default path is byte-identical. See QD_PARETO_PLAN.md §1.
+        # deck, so the default path is byte-identical. See docs/history/QD_PARETO_PLAN.md §1.
         self.n_outputs = n_outputs
         self.solution_outputs: af64 | None = (
             np.full((archive_size, n_outputs), np.nan, dtype=f64)
@@ -47,16 +47,19 @@ class SolutionDeck:
         local_optima: bool | b8 | ab8 = False,
         outputs: af64 | None = None,
     ) -> None:
-        assert (
-            solutions.shape[0] == values.shape[0]
-        ), f"Batch size mismatch on append, solutions={solutions.shape}, values={values.shape}"
+        if solutions.shape[0] != values.shape[0]:
+            raise ValueError(
+                f"Batch size mismatch on append, solutions={solutions.shape}, values={values.shape}"
+            )
         # Quality-diversity add-on: keep the tracked-outputs array row-aligned.
         if self.solution_outputs is not None:
-            assert outputs is not None, "deck tracks outputs but none were provided"
-            assert outputs.shape[0] == solutions.shape[0], (
-                f"Batch size mismatch on append, solutions={solutions.shape}, "
-                f"outputs={outputs.shape}"
-            )
+            if outputs is None:
+                raise ValueError("deck tracks outputs but none were provided")
+            if outputs.shape[0] != solutions.shape[0]:
+                raise ValueError(
+                    f"Batch size mismatch on append, solutions={solutions.shape}, "
+                    f"outputs={outputs.shape}"
+                )
             self.solution_outputs = np.vstack([self.solution_outputs, outputs])
         # Append local optima flags
         if isinstance(local_optima, bool) or isinstance(local_optima, np.bool_):
@@ -67,9 +70,10 @@ class SolutionDeck:
                 ]
             )
         else:
-            assert (
-                solutions.shape[0] == local_optima.shape[0]
-            ), f"Batch size mismatch on append, solutions={solutions.shape}, local_optima={local_optima.shape}"
+            if solutions.shape[0] != local_optima.shape[0]:
+                raise ValueError(
+                    f"Batch size mismatch on append, solutions={solutions.shape}, local_optima={local_optima.shape}"
+                )
             self.is_local_optima = np.hstack([self.is_local_optima, local_optima])
         # Append arrays
         self.solution_archive = np.vstack([self.solution_archive, solutions])
@@ -112,19 +116,19 @@ class SolutionDeck:
                 self.archive_size - num_preserve, self.num_vars
             )
 
-        for k in range(self.archive_size):
+        # Assign one column at a time (mapped through each variable's own
+        # range_value) instead of a per-cell nested Python loop that re-checked
+        # ``k >= num_preserve`` on every (row, column) pair.
+        if sample_points is not None:
+            n_new = self.archive_size - num_preserve
             for i, variable in enumerate(variables):
-                if k >= num_preserve:
-                    if sample_points is not None:
-                        # Use sampled point (mapped through variable's range_value)
-                        self.solution_archive[k, i] = variable.range_value(
-                            sample_points[k - num_preserve, i]
-                        )
+                self.solution_archive[num_preserve:, i] = [
+                    variable.range_value(sample_points[k, i]) for k in range(n_new)
+                ]
         # TODO - Parallelize this across cores?
-        for k in range(self.archive_size):
-            if k >= num_preserve:
-                self.solution_value[k] = eval_fcn(self.solution_archive[k])
-                self.is_local_optima[k] = False  # Initially, none are local optima
+        for k in range(num_preserve, self.archive_size):
+            self.solution_value[k] = eval_fcn(self.solution_archive[k])
+        self.is_local_optima[num_preserve:] = False  # Initially, none are local optima
 
     def deduplicate(self, abs_err: float = 1e-4, rel_err: float = 1e-2) -> None:
         """Deduplicate solutions in the archive based on closeness. Keeps the best solutions.
@@ -143,7 +147,7 @@ class SolutionDeck:
         # inner loop always broke after its first iteration (``j_row = i_row -
         # 1``), whether or not it matched. That per-row Python/NumPy-function-
         # call overhead dominated the profiler on cheap objectives (see
-        # PERF_CONTINUOUS_REPORT.md): each ``np.allclose`` call re-validates
+        # docs/history/PERF_CONTINUOUS_REPORT.md): each ``np.allclose`` call re-validates
         # shapes/dtypes and dispatches through ``np.isclose`` + ``all`` for a
         # single length-``num_vars`` row. Replacing it with one vectorized
         # comparison over every adjacent pair reproduces the exact same boolean
@@ -198,7 +202,7 @@ class SolutionDeck:
         """Set the full tracked-outputs array (row-aligned with the archive).
 
         Used to seed outputs for the initial deck in a multi-output run, once the
-        archive has been initialized. See QD_PARETO_PLAN.md §1.
+        archive has been initialized. See docs/history/QD_PARETO_PLAN.md §1.
         """
         assert outputs.shape[0] == self.solution_archive.shape[0], (
             f"outputs rows {outputs.shape[0]} != archive rows "
@@ -237,7 +241,7 @@ class SolutionDeck:
         leave it sorted). Without this the archive grows by ~``population_size``
         every generation forever, so every subsequent sort/dedup/CDF runs over an
         ever-larger array. Bounding it to ``archive_size`` restores the intended
-        fixed-size elitist archive. See PERFORMANCE_REPORT.md item #3.
+        fixed-size elitist archive. See docs/history/PERFORMANCE_REPORT.md item #3.
         """
         if size < 0:
             size = self.archive_size
@@ -318,10 +322,14 @@ class SolutionDeck:
         return deck
 
 
-@lru_cache(maxsize=16)
 def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> af64:
     """
     Generate N points uniformly distributed on the unit hyper-cube [0,1]^k using Lloyd's algorithm.
+
+    Not cached (unlike :func:`fibonacci_sphere_points`/:func:`spiral_points`): the
+    initial points are drawn from the seeded RNG, so the result is a function of
+    the current seed as well as ``(n, k, n_steps)`` -- caching by args alone would
+    silently return a stale result for a re-seeded run.
 
     Args:
         n (int): Number of points.
@@ -329,10 +337,10 @@ def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> af64:
         n_steps (int): Number of iterations for Lloyd's algorithm.
     """
     from sklearn.cluster import KMeans
-    from optimizers.core.random import get_seed
+    from optimizers.core.random import get_seed, rng
 
     kmeans = KMeans(n_clusters=n, random_state=get_seed())
-    points = np.sort(np.random.random(size=(n, k)), axis=0)
+    points = np.sort(rng().random(size=(n, k)), axis=0)
 
     for step in range(n_steps):
         kmeans.fit_predict(points)

@@ -89,7 +89,7 @@ def run_particles(
     # ``local_optim`` (it always scores raw particle positions), so the batched
     # path is safe whenever the caller supplied one and there's no local search
     # to interleave -- same gating as ACO/GA for consistency. See
-    # PERF_CONTINUOUS_REPORT.md.
+    # docs/history/PERF_CONTINUOUS_REPORT.md.
     use_batch = local_optim == "none" and batch_fcn is not None
 
     def _eval_batch(positions: AF) -> AF:
@@ -101,7 +101,7 @@ def run_particles(
 
     if map_elites and variation == "iso_line":
         # Shared Iso+LineDD variation over the diverse CVT archive (same operator
-        # as GA/ACO in this mode, for fair comparison). See QD_PARETO_PLAN.md §4.3.
+        # as GA/ACO in this mode, for fair comparison). See docs/history/QD_PARETO_PLAN.md §4.3.
         children = iso_line_offspring(
             solution_archive, n_particles, iso_sigma, line_sigma, lower, upper, rng
         )

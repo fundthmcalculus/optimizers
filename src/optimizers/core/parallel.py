@@ -15,7 +15,7 @@ worker process once per generation. ``GenerationRunner`` sends the fixed payload
 to each worker exactly once (via a persistent pool's initializer) and then
 dispatches only the small varying arguments per generation.
 
-See PERFORMANCE_REPORT.md items #2 (copy fixed data once) and #11 (threads vs
+See docs/history/PERFORMANCE_REPORT.md items #2 (copy fixed data once) and #11 (threads vs
 processes).
 """
 

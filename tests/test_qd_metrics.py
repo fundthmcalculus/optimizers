@@ -1,4 +1,4 @@
-"""Phase-3 quality-diversity add-on: metrics, run report, plots (QD_PARETO_PLAN.md §4.5)."""
+"""Phase-3 quality-diversity add-on: metrics, run report, plots (docs/history/QD_PARETO_PLAN.md §4.5)."""
 
 import numpy as np
 

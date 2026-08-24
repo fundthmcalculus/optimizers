@@ -10,7 +10,7 @@ from .base import TSPBase, check_path_distance
 from ..core.types import AI, F, AF
 
 # Optional compiled backend (2-opt / 3-opt). Built via `setup.py build_ext`
-# (see CYTHON_ANALYSIS.md); if it isn't compiled, the numba kernels are used, so
+# (see docs/history/CYTHON_ANALYSIS.md); if it isn't compiled, the numba kernels are used, so
 # a plain source checkout still runs without a build step.
 try:
     # Compiled extension: no source/stub for mypy to read (built ahead-of-time),
@@ -128,6 +128,22 @@ def _two_opt_kernel(
 def _three_opt_kernel(  # noqa: C901
     distances: AF, route: AI, num_iterations: int, nearest_neighbors: int
 ) -> bool:
+    """3-opt local search on ``route`` (mutated in place), numba-compiled.
+
+    For every triple of edges ``(a,b)``, ``(c,d)``, ``(e,f)`` (cut points
+    ``ij < jk < kl``) tries all 8 ways to reconnect the 3 resulting segments --
+    ``d0`` is "no change", ``d1..d7`` are the 7 genuine 3-opt moves (a mix of
+    segment-swap and segment-reversal reconnections) -- and applies whichever
+    is shortest. ``d0..d7`` / ``route[A..Fi]`` assignments are the classic
+    3-opt reconnection table: each ``best == k`` branch below moves exactly the
+    cities that reconnection needs onto their new tour positions and leaves the
+    rest untouched. This is written as a flat scalar switch rather than a
+    lookup table because it runs inside a numba ``@njit`` kernel, where a
+    table of index/reversal operations would cost more (dynamic dispatch,
+    allocation) than it saves -- see the 2-opt/3-opt section of
+    ``docs/history/CYTHON_ANALYSIS.md`` for the profiling that motivated the numba rewrite.
+    Returns ``True`` iff a full pass found no improving move (i.e. converged).
+    """
     # N is the city count (see _two_opt_kernel), not the route length.
     N = distances.shape[0]
     # kl+1 must stay in-bounds. The old Python loop used ``l_nn = N`` and only

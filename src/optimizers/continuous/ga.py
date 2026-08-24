@@ -48,7 +48,7 @@ def _tournament_selection_batch(
     # an O(n*deck_len) argpartition; see git history for both). At a large
     # archive this previously dominated GA's wall-clock end to end (measured:
     # population 8000/archive 24000 took 251s, ~100x slower than ACO/PSO on
-    # the same workload -- see PERF_CONTINUOUS_REPORT.md §6b).
+    # the same workload -- see docs/history/PERF_CONTINUOUS_REPORT.md §6b).
     #
     # This does not enforce distinctness within one tournament (unlike the
     # argsort/argpartition versions before it), so it is not bit-identical or
@@ -59,7 +59,7 @@ def _tournament_selection_batch(
     # opposite of the old approach's cost, which *grew* with the archive.
     # Statistically inconsequential for a stochastic search; accepted
     # deliberately in exchange for a complexity-class fix (see
-    # PERF_CONTINUOUS_REPORT.md §6b for the discussion this implements).
+    # docs/history/PERF_CONTINUOUS_REPORT.md §6b for the discussion this implements).
     if rng is None:
         rng = global_rng()
     deck_len = len(population_deck)
@@ -136,7 +136,7 @@ def run_ga(
 
     if map_elites and variation == "iso_line":
         # Shared Iso+LineDD variation over the diverse CVT archive (identical
-        # across GA/ACO/PSO for fair comparison). See QD_PARETO_PLAN.md §4.3.
+        # across GA/ACO/PSO for fair comparison). See docs/history/QD_PARETO_PLAN.md §4.3.
         children = iso_line_offspring(
             solution_archive, n_steps, iso_sigma, line_sigma, lower, upper, rng
         )
@@ -167,7 +167,7 @@ def run_ga(
     if local_optim == "none" and batch_fcn is not None:
         # No local search to interleave, and the caller supplied a batched goal
         # function: score both whole children batches in two vectorized calls
-        # instead of ``2 * n_steps`` scalar ones. See PERF_CONTINUOUS_REPORT.md.
+        # instead of ``2 * n_steps`` scalar ones. See docs/history/PERF_CONTINUOUS_REPORT.md.
         f1 = batch_fcn(child1)
         f2 = batch_fcn(child2)
         pick1 = f1 < f2  # ties go to child2, matching the scalar loop below

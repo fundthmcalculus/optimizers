@@ -1,4 +1,4 @@
-"""Correctness tests for the GA/ACO/PSO benchmark harness (PERF_CONTINUOUS_REPORT.md).
+"""Correctness tests for the GA/ACO/PSO benchmark harness (docs/history/PERF_CONTINUOUS_REPORT.md).
 
 Fast/small by design (a handful of generations, tiny populations) -- these
 check correctness of the scalar/batch reference implementations and the
@@ -81,7 +81,7 @@ def test_test_functions_registry_bounds_and_optimum():
 )
 def test_batched_evaluation_matches_scalar_path(optimizer_cls, config_cls):
     # local_grad_optim="none" is required for the batched-evaluation fast path
-    # (see PERF_CONTINUOUS_REPORT.md); with it enabled, GA/ACO/PSO should reach
+    # (see docs/history/PERF_CONTINUOUS_REPORT.md); with it enabled, GA/ACO/PSO should reach
     # a bit-identical result whether or not a batch_fcn is supplied, since both
     # paths must compute the same numbers -- only how many Python-level calls
     # it takes to get there differs.

@@ -33,7 +33,16 @@ class AntColonyMTSP(TSPBase):
         super().__init__(config=config, city_locations=city_locations)
 
     def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
-        # TODO - Handle the number of processors based upon parallel clusters?
+        # Each cluster's ACO run is independent and could in principle run in
+        # parallel, but every solver here draws from the seeded global RNG via
+        # core.random.spawn_streams()/rng() -- and spawn_streams' docstring is
+        # explicit that it must be called from a single thread (its counter
+        # isn't synchronized). Running clusters concurrently would race on that
+        # counter and break the reproducibility guarantee the RNG-determinism
+        # work (core/random.py) established. Parallelizing this safely needs a
+        # dedicated per-cluster stream handed in up front (spawned once, here,
+        # before dispatch) rather than each cluster spawning its own -- left
+        # sequential until that's done.
         clusters = self.do_clustering()
 
         results = []

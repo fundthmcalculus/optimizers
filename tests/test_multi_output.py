@@ -1,4 +1,4 @@
-"""Phase-1 quality-diversity add-on: multi-output tracking (QD_PARETO_PLAN.md §1).
+"""Phase-1 quality-diversity add-on: multi-output tracking (docs/history/QD_PARETO_PLAN.md §1).
 
 These cover the foundation only — the archive interface, the ``(fitness, outputs)``
 objective contract, and that tracked outputs stay row-aligned with solutions
@@ -6,6 +6,7 @@ through every deck operation. No new *search* behaviour is exercised here.
 """
 
 import numpy as np
+import pytest
 
 from optimizers.archive import Archive, ScalarArchive
 from optimizers.solution_deck import SolutionDeck
@@ -119,11 +120,8 @@ def test_deck_outputs_alignment_through_operations():
 def test_append_requires_outputs_when_tracking():
     deck = SolutionDeck(archive_size=2, num_vars=2, n_outputs=2)
     deck.set_all_outputs(np.zeros((2, 2)))
-    try:
+    with pytest.raises(ValueError, match="outputs"):
         deck.append(np.ones((1, 2)), np.array([1.0]))  # missing outputs
-        raise AssertionError("expected an assertion error for missing outputs")
-    except AssertionError as e:
-        assert "outputs" in str(e)
 
 
 def test_checkpoint_roundtrip_preserves_outputs():

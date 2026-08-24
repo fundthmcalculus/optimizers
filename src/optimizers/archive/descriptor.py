@@ -1,4 +1,4 @@
-"""Descriptor functions for MAP-Elites (QD_PARETO_PLAN.md §4.2).
+"""Descriptor functions for MAP-Elites (docs/history/QD_PARETO_PLAN.md §4.2).
 
 A *descriptor* maps a solution to a low-dimensional coordinate; MAP-Elites uses
 it to spread elites across a feature space. The default for high-dimensional

@@ -109,14 +109,28 @@ def save_checkpoint(
     return fpath
 
 
+_CHECKPOINT_REQUIRED_KEYS = ("run_id", "timestamp", "optimizer")
+
+
 def load_checkpoint(file_path: str | os.PathLike[str]) -> dict[str, Any]:
     """Load a checkpoint file and reconstruct objects where possible.
 
     Returns dict with keys: run_id, timestamp, optimizer, config, solution_deck, result, metadata
+
+    Raises:
+        ValueError: if the file is not a valid checkpoint (missing required keys).
     """
     p = Path(file_path)
     with p.open("r", encoding="utf-8") as f:
         raw = json.load(f)
+
+    if not isinstance(raw, dict) or any(
+        key not in raw for key in _CHECKPOINT_REQUIRED_KEYS
+    ):
+        raise ValueError(
+            f"{p} is not a valid checkpoint file: expected a JSON object with "
+            f"keys {_CHECKPOINT_REQUIRED_KEYS}."
+        )
 
     # Reconstruct SolutionDeck if present
     deck = None

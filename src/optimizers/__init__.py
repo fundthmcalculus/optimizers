@@ -43,7 +43,7 @@ from optimizers.combinatorial import (
     format_comparison_table,
 )
 
-# Quality-diversity / MAP-Elites archive (see QD_PARETO_PLAN.md)
+# Quality-diversity / MAP-Elites archive (see docs/history/QD_PARETO_PLAN.md)
 from optimizers.archive import CVTArchive, QDReport, qd_score, pareto_front, hypervolume
 
 # Shared config/result/base types and the solution archive every solver uses

@@ -1,4 +1,4 @@
-"""Variation operators for the quality-diversity add-on (QD_PARETO_PLAN.md §4.3).
+"""Variation operators for the quality-diversity add-on (docs/history/QD_PARETO_PLAN.md §4.3).
 
 The headline operator is **Iso+LineDD** (Vassiliades & Mouret, GECCO 2018): a child
 is a parent plus isotropic Gaussian noise plus a *directional* step along the line
@@ -73,7 +73,7 @@ def iso_line_offspring(
     *base* parent is a rank tournament — the min index of ``tournament_k`` uniform
     picks, which favours the front because the archive is sorted best-first, so it
     adds convergence pressure without needing the fitness values. The *direction*
-    parent is uniform over the whole archive (diversity). See QD_PARETO_PLAN.md
+    parent is uniform over the whole archive (diversity). See docs/history/QD_PARETO_PLAN.md
     §4.3.
     """
     archive = np.asarray(archive, dtype=float)

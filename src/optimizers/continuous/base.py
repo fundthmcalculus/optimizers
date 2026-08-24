@@ -1,3 +1,4 @@
+import logging
 import tqdm
 import joblib
 import numpy as np
@@ -27,6 +28,8 @@ from ..solution_deck import SolutionDeck
 from ..archive.cvt import CVTArchive
 from ..archive.descriptor import RandomProjectionDescriptor
 from ..archive.metrics import QDReport, qd_score, pareto_front, hypervolume
+
+logger = logging.getLogger(__name__)
 
 
 class _ArgProvider:
@@ -86,6 +89,7 @@ class _ArgProvider:
         try:
             self.meta["elapsed_time"] = float(now - start)
         except Exception:
+            logger.debug("Failed to compute elapsed_time from start_time=%r", start)
             self.meta["elapsed_time"] = 0.0
 
     def bump_eval_batch(self, n: int) -> None:
@@ -105,6 +109,7 @@ class _ArgProvider:
         try:
             self.meta["elapsed_time"] = float(now - start)
         except Exception:
+            logger.debug("Failed to compute elapsed_time from start_time=%r", start)
             self.meta["elapsed_time"] = 0.0
 
     def reset_local(self, base: int) -> None:
@@ -171,7 +176,7 @@ class IOptimizer(BaseOptimizer):
             except (ValueError, TypeError):
                 return True  # assume safe to pass args
 
-        # Quality-diversity add-on (QD_PARETO_PLAN.md §1). In a non-scalar
+        # Quality-diversity add-on (docs/history/QD_PARETO_PLAN.md §1). In a non-scalar
         # ``objective_mode`` the goal function returns ``(fitness, outputs)``. The
         # wrapped fitness callable still yields a scalar, so every existing solver
         # is untouched; the extra outputs are collected parent-side and tracked on
@@ -281,7 +286,7 @@ class IOptimizer(BaseOptimizer):
     def _build_mapelites_archive(
         self, config: IOptimizerConfig, variables: InputVariables
     ) -> CVTArchive:
-        """Construct the CVT MAP-Elites archive (Phase 2, QD_PARETO_PLAN.md §4.1)."""
+        """Construct the CVT MAP-Elites archive (Phase 2, docs/history/QD_PARETO_PLAN.md §4.1)."""
         lower = np.array([v.lower_bound for v in variables], dtype=float)
         upper = np.array([v.upper_bound for v in variables], dtype=float)
         seed = get_seed()
@@ -332,8 +337,9 @@ class IOptimizer(BaseOptimizer):
         try:
             ensure_literal_choice(phase, Phase)
         except Exception:
-            # Keep fail-soft: still set, but this should not happen given our callers
-            pass
+            # Keep fail-soft: still set, but this should not happen given our
+            # callers -- log it so a real internal bug here doesn't go silent.
+            logger.warning("Invalid optimizer phase %r; setting it anyway", phase)
         self._arg_provider.meta["phase"] = phase
 
     def _set_generation(self, generation: int) -> None:
@@ -397,7 +403,7 @@ class IOptimizer(BaseOptimizer):
         return outs
 
     def qd_report(self, reference: AF | None = None) -> QDReport:
-        """Summarize the finished run (QD_PARETO_PLAN.md §4.5).
+        """Summarize the finished run (docs/history/QD_PARETO_PLAN.md §4.5).
 
         Reports archive coverage / QD-score / best fitness, and — when the goal
         function tracks objectives (``n_outputs > 0``) — the **Pareto front** over
@@ -451,7 +457,7 @@ class IOptimizer(BaseOptimizer):
         # truncate back to archive_size ONCE per generation. Previously this
         # looped per-output calling append + deduplicate (which sorts), so the
         # ever-growing archive was re-sorted n_jobs times every generation and
-        # never bounded. See PERFORMANCE_REPORT.md items #12 (sort/dedup once)
+        # never bounded. See docs/history/PERFORMANCE_REPORT.md items #12 (sort/dedup once)
         # and #3 (bound growth).
         all_solutions = np.vstack(
             [output.population_solutions for output in job_output]
@@ -480,11 +486,25 @@ class IOptimizer(BaseOptimizer):
         """
         # Validate joblib prefer value against allowed Literal options
         ensure_literal_choice(self.config.joblib_prefer, JoblibPrefer)
-        # Set the default values for the config
+        # Set the default values for the config. A negative value is the
+        # "auto-size" sentinel; zero is neither that nor a usable size, so it
+        # must raise rather than silently fall through to an empty archive.
         if self.config.solution_archive_size < 0:
             self.config.solution_archive_size = len(self.variables) * 2
+        elif self.config.solution_archive_size == 0:
+            raise ValueError(
+                "solution_archive_size must be positive (negative auto-sizes it)."
+            )
         if self.config.population_size < 0:
             self.config.population_size = self.config.solution_archive_size // 3
+        elif self.config.population_size == 0:
+            raise ValueError(
+                "population_size must be positive (negative auto-sizes it)."
+            )
+        if self.config.num_generations <= 0:
+            raise ValueError(
+                f"num_generations must be positive, got {self.config.num_generations}."
+            )
         if self.config.n_jobs < 0:
             self.config.n_jobs = joblib.cpu_count() - 1
 

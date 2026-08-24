@@ -58,10 +58,14 @@ class TSPBase(BaseOptimizer):
         """Set the network routes for the TSP solver"""
         # If we have network routes, use that, otherwise, use the city locations
         if network_routes is None:
-            assert city_locations is not None
+            if city_locations is None:
+                raise ValueError(
+                    "Either network_routes or city_locations must be provided."
+                )
+            if len(city_locations.shape) != 2:
+                raise ValueError("City locations must be a 2D array")
 
             # Compute pairwise distances between all cities
-            assert len(city_locations.shape) == 2, "City locations must be a 2D array"
             self.city_locations = city_locations.copy()
             self.network_routes = pairwise_distances(city_locations)
         else:
