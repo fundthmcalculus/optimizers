@@ -2,12 +2,13 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
+from joblib import Parallel, cpu_count, delayed
 from sklearn.cluster import KMeans, SpectralClustering
 
 from .base import TSPBase
 from .aco import AntColonyTSPConfig, AntColonyTSP
 from ..core.base import OptimizerResult, create_from_dict, literal_options
-from ..core.random import get_seed
+from ..core.random import get_seed, spawn_stream_roots, use_stream_root
 from ..core.types import AF
 
 # NOTE: "FCM" is accepted but always raises NotImplementedError (see
@@ -15,6 +16,31 @@ from ..core.types import AF
 # implementation was pulled, but the option is left here (rather than removed)
 # as a documented placeholder for whoever restores it.
 ClusterMethod = Literal["kmeans", "spectral", "FCM"]
+
+
+def _solve_cluster(
+    cluster_id: int,
+    cluster: list[int],
+    city_locations: AF,
+    base_config: "AntColonyMTSPConfig",
+    n_jobs: int,
+    stream_root: np.random.SeedSequence,
+) -> OptimizerResult:
+    """Solve one cluster's independent ACO tour. Module-level so it's picklable
+    for joblib's ``processes`` backend; ``stream_root`` isolates this cluster's
+    internal RNG draws from every other concurrently-running cluster."""
+    with use_stream_root(stream_root):
+        cluster_cities = city_locations[cluster, :]
+        cluster_config = create_from_dict(base_config.__dict__, AntColonyTSPConfig)
+        cluster_config.name = f"{base_config.name}-{cluster_id + 1}"
+        cluster_config.n_jobs = n_jobs
+        tsp_solve = AntColonyTSP(config=cluster_config, city_locations=cluster_cities)
+        cluster_result = tsp_solve.solve()
+        # Map cluster indices back to original indices
+        cluster_result.solution_vector = np.array(
+            [cluster[i] for i in cluster_result.solution_vector]
+        )
+        return cluster_result
 
 
 @dataclass
@@ -33,33 +59,39 @@ class AntColonyMTSP(TSPBase):
         super().__init__(config=config, city_locations=city_locations)
 
     def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
-        # Each cluster's ACO run is independent and could in principle run in
-        # parallel, but every solver here draws from the seeded global RNG via
-        # core.random.spawn_streams()/rng() -- and spawn_streams' docstring is
-        # explicit that it must be called from a single thread (its counter
-        # isn't synchronized). Running clusters concurrently would race on that
-        # counter and break the reproducibility guarantee the RNG-determinism
-        # work (core/random.py) established. Parallelizing this safely needs a
-        # dedicated per-cluster stream handed in up front (spawned once, here,
-        # before dispatch) rather than each cluster spawning its own -- left
-        # sequential until that's done.
         clusters = self.do_clustering()
+        n_clusters = len(clusters)
 
-        results = []
-        for cluster_id, cluster in enumerate(clusters):
-            cluster_cities = self.city_locations[cluster, :]
-            cluster_config = create_from_dict(self.config.__dict__, AntColonyTSPConfig)
-            cluster_config.name = f"{self.config.name}-{cluster_id + 1}"
-            tsp_solve = AntColonyTSP(
-                config=cluster_config, city_locations=cluster_cities
-            )
-            cluster_result = tsp_solve.solve()
-            # Map cluster indices back to original indices
-            cluster_result.solution_vector = np.array(
-                [cluster[i] for i in cluster_result.solution_vector]
-            )
+        # Split the configured processor budget between cluster-level and
+        # per-cluster ant-level parallelism instead of giving every cluster
+        # the full budget (which would oversubscribe once clusters run
+        # concurrently) -- this is what the old TODO here ("handle the number
+        # of processors based upon parallel clusters") was asking for.
+        total_jobs = self.config.n_jobs if self.config.n_jobs > 0 else cpu_count() - 1
+        outer_jobs = max(1, min(n_clusters, total_jobs))
+        inner_jobs = max(1, total_jobs // outer_jobs)
 
-            results.append(cluster_result)
+        # Each cluster's ACO run draws from the seeded RNG via
+        # core.random.spawn_streams()/rng() internally, and spawn_streams'
+        # counter isn't itself synchronized across threads. Spawn one
+        # independent stream *root* per cluster up front, here, from the
+        # single (calling) thread, then have each cluster task stand in its
+        # own root for the duration of its run (use_stream_root) so its
+        # internal spawn_streams() calls draw from that root instead of
+        # racing on the shared global one -- see core/random.py.
+        stream_roots = spawn_stream_roots(n_clusters)
+
+        results = Parallel(n_jobs=outer_jobs, prefer=self.config.joblib_prefer)(
+            delayed(_solve_cluster)(
+                cluster_id,
+                cluster,
+                self.city_locations,
+                self.config,
+                inner_jobs,
+                stream_roots[cluster_id],
+            )
+            for cluster_id, cluster in enumerate(clusters)
+        )
 
         optimal_paths = [result.solution_vector for result in results]
 

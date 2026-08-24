@@ -33,8 +33,16 @@ from optimizers.continuous.pso import (
     ParticleSwarmOptimizer,
     ParticleSwarmOptimizerConfig,
 )
+from optimizers.combinatorial.mtsp import AntColonyMTSPConfig, AntColonyMTSP
 from optimizers.continuous.variables import InputContinuousVariable
-from optimizers.core.random import rng, set_seed, spawn_streams, use_stream
+from optimizers.core.random import (
+    rng,
+    set_seed,
+    spawn_stream_roots,
+    spawn_streams,
+    use_stream,
+    use_stream_root,
+)
 
 OPTIMIZERS = {
     "ga": (GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig),
@@ -170,3 +178,109 @@ def test_worker_streams_do_not_disturb_the_main_stream():
     for generator in spawn_streams(4):
         generator.random(10)
     assert rng().random(5).tolist() == expected
+
+
+# ---------------------------------------------------------------------------
+# Nested parallelism: spawn_stream_roots / use_stream_root
+#
+# AntColonyMTSP dispatches one independent, itself-multi-generation ACO run
+# per cluster in parallel. Each of those runs calls spawn_streams() many times
+# internally, so giving the clusters plain spawned Generators (like leaf
+# tasks get) isn't enough -- two clusters running concurrently would each be
+# advancing spawn_streams()'s single shared counter from a different thread.
+# spawn_stream_roots()/use_stream_root() give each such task its own
+# independent root to spawn *from*, so its internal spawn_streams() calls
+# can't collide with any other concurrently-running task's.
+# ---------------------------------------------------------------------------
+
+
+def test_stream_roots_are_deterministic_and_distinct():
+    set_seed(7)
+    first = [np.random.default_rng(r).random(4).tolist() for r in spawn_stream_roots(3)]
+    set_seed(7)
+    second = [
+        np.random.default_rng(r).random(4).tolist() for r in spawn_stream_roots(3)
+    ]
+
+    assert first == second, "the same seed must produce the same root family"
+    assert first[0] != first[1] != first[2], "roots must not collide"
+
+
+def test_use_stream_root_isolates_nested_spawn_streams():
+    """Two tasks standing in different roots must not see each other's
+    nested spawn_streams() numbers, even though both call it the same way."""
+    set_seed(7)
+    root_a, root_b = spawn_stream_roots(2)
+
+    with use_stream_root(root_a):
+        a_children = [g.random(4).tolist() for g in spawn_streams(2)]
+    with use_stream_root(root_b):
+        b_children = [g.random(4).tolist() for g in spawn_streams(2)]
+
+    assert a_children != b_children
+
+
+def test_use_stream_root_scopes_to_the_calling_thread_and_restores():
+    """Nested spawn_streams() calls inside a use_stream_root scope must not
+    advance the shared global root's own spawn counter -- so code outside the
+    scope sees exactly the numbers it would have if the scope never ran."""
+    set_seed(7)
+    (nested_root,) = spawn_stream_roots(1)
+    with use_stream_root(nested_root):
+        spawn_streams(5)  # busywork inside the nested root
+    outside = [g.random(4).tolist() for g in spawn_streams(2)]
+
+    set_seed(7)
+    spawn_stream_roots(1)  # same single spawn from the global root as above
+    expected_outside = [g.random(4).tolist() for g in spawn_streams(2)]
+
+    assert outside == expected_outside
+
+
+def test_use_stream_root_nests():
+    set_seed(7)
+    first, second = spawn_stream_roots(2)
+    with use_stream_root(first):
+        with use_stream_root(second):
+            inner = spawn_streams(1)[0].random(4).tolist()
+        middle = spawn_streams(1)[0].random(4).tolist()
+    assert inner != middle, "nested and restored scopes must draw from different roots"
+
+
+# ---------------------------------------------------------------------------
+# AntColonyMTSP: clusters solve concurrently via joblib; each must be immune
+# to how the others happen to be scheduled.
+# ---------------------------------------------------------------------------
+
+
+def solve_mtsp_once(seed, *, n_jobs=4):
+    """One seeded AntColonyMTSP run over a fixed city layout."""
+    city_locations = np.random.default_rng(42).uniform(0.0, 10.0, size=(24, 2))
+    set_seed(seed)
+    config = AntColonyMTSPConfig(
+        name="determinism-mtsp",
+        num_generations=3,
+        population_size=8,
+        n_clusters=3,
+        clustering_method="kmeans",
+        stop_after_iterations=8,
+        n_jobs=n_jobs,
+        joblib_prefer="threads",
+    )
+    with (
+        contextlib.redirect_stdout(io.StringIO()),
+        contextlib.redirect_stderr(io.StringIO()),
+    ):
+        result = AntColonyMTSP(config=config, city_locations=city_locations).solve()
+    return round(float(result.solution_score), 9)
+
+
+def test_mtsp_parallel_clusters_are_reproducible():
+    """Clusters run concurrently (n_clusters=3, n_jobs=4); a seeded run must
+    still be a pure function of the seed regardless of scheduling."""
+    runs = [solve_mtsp_once(3) for _ in range(3)]
+    assert len(set(runs)) == 1, f"mtsp varied across runs: {runs}"
+
+
+def test_mtsp_different_seeds_still_differ():
+    assert solve_mtsp_once(3) != solve_mtsp_once(4)

@@ -79,6 +79,18 @@ def rng() -> np.random.Generator:
     return _global_rng
 
 
+def _current_worker_root() -> np.random.SeedSequence:
+    local_root: np.random.SeedSequence | None = getattr(
+        _thread_local, "worker_sequence", None
+    )
+    if local_root is not None:
+        return local_root
+    if _worker_sequence is None:
+        set_seed(None)
+    assert _worker_sequence is not None
+    return _worker_sequence
+
+
 def spawn_streams(n: int) -> list[np.random.Generator]:
     """``n`` independent Generators, derived deterministically from the seed.
 
@@ -92,12 +104,30 @@ def spawn_streams(n: int) -> list[np.random.Generator]:
     Successive calls return successive families, so a per-generation call gives
     every generation fresh numbers while remaining a pure function of the seed and
     the call order. Call it from one thread -- the counter it advances is not
-    itself synchronized.
+    itself synchronized -- unless that thread is inside a :func:`use_stream_root`
+    scope, in which case it draws from that scope's own independent root instead
+    of the shared global one (see :func:`use_stream_root`).
     """
-    if _worker_sequence is None:
-        set_seed(None)
-    assert _worker_sequence is not None
-    return [np.random.default_rng(child) for child in _worker_sequence.spawn(n)]
+    root = _current_worker_root()
+    return [np.random.default_rng(child) for child in root.spawn(n)]
+
+
+def spawn_stream_roots(n: int) -> list[np.random.SeedSequence]:
+    """``n`` independent ``SeedSequence`` roots, for a *nested* level of parallelism.
+
+    :func:`spawn_streams` hands out ready-to-use Generators for leaf tasks. This
+    instead returns the ``SeedSequence`` objects themselves, for a task that is
+    itself going to dispatch further parallel work which internally calls
+    :func:`spawn_streams` many times (e.g. one independent multi-generation
+    solver run per cluster). Call it once, from the single thread doing the
+    dispatching, before launching the nested tasks -- the same one-thread
+    requirement as :func:`spawn_streams`, and for the same reason (the spawn
+    counter it advances isn't synchronized). Each task then wraps its own work in
+    ``with use_stream_root(roots[i]):`` so its internal ``spawn_streams()`` calls
+    draw from its own independent sub-tree instead of racing on the shared root.
+    """
+    root = _current_worker_root()
+    return list(root.spawn(n))
 
 
 @contextmanager
@@ -113,3 +143,25 @@ def use_stream(generator: np.random.Generator) -> Iterator[None]:
         yield
     finally:
         _thread_local.rng = previous
+
+
+@contextmanager
+def use_stream_root(seed_sequence: np.random.SeedSequence) -> Iterator[None]:
+    """Make ``seed_sequence`` the root :func:`spawn_streams` draws from, for a task.
+
+    Companion to :func:`use_stream`: where ``use_stream`` overrides what plain
+    ``rng()`` calls see on this thread, this overrides what *nested*
+    ``spawn_streams()``/``spawn_stream_roots()`` calls see, so a task that
+    itself dispatches further parallel work draws from its own independent
+    sub-tree instead of racing on the shared global root's spawn counter.
+    Restores whatever was in place on exit, so nesting is safe and a worker
+    thread reused by a later task never inherits the previous task's root.
+    """
+    previous: np.random.SeedSequence | None = getattr(
+        _thread_local, "worker_sequence", None
+    )
+    _thread_local.worker_sequence = seed_sequence
+    try:
+        yield
+    finally:
+        _thread_local.worker_sequence = previous
