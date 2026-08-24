@@ -169,6 +169,11 @@ class IOptimizerConfig:
     """Iso+LineDD isotropic std-dev, as a fraction of each variable's domain."""
     line_sigma: float = 0.2
     """Iso+LineDD directional (line) std-dev (dimensionless)."""
+    init_sampler: Literal["uniform", "sobol", "halton", "lhs"] = "uniform"
+    """Initial population sampling strategy: ``"uniform"`` (default, i.i.d. draws),
+    ``"sobol"`` (Sobol sequence), ``"halton"`` (Halton sequence), or ``"lhs"``
+    (Latin Hypercube Sampling). QMC samplers generate lower-discrepancy initial
+    populations, improving early exploration."""
 
     def __post_init__(self) -> None:
         # When fast mode is on, cap the dominant runtime drivers so the pipeline

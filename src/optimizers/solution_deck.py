@@ -10,9 +10,11 @@ from .core.base import WrappedGoalFcn as WrappedGoalFcn  # re-exported
 from .core.random import get_seed
 from .core.types import f64, af64, ab8, b8
 from .core.variables import InputVariables as InputVariables  # re-exported
+from .sampling.qmc import generate_qmc_samples
 
 # Some type hinting
-InitializationType = Literal["random", "fibonacci", "spiral"]
+# Note: "uniform" is an alias for "random" for backward compatibility with config
+InitializationType = Literal["random", "uniform", "fibonacci", "spiral", "sobol", "halton", "lhs"]
 
 
 class SolutionDeck:
@@ -86,16 +88,31 @@ class SolutionDeck:
             raise ValueError(
                 "Number of variables does not match the initialized deck size."
             )
+        # Map "uniform" to "random" for backward compatibility
+        if init_type == "uniform":
+            init_type = "random"
         # Validate initialization type early
         ensure_literal_choice(init_type, InitializationType)
         num_preserve = int(self.archive_size * preserve_percent)
+
+        # Pre-generate points for deterministic initialization methods
+        qmc_points = None
         if init_type == "fibonacci" and num_preserve < self.archive_size:
-            fibb_spiral_points = fibonacci_sphere_points(
+            qmc_points = fibonacci_sphere_points(
                 self.archive_size - num_preserve, self.num_vars
             )
         elif init_type == "spiral" and num_preserve < self.archive_size:
-            fibb_spiral_points = spiral_points(
+            qmc_points = spiral_points(
                 self.archive_size - num_preserve, self.num_vars
+            )
+        elif init_type in ("sobol", "halton", "lhs") and num_preserve < self.archive_size:
+            # Generate QMC samples for the non-preserved portion
+            seed = get_seed()
+            qmc_points = generate_qmc_samples(
+                n=self.archive_size - num_preserve,
+                d=self.num_vars,
+                sampler=init_type,
+                seed=seed,
             )
 
         for k in range(self.archive_size):
@@ -103,14 +120,10 @@ class SolutionDeck:
                 if k >= num_preserve:
                     if init_type == "random":
                         self.solution_archive[k, i] = variable.initial_random_value()
-                    elif init_type == "fibonacci":
-                        # http://www.math.vanderbilt.edu/saffeb/texts/161.pdf
+                    elif init_type in ("fibonacci", "spiral", "sobol", "halton", "lhs"):
+                        # Map from [0,1] to variable range via range_value
                         self.solution_archive[k, i] = variable.range_value(
-                            fibb_spiral_points[k - num_preserve, i]
-                        )
-                    elif init_type == "spiral":
-                        self.solution_archive[k, i] = variable.range_value(
-                            fibb_spiral_points[k - num_preserve, i]
+                            qmc_points[k - num_preserve, i]
                         )
         # TODO - Parallelize this across cores?
         for k in range(self.archive_size):
