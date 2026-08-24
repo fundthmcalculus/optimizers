@@ -11,7 +11,7 @@ The batch form is not a different algorithm -- it is the same arithmetic,
 written so NumPy evaluates every row in one vectorized pass instead of the
 optimizer calling the scalar form once per individual. It is the reference
 implementation for the optional ``batch_fcn`` hot-path described in
-PERF_CONTINUOUS_REPORT.md. Both forms are plain Python; there is no compiled
+docs/history/PERF_CONTINUOUS_REPORT.md. Both forms are plain Python; there is no compiled
 kernel here (see ``optimizers.benchmarks.cython_kernels`` for the optional
 compiled follow-up).
 """

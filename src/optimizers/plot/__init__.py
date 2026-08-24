@@ -178,7 +178,7 @@ def plot_pareto_front(
 ) -> Figure:
     """Scatter the tracked objectives with the Pareto-non-dominated set highlighted.
 
-    Quality-diversity add-on (QD_PARETO_PLAN.md §4.5). Handles 2 or 3 objectives;
+    Quality-diversity add-on (docs/history/QD_PARETO_PLAN.md §4.5). Handles 2 or 3 objectives;
     for more, the first three are shown. Returns the figure.
     """
     from ..archive.metrics import non_dominated_mask

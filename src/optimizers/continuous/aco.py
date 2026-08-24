@@ -56,7 +56,7 @@ def run_ants(
 
     if map_elites and variation == "iso_line":
         # Shared Iso+LineDD variation over the diverse CVT archive (same operator
-        # as GA/PSO in this mode, for fair comparison). See QD_PARETO_PLAN.md §4.3.
+        # as GA/PSO in this mode, for fair comparison). See docs/history/QD_PARETO_PLAN.md §4.3.
         children = iso_line_offspring(
             solution_archive, n_ants, iso_sigma, line_sigma, lower, upper, rng
         )
@@ -95,7 +95,7 @@ def run_ants(
     # function is a user-supplied scalar and cannot be assumed vectorizable.
     # When there is no local search to interleave AND the caller supplied a
     # batched goal function, score the whole ant batch in one vectorized call
-    # instead of ``n_ants`` scalar ones -- see PERF_CONTINUOUS_REPORT.md.
+    # instead of ``n_ants`` scalar ones -- see docs/history/PERF_CONTINUOUS_REPORT.md.
     if local_optim == "none" and batch_fcn is not None:
         ant_values = batch_fcn(ant_solutions)
     else:

@@ -4,7 +4,7 @@
 ``ScalarArchive`` is the classic single-objective, best-first deck (today's
 :class:`~optimizers.solution_deck.SolutionDeck`) and remains the default. The
 quality-diversity / multi-objective implementations (``GridArchive`` for
-MAP-Elites, ``ParetoArchive``) land in later phases of ``QD_PARETO_PLAN.md``.
+MAP-Elites, ``ParetoArchive``) land in later phases of ``docs/history/QD_PARETO_PLAN.md``.
 """
 
 from .base import Archive

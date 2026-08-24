@@ -11,7 +11,7 @@ this harness and renders the comparison plot, and
 
 Scope note: every run here uses ``local_grad_optim="none"``. The combinatorial
 solvers and the gradient-descent/local-search optimizers are out of scope for
-this benchmark (see PERF_CONTINUOUS_REPORT.md).
+this benchmark (see docs/history/PERF_CONTINUOUS_REPORT.md).
 """
 
 import time

@@ -49,7 +49,7 @@ WrappedConstraintFcn = WrappedGoalFcn
 # Optional batched form of the goal function: takes the whole generation's
 # candidate matrix ``(n, num_vars)`` at once and returns ``(n,)`` scores, one
 # vectorized call instead of ``n`` scalar ones. Same "takes args or not" shapes
-# as ``GoalFcn``. See PERF_CONTINUOUS_REPORT.md -- opt-in fast path for GA/ACO/
+# as ``GoalFcn``. See docs/history/PERF_CONTINUOUS_REPORT.md -- opt-in fast path for GA/ACO/
 # PSO used only when ``local_grad_optim == "none"`` (no per-candidate local
 # search to interleave with the batch).
 BatchGoalFcn = Union[
@@ -154,7 +154,7 @@ class IOptimizerConfig:
     is the classic single-objective behaviour. ``"map-elites"`` / ``"pareto"``
     tell the optimizer the goal function returns ``(fitness, outputs)`` and that
     the extra outputs should be tracked on each archived solution. See
-    QD_PARETO_PLAN.md. Phase 1 wires the tracking only; it does not yet change
+    docs/history/QD_PARETO_PLAN.md. Phase 1 wires the tracking only; it does not yet change
     how search selects parents."""
     n_outputs: int = 0
     """Number of tracked objectives/outputs for the Pareto report. When ``> 0``

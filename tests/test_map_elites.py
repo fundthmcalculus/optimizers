@@ -1,4 +1,4 @@
-"""Phase-2 quality-diversity add-on: CVT MAP-Elites + Iso+LineDD (QD_PARETO_PLAN.md §4).
+"""Phase-2 quality-diversity add-on: CVT MAP-Elites + Iso+LineDD (docs/history/QD_PARETO_PLAN.md §4).
 
 Covers the archive, the projection descriptor, the variation operator, and the
 end-to-end map-elites mode on the solvers. The default scalar path must stay

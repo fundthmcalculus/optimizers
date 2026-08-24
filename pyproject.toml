@@ -16,14 +16,12 @@ dependencies = [
     "matplotlib>=3.10",
     "tqdm>=4.60",
     "joblib>=1.0",
-    "contextlib2>=0.6.0",
     "kmodes>=0.12.2",
     "scikit-learn>=1.7.2",
     "scipy",
     "pandas>=2.0.0",
     "numba",
     "cloudpickle",
-    "sympy"
 ]
 
 [project.optional-dependencies]
@@ -34,25 +32,22 @@ dev = [
     "flake8",
     "Flake8-pyproject",
     "optuna>=4.3.0",
-    "pyclustertend",
     "Cython>=3.0",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/optimizers", "src/fuzzy"]
-
-[project.scripts]
-optimizers = "optimizers.__init__:main"
-fuzzy = "fuzzy.__init__:main"
+packages = ["src/optimizers"]
 
 [tool.flake8]
 max-line-length = 120
 exclude = ".git,__pycache__,build,dist,.eggs,.tox,.venv,venv"
 include = "./src,./tests"
 extend-ignore = ["E203"]
-# Complexity ceiling set at the current worst (_three_opt_kernel's 8-way
-# reconnection switch = 24). It only guards against regressions; ratchet it
-# down over time as complex functions are simplified.
+# Complexity ceiling: kept above the current worst offender, _three_opt_kernel
+# (bypassed via its own `# noqa: C901` -- an 8-way reconnection switch that
+# isn't realistically reducible under numba -- see combinatorial/strategy.py).
+# Guards against regressions elsewhere; ratchet down as complex functions are
+# simplified.
 max-complexity = 18
 
 [tool.mypy]

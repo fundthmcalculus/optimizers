@@ -119,6 +119,11 @@ class InputContinuousVariable(InputVariable):
         perturbation: float = 0.1,
     ):
         super().__init__(name)
+        if not lower_bound < upper_bound:
+            raise ValueError(
+                f"lower_bound ({lower_bound}) must be less than upper_bound ({upper_bound})"
+                f" for variable {name!r}."
+            )
         self.__lower_bound = lower_bound
         self.__upper_bound = upper_bound
         self.initial_value = self.initial_random_value()
@@ -172,7 +177,7 @@ class InputContinuousVariable(InputVariable):
         # Inverse-CDF (Gaussian) sampling of a truncated normal. This avoids
         # constructing a scipy ``truncnorm`` frozen distribution on every call
         # (which spent ~60% of ACO runtime building docstrings); the draw is
-        # statistically identical. See PERFORMANCE_REPORT.md item #1.
+        # statistically identical. See docs/history/PERFORMANCE_REPORT.md item #1.
         if stdev <= 0.0:
             stdev = 1.0
         if rng is None:
@@ -231,7 +236,7 @@ class InputContinuousVariable(InputVariable):
         # and is O(n_ants * archive_size) *per variable* -- at a large
         # population/archive this dwarfs everything else in ACO (measured:
         # ~90% of total wall-clock at population=1000/archive=3000/dim=30, see
-        # PERF_CONTINUOUS_REPORT.md addendum). Sort the archive column once and
+        # docs/history/PERF_CONTINUOUS_REPORT.md addendum). Sort the archive column once and
         # use the standard prefix-sum identity for L1 distance to a sorted
         # array: for sorted ``s`` (prefix sums ``S``) and a query ``c`` with
         # rank ``m`` (count of elements < c),
