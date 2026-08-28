@@ -7,8 +7,15 @@ extension modules (2-opt / 3-opt kernels — see CYTHON_ANALYSIS.md).
 ``hatchling`` (``pyproject.toml``), and there is no hatchling build hook, so no
 packaging path executes this file. ``pip install .``, ``uv sync`` and
 ``python -m build`` all produce a pure-Python ``py3-none-any`` wheel that ships
-``_tsp_cython.pyx`` as package data and no compiled module, which is why
-``strategy.HAS_CYTHON`` is ``False`` in every installed copy.
+``_tsp_cython.pyx`` as package data and no compiled module, which is why both
+``strategy.HAS_CYTHON`` and ``benchmarks.cython_kernels.HAS_CYTHON`` are
+``False`` in every installed copy.
+
+Nor can a local build leak into one: hatchling's file selection honours
+``.gitignore``, which excludes ``*.so`` and ``*.py[codz]`` (that last pattern
+matches ``.pyd``), so ``python -m build`` emits ``py3-none-any`` even when run
+immediately after a successful ``build_ext --inplace`` with the artifacts
+sitting in ``src/``.
 
 So this file is a developer and CI convenience, reached only by an explicit::
 
@@ -18,10 +25,15 @@ That is what CI runs, and it is the only way the compiled kernels come into
 existence. Wiring them into the wheel would need a hatchling custom build hook
 and is a separate question from anything below.
 
-The extensions are **optional**: if one can't be compiled (no C compiler,
-unsupported toolchain) the build emits a warning and continues, and the library
-falls back to the numba kernels at import time (see ``combinatorial/strategy.py``
-and ``benchmarks/cython_kernels.py``).
+The extensions are **optional**: if one can't be compiled the build emits a
+warning and continues, and the library falls back to the numba kernels at import
+time (see ``combinatorial/strategy.py`` and ``benchmarks/cython_kernels.py``).
+That covers an unsupported toolchain, an ordinary compile error, and a missing
+Cython — without Cython the ``.pyx`` reaches the compiler untranslated and
+``object_filenames()`` raises ``UnknownFileType``, a ``CCompilerError`` subclass,
+which ``optional=True`` swallows. It does **not** cover the total absence of a
+compiler on the mingw32 path, where ``build_ext`` dies in the compiler
+constructor's version probe before ``optional`` is ever consulted.
 
 Two things below are less obvious than they look, and both were wrong before:
 
