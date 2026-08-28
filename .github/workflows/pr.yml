@@ -34,12 +34,15 @@ jobs:
         run: python setup.py build_ext --inplace
 
       - name: Confirm the compiled kernels actually built
-        # Both extensions are declared `optional=True`, and as of this change
-        # that flag is finally effective, so a compile failure is a warning and
-        # the step above still exits 0. That is the point -- a source install
-        # degrades to the numba / pure-NumPy fallbacks rather than hard-failing.
-        # CI must not accept that degradation silently, though, or a broken
-        # kernel reads as a green build with a quiet performance regression.
+        # Guards the `build_ext` step directly above, not the `pip install`
+        # further up -- the build backend is hatchling, so an install ships a
+        # pure-Python wheel and compiles nothing. Both extensions are declared
+        # `optional=True`, and that flag is now actually effective, so a compile
+        # failure is a warning and `build_ext` still exits 0. That is deliberate:
+        # a source tree without a usable toolchain should fall back to the numba
+        # / pure-NumPy kernels rather than hard-fail. CI must not accept the
+        # fallback silently, though, or a broken kernel reads as a green build
+        # hiding a large performance regression.
         run: PYTHONPATH=./src python -c "import optimizers.combinatorial._tsp_cython, optimizers.benchmarks._bench_cython; print('compiled kernels present')"
 
       - name: Check code formatting with black
