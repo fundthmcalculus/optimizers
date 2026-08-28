@@ -33,6 +33,15 @@ jobs:
         # above doesn't leave the build deps importable, so install them here.
         run: python setup.py build_ext --inplace
 
+      - name: Confirm the compiled kernels actually built
+        # Both extensions are declared `optional=True`, and as of this change
+        # that flag is finally effective, so a compile failure is a warning and
+        # the step above still exits 0. That is the point -- a source install
+        # degrades to the numba / pure-NumPy fallbacks rather than hard-failing.
+        # CI must not accept that degradation silently, though, or a broken
+        # kernel reads as a green build with a quiet performance regression.
+        run: PYTHONPATH=./src python -c "import optimizers.combinatorial._tsp_cython, optimizers.benchmarks._bench_cython; print('compiled kernels present')"
+
       - name: Check code formatting with black
         run: black --check .
 
