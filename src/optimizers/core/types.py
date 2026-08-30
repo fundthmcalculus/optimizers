@@ -14,7 +14,6 @@ b8 = np.bool_
 af64 = NDArray[f64]
 ai64 = NDArray[i64]
 ab8 = NDArray[b8]
-T = typing.TypeVar("T")
 
 # "Some float", "some integer" -- for the code that does not care about width.
 #

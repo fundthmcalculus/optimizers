@@ -65,7 +65,9 @@ class RandomOptimizerSelection(IOptimizerSelection):
     def select(
         self, existing_optim: Optional[OptimizationType] = None
     ) -> OptimizationType:
-        choices = list(get_args(OptimizationType))
+        # Annotated: ``get_args`` is typed ``tuple[Any, ...]``, so without this
+        # the element type is Any and the declared Literal return is unchecked.
+        choices: list[OptimizationType] = list(get_args(OptimizationType))
         if existing_optim is not None:
             choices.remove(existing_optim)
         # TODO - Find a better way to select optimizers

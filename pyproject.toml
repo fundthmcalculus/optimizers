@@ -141,43 +141,39 @@ strict_optional = true
 # normally, including in these files.
 #
 # It is deliberately narrow rather than one broad block. A module listed for
-# `arg-type` alone still fails CI on a new `assignment` or `union-attr` bug; the
-# old shape disabled nine codes across fourteen modules, so 136 (module, code)
-# pairs were unreachable. This is 34.
+# `arg-type` alone still fails CI on a new `assignment` or `union-attr` bug. The
+# original shape disabled nine codes across fourteen modules, so 136 (module,
+# code) pairs were unreachable; this is 31.
 #
 # Measured in #143: with the whole baseline removed the tree had 110 errors.
-# #144 fixed a Liskov violation in continuous/variables.py (25) and #146 swapped
-# the AF/AI dtype unions for numpy's abstract `floating`/`integer` (13), leaving
-# 72. Those 72 are:
+# #144 fixed a Liskov violation in continuous/variables.py (25), #146 swapped the
+# AF/AI dtype unions for numpy's abstract floating/signedinteger (13), and #147
+# fixed three non-numpy issues (4). 68 remain, and they are not one problem:
 #   * ~10 `no-any-return` from numpy's largely untyped ufunc/reduction stubs.
 #     Genuinely upstream; this part may never go away.
-#   * three unrelated non-numpy issues -- generic dataclass introspection,
-#     checkpoint deserialization, config values not narrowed to Literal.
-#   * the remainder, which needs narrowing per call site rather than per module.
+#   * the rest, which needs narrowing per call site rather than per module --
+#     mostly functions declared to take or return the abstract `AF`/`AI` while
+#     the body pins float64, and vice versa.
 
 [[tool.mypy.overrides]]
 module = [
-    "optimizers.checkpoint",
     "optimizers.continuous.aco",
+    "optimizers.continuous.optimizer_strategy",
     "optimizers.continuous.step",
 ]
 disable_error_code = ["arg-type"]
+
+[[tool.mypy.overrides]]
+module = ["optimizers.core.base"]
+disable_error_code = ["assignment"]
 
 [[tool.mypy.overrides]]
 module = ["optimizers.combinatorial.base"]
 disable_error_code = ["return-value"]
 
 [[tool.mypy.overrides]]
-module = [
-    "optimizers.combinatorial.ga",
-    "optimizers.combinatorial.strategy",
-    "optimizers.core.base",
-]
+module = ["optimizers.combinatorial.ga", "optimizers.combinatorial.strategy"]
 disable_error_code = ["arg-type", "assignment"]
-
-[[tool.mypy.overrides]]
-module = ["optimizers.continuous.optimizer_strategy"]
-disable_error_code = ["arg-type", "no-any-return"]
 
 [[tool.mypy.overrides]]
 module = ["optimizers.continuous.base"]
