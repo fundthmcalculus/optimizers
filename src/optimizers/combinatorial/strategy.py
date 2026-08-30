@@ -5,9 +5,9 @@ from typing import Literal, Optional
 import numpy as np
 
 from ..core import IOptimizerConfig
-from ..core.base import OptimizerResult, ensure_literal_choice
+from ..core.base import OptimizerResult, ensure_literal_choice, single_vector
 from .base import TSPBase, check_path_distance
-from ..core.types import AI, AF
+from ..core.types import AI, AF, i64
 
 # --- Compiled local-search backend -------------------------------------------
 # The 2-opt / 3-opt / Lin-Kernighan hot loops are tight scalar sweeps over a
@@ -551,7 +551,9 @@ class TwoOptTSP(TSPBase):
                 city_locations=self.city_locations,
             )
             solution = nn_solver.solve()
-            self.initial_route = solution.solution_vector
+            # int64 explicitly: the compiled kernels index with it, and a
+            # float route would only fail once it reached them.
+            self.initial_route = np.asarray(single_vector(solution), dtype=i64)
             self.initial_value = solution.solution_score
         assert self.initial_route is not None
         new_route = self.initial_route.copy()

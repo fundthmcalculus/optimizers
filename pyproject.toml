@@ -135,39 +135,17 @@ warn_return_any = true
 no_implicit_reexport = true
 strict_optional = true
 
-# --- Ratchet baseline -------------------------------------------------------
-# What is left of the baseline, grouped by the error codes each module actually
-# still produces. Everything else -- and any brand-new error type -- is caught
-# normally, including in these files.
+# --- No baseline ------------------------------------------------------------
+# There are no per-module suppressions. There used to be: nine error codes
+# disabled across fourteen modules -- 136 (module, code) pairs in which a new bug
+# of that class could land unnoticed -- justified by a comment claiming the AF/AI
+# dtype aliases were the cause.
 #
-# The original shape disabled nine codes across fourteen modules, so 136
-# (module, code) pairs were unreachable; this is 7.
+# #143 measured that: 110 errors with the whole list removed, of which the
+# aliases were 13%. Taking it to zero (#144, #146, #147, #148, #149, #150, #152,
+# #153, #154) turned up two crashes, a returned None, a broken feature, a
+# silently-ignored config argument and a mis-weighted sampler -- see #145 and
+# #151 for the two left open deliberately.
 #
-# Measured in #143: with the whole baseline removed the tree had 110 errors.
-# #144 (25), #146 (13), #147 (4), #148 (22), #149 (9), #150 (13), #152 (7) and
-# #153 (7) have taken that to 10. What is left is one thing: the `Solution`
-# union on OptimizerResult, `AF | AI | list[AI]`, which every consumer has to
-# narrow by hand.
-#
-# `no-any-return`, `operator`, `union-attr`, `list-item` and `misc` are
-# deliberately absent below. Each turned out to mark a real defect rather than a
-# numpy-stub artefact. If one reappears, fix it rather than re-adding it here.
-
-[[tool.mypy.overrides]]
-module = [
-    "optimizers.continuous.optimizer_strategy",
-    "optimizers.continuous.step",
-]
-disable_error_code = ["arg-type"]
-
-[[tool.mypy.overrides]]
-module = [
-    "optimizers.combinatorial.strategy",
-    "optimizers.continuous.gd",
-    "optimizers.core.base",
-]
-disable_error_code = ["assignment"]
-
-[[tool.mypy.overrides]]
-module = ["optimizers.combinatorial.ga"]
-disable_error_code = ["arg-type", "assignment"]
+# If a new error appears here, fix it. Adding a module back to a suppression list
+# is how the previous 136 accumulated.

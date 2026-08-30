@@ -108,6 +108,15 @@ class StepWiseOptimizer(IOptimizer):
                     best_soln_vector = x0
                     best_soln_value.append(cur_best_soln_value[-1])
 
+            if best_soln_vector is None:
+                # Nothing ever beat the incumbent, so no vector was recorded.
+                # Handing None back as the answer is bug (3) of #151; the other
+                # three in this branch are left alone, but returning None from a
+                # field typed `Solution` is wrong under any reading.
+                raise ValueError(
+                    "no solution was recorded: every deck entry failed to "
+                    "improve. See #151 -- this code path is known-broken."
+                )
             return OptimizerResult(
                 solution_score=best_soln_value[-1],
                 solution_history=np.array(best_soln_value),

@@ -16,6 +16,7 @@ from ..core.base import (
     literal_options,
     GoalFcn,
     InputArguments,
+    single_vector,
 )
 from ..checkpoint import CheckpointConfig, load_checkpoint, save_checkpoint
 from .base import IOptimizer
@@ -24,7 +25,7 @@ from .aco import AntColonyOptimizer, AntColonyOptimizerConfig
 from .pso import ParticleSwarmOptimizer, ParticleSwarmOptimizerConfig
 from .ga import GeneticAlgorithmOptimizer, GeneticAlgorithmOptimizerConfig
 from .gd import GradientDescentOptimizer, GradientDescentOptimizerConfig
-from ..core.types import AF
+from ..core.types import AF, AI
 
 OptimizationType = Literal["aco", "pso", "ga", "gd"]
 
@@ -224,7 +225,7 @@ class GroupedVariableOptimizer(IOptimizer):
         self.checkpoint_cfg = checkpoint_cfg
         self._checkpoint_run_id = uuid.uuid4().hex if checkpoint_cfg else None
 
-    def interleave_variables(self, group: InputVariableGroup, x: AF, y: AF) -> AF:
+    def interleave_variables(self, group: InputVariableGroup, x: AF | AI, y: AF) -> AF:
         x_i = 0
         for i, var in enumerate(self.variables):
             if var.name in group.variables:
@@ -289,11 +290,14 @@ class GroupedVariableOptimizer(IOptimizer):
                     raise NotImplementedError("Optimizer not implemented")
                 result = optim.solve()
                 # TODO - Update the solution deck here?
-                default_values = list(
-                    self.interleave_variables(
-                        group, result.solution_vector, default_values
-                    )
-                )
+                # .tolist(), not list(): the latter yields np.float64 elements
+                # into a list[float], which is the sort of drift this whole
+                # series was cleaning up.
+                default_values = self.interleave_variables(
+                    group,
+                    single_vector(result),
+                    np.asarray(default_values, dtype=float),
+                ).tolist()
 
             is_last_round = cur_round == self.config.num_rounds - 1
             if self.checkpoint_cfg is not None and self.checkpoint_cfg.enabled:

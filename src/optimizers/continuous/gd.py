@@ -11,6 +11,7 @@ from ..core.base import (
     GoalFcn,
     InputArguments,
     StopReason,
+    single_vector,
 )
 from ..core.types import AF
 from ..core import WrappedGoalFcn, InputVariables
@@ -202,7 +203,7 @@ class GradientDescentOptimizer(IOptimizer):
                             x0, self.variables, var_idx, self.wrapped_fcn
                         )
                         x0_val = result.solution_score
-                        x0 = result.solution_vector
+                        x0 = single_vector(result)
                     if len(best_soln_value) == 0:
                         best_soln_value.append(x0_val)
                     else:
