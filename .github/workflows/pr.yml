@@ -18,6 +18,15 @@ jobs:
     # against `numpy>=2.4.6` contradiction (#126) on the first PR that
     # introduced it -- that combination has no solution, so the resolve fails
     # outright -- instead of some weeks later.
+    #
+    # NOTE: the lockfile is gated here but deliberately NOT consumed by `test`
+    # below, which still installs with `pip install .[dev]`. That inconsistency
+    # is the intended design, so please do not "fix" it by switching `test` to
+    # `uv sync --locked`. For a library, the unlocked install is what catches "a
+    # new numpy release breaks us"; pinning CI would trade that signal away. The
+    # lock exists to keep the *developer* environment reproducible and to keep
+    # the working tree clean for repos that vendor this one as a pinned
+    # submodule (#131) -- not to pin CI.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
