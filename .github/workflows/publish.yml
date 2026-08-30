@@ -63,7 +63,12 @@ jobs:
           python-version: '3.14'
 
       - name: Build sdist
-        run: pipx run build --sdist
+        # An sdist carries no interpreter tag, so pipx's own Python would be
+        # harmless here -- but the venv check below compiles the sdist for the
+        # interpreter set up above, so keep one interpreter for the whole job.
+        run: |
+          python -m pip install --upgrade build
+          python -m build --sdist
 
       - name: Confirm the sdist can actually compile the kernels
         # An sdist is the fallback for every platform the matrix above does not

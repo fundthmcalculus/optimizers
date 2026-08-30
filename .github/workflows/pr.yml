@@ -59,12 +59,20 @@ jobs:
           python-version: '3.14'
 
       - name: Build a wheel with the kernels required
-        # Without this the hook degrades to a pure-Python wheel on a compile
-        # failure, which is correct for a source install but would let exactly
-        # the #132 regression through this gate unnoticed.
+        # `python -m build`, NOT `pipx run build`: the wheel is now
+        # interpreter-specific, and pipx runs `build` under its own Python
+        # (3.12 on the runner) regardless of setup-python. That produced a
+        # cp312 wheel the 3.14 venv below then refused with "not a supported
+        # wheel on this platform".
+        #
+        # OPTIMIZERS_REQUIRE_CYTHON makes the hook fatal instead of degrading to
+        # a pure-Python wheel, which is correct for a source install but would
+        # let exactly the #132 regression through this gate unnoticed.
         env:
           OPTIMIZERS_REQUIRE_CYTHON: '1'
-        run: pipx run build --wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel
 
       - name: The wheel must be platform-tagged, not py3-none-any
         run: |

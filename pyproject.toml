@@ -76,9 +76,11 @@ environment = { OPTIMIZERS_REQUIRE_CYTHON = "1" }
 # the archive -- is what proves the extension imports on a clean machine.
 test-command = "python -c \"from optimizers.combinatorial.strategy import HAS_CYTHON as t; from optimizers.benchmarks.cython_kernels import HAS_CYTHON as b; assert t and b, f'wheel has no kernels: tsp={t} bench={b}'; print('kernels present')\""
 
-[tool.cibuildwheel.linux]
-# manylinux needs OpenMP present for the -fopenmp the extensions build with.
-before-all = "yum install -y libgomp || apt-get update && apt-get install -y libgomp1"
+# Deliberately no [tool.cibuildwheel.linux] before-all installing libgomp: the
+# manylinux images already ship a GCC toolchain with it, and auditwheel vendors
+# libgomp.so into the wheel during repair, which is what makes the result work
+# on a user machine that has no libgomp at all. Installing it at build time
+# solves nothing and adds a step that can fail.
 
 [tool.flake8]
 max-line-length = 120

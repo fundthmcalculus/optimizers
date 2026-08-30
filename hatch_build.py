@@ -16,11 +16,18 @@ reason a real build hook was the only workable fix.
 
 How it works
 ------------
-``initialize()`` shells out to ``setup.py build_ext`` with an explicit
-``--build-lib``, then force-includes whatever landed there. Reusing ``setup.py``
-rather than reimplementing the compile is deliberate: that file already carries
-the compiler-detection and flag-selection logic fixed in #130, and duplicating it
+``initialize()`` shells out to ``setup.py build_ext``, pointing both
+``--build-lib`` and ``--build-temp`` at a temp tree, then force-includes whatever
+landed there; ``finalize()`` removes the tree. Reusing ``setup.py`` rather than
+reimplementing the compile is deliberate: that file already carries the
+compiler-detection and flag-selection logic fixed in #130, and duplicating it
 here would give the project two build paths to keep in agreement.
+
+Partial builds are all-or-nothing. If one extension compiles and the other does
+not, the default path discards both and emits a pure-Python wheel, because a
+platform-tagged wheel carrying an arbitrary subset of the kernels is a confusing
+artifact to receive a bug report about. Under ``OPTIMIZERS_REQUIRE_CYTHON`` a
+partial build is fatal, so no release can take that path.
 
 Degradation policy
 ------------------
@@ -43,6 +50,7 @@ the artifacts**, never the exit status.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -69,6 +77,21 @@ class CustomBuildHook(BuildHookInterface):
     """Compile the extensions and force them into the wheel."""
 
     PLUGIN_NAME = "custom"
+
+    # Set once a compile is attempted; removed in finalize().
+    _build_root: Path | None = None
+
+    def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
+        """Remove the temp build tree once the wheel has been written.
+
+        It cannot be cleaned in ``initialize()``: hatchling copies the
+        ``force_include`` sources while assembling the archive, which happens
+        after ``initialize()`` returns, so deleting earlier would drop the very
+        artifacts this hook exists to add.
+        """
+        if self._build_root is not None:
+            shutil.rmtree(self._build_root, ignore_errors=True)
+            self._build_root = None
 
     def initialize(self, version: str, build_data: dict) -> None:
         # sdists carry the .pyx sources and are built on the consumer's machine;
@@ -132,9 +155,17 @@ class CustomBuildHook(BuildHookInterface):
         destination). A missing entry means that extension failed to compile.
         """
         root = Path(self.root)
-        # A temp build-lib keeps the compile out of src/, so a wheel build never
-        # leaves artifacts behind in the working tree.
-        build_lib = Path(tempfile.mkdtemp(prefix="optimizers-build-ext-"))
+        # Both output directories go to a temp tree, so a wheel build leaves
+        # nothing behind in the working copy.
+        #
+        # --build-lib alone is NOT enough: --build-temp defaults to
+        # `build/temp.*` *relative to cwd*, which is the repo root, and `build/`
+        # is not in .gitignore. Redirecting only the first would leave every
+        # `pip install .` with a dirty `git status` -- exactly the breakage #131
+        # was filed to remove, arriving through a different door.
+        self._build_root = Path(tempfile.mkdtemp(prefix="optimizers-build-ext-"))
+        build_lib = self._build_root / "lib"
+        build_temp = self._build_root / "temp"
 
         command = [
             sys.executable,
@@ -142,6 +173,8 @@ class CustomBuildHook(BuildHookInterface):
             "build_ext",
             "--build-lib",
             str(build_lib),
+            "--build-temp",
+            str(build_temp),
         ]
         result = subprocess.run(
             command,
