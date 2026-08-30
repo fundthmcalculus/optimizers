@@ -62,7 +62,18 @@ include = ["src", "setup.py", "hatch_build.py", "README.md", "LICENSE"]
 build = "cp311-* cp312-* cp313-* cp314-*"
 # 32-bit legs have no numpy/numba wheels to test against, and PyPy cannot load
 # these CPython-API extensions at all.
-skip = "*_i686 *-win32 pp*"
+#
+# musllinux is skipped because `numba` is a hard runtime dependency and its own
+# dependency `llvmlite` publishes no musl wheels, so installing the built wheel
+# falls back to compiling LLVM from source and fails. As of llvmlite 0.49.0 the
+# complete set of published wheel platforms is:
+#
+#     macosx_12_0_arm64 · manylinux_2_17_x86_64 · manylinux_2_28_aarch64 · win_amd64
+#
+# That list -- not anything about the Cython kernels -- is what bounds this
+# project's distributable platforms. A musllinux wheel would build fine here and
+# then be uninstallable, which is worse than not shipping one.
+skip = "*_i686 *-win32 pp* *musllinux*"
 
 # The whole point of #132. Without this the hook degrades to a pure-Python wheel
 # on a compile failure, which is correct for a source install but would silently
