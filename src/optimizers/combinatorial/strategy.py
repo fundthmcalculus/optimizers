@@ -5,7 +5,7 @@ from typing import Literal, Optional
 import numpy as np
 
 from ..core import IOptimizerConfig
-from ..core.base import OptimizerResult
+from ..core.base import OptimizerResult, ensure_literal_choice
 from .base import TSPBase, check_path_distance
 from ..core.types import AI, F, AF
 
@@ -37,13 +37,10 @@ except ImportError:  # pragma: no cover - exercised only in unbuilt checkouts
 #: never what you want otherwise.
 LocalSearchBackend = Literal["cython", "python"]
 
-#: Historical value. numba is gone, but configs and pickles predating its
-#: removal still carry it, so it is accepted and treated as "use the compiled
-#: kernel if you have one" -- which is what anyone who wrote it actually wanted.
+#: Historical value. Rejected rather than aliased -- see `_use_cython_backend`.
 _LEGACY_NUMBA = "numba"
 
 _warned_no_accelerator = False
-_warned_legacy_numba = False
 
 
 def _use_cython_backend(config: object) -> bool:
@@ -57,24 +54,27 @@ def _use_cython_backend(config: object) -> bool:
       slowdown is much worse than a noisy one.
     * ``"python"`` -> always the interpreted kernels, and no warning, because
       that was asked for rather than fallen back to.
-    * ``"numba"`` -> deprecated alias, treated as ``"cython"``.
+    * anything else, ``"numba"`` included -> ``ValueError``.
+
+    The value is validated rather than tolerated. A stale ``"numba"`` was
+    briefly accepted as an alias for ``"cython"``, which reads as kind but is
+    not: it lets a config that names a backend this library no longer has run
+    silently under a different one, which is exactly the way a benchmark
+    comparison ends up measuring something other than what it says. The same
+    argument applies to a typo -- ``"cyton"`` used to fall through to the
+    compiled path and look like a pass.
     """
     requested = getattr(config, "local_search_backend", "cython")
 
     if requested == _LEGACY_NUMBA:
-        global _warned_legacy_numba
-        if not _warned_legacy_numba:
-            _warned_legacy_numba = True
-            warnings.warn(
-                'local_search_backend="numba" is deprecated: the numba backend '
-                "has been removed because the Cython kernels are faster on every "
-                'kernel measured. Treating it as "cython". Pass "cython" '
-                '(the default) to silence this, or "python" to force the '
-                "interpreted kernels.",
-                DeprecationWarning,
-                stacklevel=3,
-            )
-        requested = "cython"
+        raise ValueError(
+            'local_search_backend="numba" is no longer supported: the numba '
+            "backend was removed because the Cython kernels are faster on every "
+            'kernel and size measured. Use "cython" (the default) for the '
+            'compiled kernels, or "python" for the interpreted reference '
+            "kernels."
+        )
+    ensure_literal_choice(requested, LocalSearchBackend)
 
     if requested == "python":
         return False
@@ -115,9 +115,11 @@ class TwoOptTSPConfig(IOptimizerConfig):
     This is a preference, not a guarantee: on a build without the extension
     ``"cython"`` falls back to the interpreted kernels and warns once.
 
-    ``"numba"`` is accepted as a deprecated alias for ``"cython"``. The numba
-    backend was removed once the Cython kernels measured faster on every kernel
-    and size."""
+    ``"numba"`` is rejected with a ``ValueError``, as is any other unknown
+    value. The numba backend was removed once the Cython kernels measured
+    faster on every kernel and size, and silently redirecting a stale config to
+    a different backend is how a benchmark ends up measuring something other
+    than what it reports."""
 
 
 def _depot_first_tour(route: AI, n: int) -> AI:

@@ -54,56 +54,43 @@ def test_missing_backend_attribute_defaults_to_cython(monkeypatch):
     assert st._use_cython_backend(object()) is True
 
 
-# ------------------------- the legacy numba alias --------------------------
+# ------------------------ stale and invalid values --------------------------
 
 
-def test_legacy_numba_value_maps_to_cython(monkeypatch):
-    """Old configs and pickles still say "numba"; they meant "go fast".
+@pytest.mark.parametrize("has_cython", [True, False])
+def test_legacy_numba_value_is_rejected(monkeypatch, has_cython):
+    """A config naming a backend this library no longer has must not run.
 
-    Mapping it to the interpreted kernels instead would turn a stale config
-    value into a silent ~900x slowdown, which is the opposite of what whoever
-    wrote it wanted.
+    It was briefly accepted as an alias for ``"cython"``. That reads as kind and
+    is not: it lets a benchmark that says it is measuring numba quietly measure
+    Cython instead. Rejected on both availability paths, so the error does not
+    depend on whether the extension happens to be built.
     """
+    monkeypatch.setattr(st, "HAS_CYTHON", has_cython)
+    with pytest.raises(ValueError, match="numba"):
+        st._use_cython_backend(_Cfg("numba"))
+
+
+@pytest.mark.parametrize("bad", ["cyton", "CYTHON", "", "c", None, 0])
+def test_unknown_backend_values_are_rejected(monkeypatch, bad):
+    """Typos must not fall through to the compiled path and look like a pass."""
     monkeypatch.setattr(st, "HAS_CYTHON", True)
-    monkeypatch.setattr(st, "_warned_legacy_numba", False)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        assert st._use_cython_backend(_Cfg("numba")) is True
-
-
-def test_legacy_numba_value_warns_once(monkeypatch):
-    monkeypatch.setattr(st, "HAS_CYTHON", True)
-    monkeypatch.setattr(st, "_warned_legacy_numba", False)
-
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        for _ in range(5):
-            st._use_cython_backend(_Cfg("numba"))
-
-    deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
-    assert len(deprecations) == 1, "must not warn once per solve"
-    assert "numba" in str(deprecations[0].message)
+    with pytest.raises(ValueError):
+        st._use_cython_backend(_Cfg(bad))
 
 
 # ------------------------------- the warning -------------------------------
 
 
-@pytest.mark.parametrize("backend", ["cython", "numba"])
-def test_warns_when_falling_back_to_interpreted(monkeypatch, backend):
-    """Falling back is never silent -- for either spelling that asks to go fast.
-
-    Parametrised deliberately: an earlier version returned early for one of the
-    spellings and skipped the warning on exactly the path where the caller had
-    asked for a compiled backend and not got one.
-    """
+def test_warns_when_falling_back_to_interpreted(monkeypatch):
+    """Falling back to the interpreted kernels is never silent."""
     monkeypatch.setattr(st, "HAS_CYTHON", False)
     monkeypatch.setattr(st, "_warned_no_accelerator", False)
-    monkeypatch.setattr(st, "_warned_legacy_numba", True)  # isolate the one warning
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         for _ in range(5):
-            st._use_cython_backend(_Cfg(backend))
+            st._use_cython_backend(_Cfg("cython"))
 
     runtime = [w for w in caught if issubclass(w.category, RuntimeWarning)]
     assert len(runtime) == 1, "must not warn once per solve"
