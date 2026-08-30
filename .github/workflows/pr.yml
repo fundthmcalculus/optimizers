@@ -102,6 +102,45 @@ jobs:
           print('installed wheel exposes both compiled kernels')
           "
 
+      - name: A default install must not pull in numba, and must still work
+        # numba is an optional extra. The install above deliberately did NOT
+        # request it, so this asserts two things that are easy to regress
+        # together: that nothing re-introduced numba as a hard dependency (which
+        # would make the package uninstallable on Intel macOS again), and that
+        # the library actually runs without it by auto-selecting the compiled
+        # kernels rather than silently interpreting them.
+        run: |
+          set -euo pipefail
+          if /tmp/wheel-check/bin/pip show numba >/dev/null 2>&1; then
+            echo "::error::numba was installed without being requested -- it must stay an optional extra"
+            exit 1
+          fi
+          cd /tmp
+          /tmp/wheel-check/bin/python -W error::RuntimeWarning -c "
+          import numpy as np
+          from optimizers.combinatorial.strategy import (
+              HAS_NUMBA, HAS_CYTHON, TwoOptTSP, TwoOptTSPConfig,
+              NearestNeighborTSP, NearestNeighborTSPConfig,
+          )
+          assert not HAS_NUMBA, 'numba should be absent here'
+          assert HAS_CYTHON, 'the wheel must still carry the compiled kernels'
+          rng = np.random.default_rng(0)
+          pts = rng.uniform(0, 100, (60, 2))
+          d = np.linalg.norm(pts[:, None, :] - pts[None, :, :], axis=-1)
+          np.fill_diagonal(d, 0.0)
+          d = np.ascontiguousarray(d)
+          nn = NearestNeighborTSP(config=NearestNeighborTSPConfig(name='nn'),
+                                  network_routes=d.copy()).solve()
+          # -W error::RuntimeWarning: auto-promotion to cython is NOT a degraded
+          # state, so the 'no accelerator' warning must not fire here.
+          r = TwoOptTSP(config=TwoOptTSPConfig(name='x'),
+                        initial_route=nn.solution_vector.copy(),
+                        initial_value=nn.solution_score,
+                        network_routes=d.copy()).solve()
+          assert r.solution_score <= nn.solution_score
+          print(f'solved without numba via the cython kernels: {r.solution_score:.3f}')
+          "
+
   test:
     runs-on: ubuntu-latest
     steps:

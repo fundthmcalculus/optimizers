@@ -1070,7 +1070,6 @@ dependencies = [
     { name = "joblib" },
     { name = "kmodes" },
     { name = "matplotlib" },
-    { name = "numba" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pandas" },
@@ -1087,8 +1086,12 @@ dev = [
     { name = "flake8" },
     { name = "flake8-pyproject" },
     { name = "mypy" },
+    { name = "numba" },
     { name = "optuna" },
     { name = "pytest" },
+]
+numba = [
+    { name = "numba" },
 ]
 
 [package.metadata]
@@ -1102,7 +1105,8 @@ requires-dist = [
     { name = "kmodes", specifier = ">=0.12.2" },
     { name = "matplotlib", specifier = ">=3.10" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
-    { name = "numba" },
+    { name = "numba", marker = "extra == 'dev'" },
+    { name = "numba", marker = "extra == 'numba'" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "optuna", marker = "extra == 'dev'", specifier = ">=4.3.0" },
     { name = "pandas", specifier = ">=2.0.0" },
@@ -1111,7 +1115,7 @@ requires-dist = [
     { name = "scipy" },
     { name = "tqdm", specifier = ">=4.60" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["numba", "dev"]
 
 [[package]]
 name = "optuna"
