@@ -16,9 +16,15 @@ solvers rely on; ``SolutionDeck`` already satisfies it and is aliased as
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from ..core.types import AF, b8
+
+if TYPE_CHECKING:
+    from ..core.base import WrappedGoalFcn
+    from ..core.samplers import SamplerType
+    from ..core.variables import InputVariables
+    from ..solution_deck import InitializationType
 
 
 @runtime_checkable
@@ -48,6 +54,27 @@ class Archive(Protocol):
     def get_best(self) -> tuple[AF, float, b8]: ...
 
     def __len__(self) -> int: ...
+
+    # --- population lifecycle (both implementations, and every solver, use
+    # these; they were missing from the protocol even though `soln_deck` is
+    # exactly one of the two) ---
+
+    def initialize_solution_deck(
+        self,
+        variables: "InputVariables",
+        eval_fcn: "WrappedGoalFcn",
+        preserve_percent: float = 0.0,
+        init_type: "InitializationType" = "random",
+        sampler_type: "SamplerType" = "uniform",
+    ) -> None: ...
+
+    def add_generation(
+        self,
+        solutions: AF,
+        values: AF,
+        outputs: AF | None = None,
+        local_optima: bool = False,
+    ) -> None: ...
 
     # --- multi-output surface (quality-diversity add-on) ---
     solution_outputs: AF | None  # (N, n_outputs) tracked outputs, or None (scalar)

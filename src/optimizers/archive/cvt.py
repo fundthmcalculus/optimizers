@@ -79,7 +79,7 @@ class CVTArchive:
         self.solution_archive: af64 = np.empty((0, num_vars), dtype=dtype)
         self.solution_value: af64 = np.empty((0,), dtype=f64)
         self.is_local_optima = np.empty((0,), dtype=b8)
-        self.solution_outputs: af64 | None = None
+        self.solution_outputs: AF | None = None
         # ``archive_size`` kept for API parity (consumers read it); for a MAP-Elites
         # archive capacity is the number of cells, not an elitist top-k.
         self.archive_size = n_cells

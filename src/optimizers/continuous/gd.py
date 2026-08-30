@@ -10,6 +10,7 @@ from ..core.base import (
     OptimizerResult,
     GoalFcn,
     InputArguments,
+    StopReason,
 )
 from ..core.types import AF
 from ..core import WrappedGoalFcn, InputVariables
@@ -188,7 +189,7 @@ class GradientDescentOptimizer(IOptimizer):
             else:
                 best_soln_value: list[float] = list()
                 x0 = np.array([v.initial_random_value(0.0) for v in self.variables])
-                stop_reason = "max_iterations"
+                stop_reason: StopReason = "max_iterations"
                 for gen in tqdm(
                     range(self.config.num_generations),
                     desc="Stepwise optimization generations",

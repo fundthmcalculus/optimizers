@@ -23,8 +23,10 @@ from ..core.base import (
     WrappedBatchGoalFcn,
 )
 from ..core.types import AF, af64
+from ..core.samplers import SamplerType
 from ..core.random import get_seed
-from ..solution_deck import SolutionDeck
+from ..solution_deck import InitializationType, SolutionDeck
+from ..archive.base import Archive
 from ..archive.cvt import CVTArchive
 from ..archive.descriptor import RandomProjectionDescriptor
 from ..archive.metrics import QDReport, qd_score, pareto_front, hypervolume
@@ -276,6 +278,9 @@ class IOptimizer(BaseOptimizer):
 
         self._eval_full = _eval_full
 
+        # Archive, not SolutionDeck: the map-elites branch below assigns a
+        # CVTArchive, which is a structural sibling rather than a subclass.
+        self.soln_deck: Archive
         if existing_soln_deck is not None:
             self.soln_deck = existing_soln_deck
         elif self._objective_mode == "map-elites":
@@ -353,8 +358,13 @@ class IOptimizer(BaseOptimizer):
         self, preserve_percent: float
     ) -> tuple[list[float], tqdm.tqdm, int, int, int, joblib.Parallel, StopReason]:
         self.validate_config()
-        init_type = getattr(self.config, "init_type", "random")
-        sampler_type = getattr(self.config, "sampler_type", "uniform")
+        # getattr erases the Literal the config declares, so re-check it here
+        # rather than assert it: a typo used to reach the deck and pick the
+        # default branch silently.
+        init_type: InitializationType = getattr(self.config, "init_type", "random")
+        sampler_type: SamplerType = getattr(self.config, "sampler_type", "uniform")
+        ensure_literal_choice(init_type, InitializationType)
+        ensure_literal_choice(sampler_type, SamplerType)
         self.soln_deck.initialize_solution_deck(
             self.variables,
             self.wrapped_fcn,
@@ -365,7 +375,13 @@ class IOptimizer(BaseOptimizer):
         self.soln_deck.sort()
         # QD add-on: seed tracked outputs for the initial archive so the deck's
         # solution_outputs stays row-aligned from generation zero.
-        if self.soln_deck.solution_outputs is not None:
+        # set_all_outputs is the scalar deck's alone -- CVTArchive pins
+        # solution_outputs to None, so this branch was already unreachable for
+        # it. The isinstance says that out loud instead of relying on it.
+        if (
+            isinstance(self.soln_deck, SolutionDeck)
+            and self.soln_deck.solution_outputs is not None
+        ):
             self.soln_deck.set_all_outputs(
                 self._evaluate_outputs(self.soln_deck.solution_archive)
             )
