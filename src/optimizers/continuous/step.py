@@ -6,7 +6,7 @@ from tqdm import tqdm
 from .base import IOptimizer
 from .local import local_perturb_optim
 from ..core import InputVariables, OptimizerResult
-from ..core.base import GoalFcn, InputArguments, IOptimizerConfig
+from ..core.base import GoalFcn, InputArguments, IOptimizerConfig, StopReason
 from ..solution_deck import SolutionDeck
 
 
@@ -43,7 +43,7 @@ class StepWiseOptimizer(IOptimizer):
         # Start with the initial value from the input variables, and stepwise refine solve
         if not self.config.optimize_whole_solution_deck:
             x0 = np.array([v.initial_random_value(0.0) for v in self.variables])
-            stop_reason = "max_iterations"
+            stop_reason: StopReason = "max_iterations"
             for gen in tqdm(
                 range(self.config.num_generations),
                 desc="Stepwise optimization generations",
@@ -69,6 +69,16 @@ class StepWiseOptimizer(IOptimizer):
             )
         else:
             best_soln_vector = None
+            # ``get``/``set`` are index-addressable-storage operations that only
+            # the scalar deck has; a CVTArchive stores by cell. This path is also
+            # broken for a different reason -- see the issue linked in the
+            # docstring -- but an AttributeError three frames down is the worse
+            # of the two failures.
+            if not isinstance(self.soln_deck, SolutionDeck):
+                raise NotImplementedError(
+                    "optimize_whole_solution_deck requires the scalar SolutionDeck; "
+                    f"got {type(self.soln_deck).__name__}."
+                )
             for soln_idx in tqdm(
                 range(self.soln_deck.archive_size), desc="Solution Deck Entry"
             ):

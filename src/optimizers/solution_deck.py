@@ -7,7 +7,7 @@ from kmodes.kmodes import KModes
 
 from .core.base import ensure_literal_choice, WrappedGoalFcn
 from .core.random import get_seed
-from .core.types import f64, af64, ab8, b8
+from .core.types import AF, f64, af64, ab8, b8
 from .core.variables import InputVariables
 from .core.samplers import SamplerType, create_sampler
 
@@ -34,7 +34,7 @@ class SolutionDeck:
         # through every append/sort/dedup/truncate). ``None`` == classic scalar
         # deck, so the default path is byte-identical. See docs/history/QD_PARETO_PLAN.md §1.
         self.n_outputs = n_outputs
-        self.solution_outputs: af64 | None = (
+        self.solution_outputs: AF | None = (
             np.full((archive_size, n_outputs), np.nan, dtype=f64)
             if n_outputs > 0
             else None
@@ -42,10 +42,10 @@ class SolutionDeck:
 
     def append(
         self,
-        solutions: af64,
-        values: af64,
+        solutions: AF,
+        values: AF,
         local_optima: bool | b8 | ab8 = False,
-        outputs: af64 | None = None,
+        outputs: AF | None = None,
     ) -> None:
         if solutions.shape[0] != values.shape[0]:
             raise ValueError(
@@ -198,7 +198,7 @@ class SolutionDeck:
         if self.solution_outputs is not None:
             self.solution_outputs = self.solution_outputs[idx]
 
-    def set_all_outputs(self, outputs: af64) -> None:
+    def set_all_outputs(self, outputs: AF) -> None:
         """Set the full tracked-outputs array (row-aligned with the archive).
 
         Used to seed outputs for the initial deck in a multi-output run, once the
@@ -213,9 +213,9 @@ class SolutionDeck:
 
     def add_generation(
         self,
-        solutions: af64,
-        values: af64,
-        outputs: af64 | None = None,
+        solutions: AF,
+        values: AF,
+        outputs: AF | None = None,
         local_optima: bool = False,
     ) -> None:
         """Insert one generation of candidates (the classic elitist path).
