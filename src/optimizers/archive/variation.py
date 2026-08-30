@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 from numpy.random import Generator
 
-from ..core.types import AF
+from ..core.types import AF, af64, f64
 
 
 def iso_line_dd(
@@ -53,7 +53,10 @@ def iso_line_dd(
     # One directional scalar per pair, applied along (b - a).
     line = rng.standard_normal((n, 1)) * line_sigma
     children = a + iso + line * (b - a)
-    return np.clip(children, lower, upper)
+    # np.clip is stubbed as returning Any; the asarray is a no-op at runtime
+    # (children is already float64) and re-attaches the declared type.
+    clipped: af64 = np.asarray(np.clip(children, lower, upper), dtype=f64)
+    return clipped
 
 
 def iso_line_offspring(

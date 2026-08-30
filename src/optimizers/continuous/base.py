@@ -22,7 +22,7 @@ from ..core.base import (
     BatchGoalFcn,
     WrappedBatchGoalFcn,
 )
-from ..core.types import AF
+from ..core.types import AF, af64
 from ..core.random import get_seed
 from ..solution_deck import SolutionDeck
 from ..archive.cvt import CVTArchive
@@ -212,10 +212,14 @@ class IOptimizer(BaseOptimizer):
                 # the result) keeps this checkable across numpy versions -- some
                 # numpy typeshed releases don't offer a generic.__getitem__(int)
                 # overload.
+                # float() here is the single choke point where a user's goal
+                # function meets the library's `float` score contract: numpy
+                # scalars, 0-d arrays and Python floats all normalise, so no
+                # np.float64 leaks into OptimizerResult.solution_score.
                 if self._returns_outputs:
                     fitness, _outputs = result
-                    return fitness
-                return result
+                    return float(fitness)
+                return float(result)
 
             return __wrapped
 
@@ -551,7 +555,7 @@ def check_stop_early(
     return "none"
 
 
-def cdf(q: float, N: int) -> AF:
+def cdf(q: float, N: int) -> af64:
     """
     Parameters
     ----------
@@ -562,7 +566,8 @@ def cdf(q: float, N: int) -> AF:
     -------
     af64 The cumulative density function.
     """
-    j = np.r_[1 : N + 1]
-    c1 = 1 - np.exp(-q * j / N)
+    j = np.arange(1, N + 1)
+    c1: af64 = 1 - np.exp(-q * j / N)
     # Unity scaling, and since the CDF is positive-definite, we can use the last entry.
-    return c1 / c1[-1]
+    scaled: af64 = c1 / c1[-1]
+    return scaled

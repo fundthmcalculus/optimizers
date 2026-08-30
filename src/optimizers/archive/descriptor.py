@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..core.types import AF
+from ..core.types import AF, af64
 
 
 class RandomProjectionDescriptor:
@@ -33,14 +33,18 @@ class RandomProjectionDescriptor:
         seed: int = 0,
     ):
         rng = np.random.default_rng(seed)
-        self.R = rng.standard_normal((descriptor_dim, num_vars)) / np.sqrt(num_vars)
-        self.lower = np.asarray(lower, dtype=float)
-        self.upper = np.asarray(upper, dtype=float)
+        self.R: af64 = rng.standard_normal((descriptor_dim, num_vars)) / np.sqrt(
+            num_vars
+        )
+        self.lower: af64 = np.asarray(lower, dtype=float)
+        self.upper: af64 = np.asarray(upper, dtype=float)
         self.descriptor_dim = descriptor_dim
 
     def __call__(self, x: AF) -> AF:
         x = np.atleast_2d(np.asarray(x, dtype=float))
-        span = np.where(self.upper > self.lower, self.upper - self.lower, 1.0)
+        # np.where is stubbed as Any; annotating here is what makes the
+        # projection below type-check rather than leak Any out of __call__.
+        span: af64 = np.where(self.upper > self.lower, self.upper - self.lower, 1.0)
         x_norm = (x - self.lower) / span
         return x_norm @ self.R.T  # (n, descriptor_dim)
 
