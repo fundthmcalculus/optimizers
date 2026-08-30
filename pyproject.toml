@@ -24,12 +24,18 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "scipy",
     "pandas>=2.0.0",
-    "numba",
     "cloudpickle",
 ]
 
 [project.optional-dependencies]
+# numba is an accelerator, not a requirement. It is an extra because its own
+# dependency `llvmlite` publishes no macOS x86_64 wheel, so listing numba as a
+# hard dependency made this package uninstallable on Intel Macs. The TSP
+# local-search kernels fall back to the compiled Cython extension (shipped in
+# every wheel) and then to interpreted Python. See combinatorial/strategy.py.
+numba = ["numba"]
 dev = [
+    "numba",
     "pytest>=6.0",
     "black>=24.0",
     "mypy>=1.8",
@@ -63,16 +69,15 @@ build = "cp311-* cp312-* cp313-* cp314-*"
 # 32-bit legs have no numpy/numba wheels to test against, and PyPy cannot load
 # these CPython-API extensions at all.
 #
-# musllinux is skipped because `numba` is a hard runtime dependency and its own
-# dependency `llvmlite` publishes no musl wheels, so installing the built wheel
-# falls back to compiling LLVM from source and fails. As of llvmlite 0.49.0 the
-# complete set of published wheel platforms is:
+# musllinux is skipped because `scikit-learn` -- a hard runtime dependency --
+# publishes no musl wheels. As of 1.9.0 its platform tags are macosx x86_64 and
+# arm64, manylinux x86_64 and aarch64, win_amd64 and win_arm64: no musllinux at
+# all. So a musl wheel would build fine here and then be uninstallable.
 #
-#     macosx_12_0_arm64 · manylinux_2_17_x86_64 · manylinux_2_28_aarch64 · win_amd64
-#
-# That list -- not anything about the Cython kernels -- is what bounds this
-# project's distributable platforms. A musllinux wheel would build fine here and
-# then be uninstallable, which is worse than not shipping one.
+# This was previously attributed to numba/llvmlite, which was also true at the
+# time. numba is now an optional extra, which removed it as a constraint and
+# restored the macOS x86_64 leg -- but scikit-learn independently blocks musl,
+# so the skip stays. Re-checking this means re-checking sklearn, not numba.
 skip = "*_i686 *-win32 pp* *musllinux*"
 
 # The whole point of #132. Without this the hook degrades to a pure-Python wheel
