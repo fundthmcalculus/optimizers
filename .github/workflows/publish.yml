@@ -3,7 +3,7 @@ name: Publish to PyPI
 # Until #132 this job ran a bare `python -m build` on one Linux runner and
 # uploaded a single `py3-none-any` wheel. Since hatchling never executed
 # setup.py, that wheel contained no compiled kernels at all -- every
-# `pip install optimizers` silently took the numba / pure-NumPy fallback.
+# `pip install optimizers` silently took the interpreted / pure-NumPy fallback.
 #
 # With the hatch_build.py hook in place a wheel is now platform-specific, so one
 # runner can no longer produce a release: it has to be a matrix, one leg per
@@ -34,7 +34,7 @@ jobs:
         # These legs are the platforms every *hard* runtime dependency ships
         # wheels for. macOS x86_64 is back: it was dropped when `numba` was a
         # hard dependency, because llvmlite publishes no Intel-mac wheel, and
-        # making numba an optional extra removed that constraint.
+        # removing numba removed that constraint.
         #
         # musllinux is still absent, now for an unrelated reason -- scikit-learn
         # publishes no musl wheels either. See the `skip` note in pyproject.toml.
@@ -43,7 +43,7 @@ jobs:
           - ubuntu-24.04-arm   # manylinux aarch64
           - windows-latest     # win_amd64
           - macos-latest       # macOS arm64 (Apple silicon)
-          - macos-15-intel     # macOS x86_64 (restored by the numba extra)
+          - macos-15-intel     # macOS x86_64 (restored by dropping numba)
     steps:
       - uses: actions/checkout@v7
 

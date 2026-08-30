@@ -102,27 +102,24 @@ jobs:
           print('installed wheel exposes both compiled kernels')
           "
 
-      - name: A default install must not pull in numba, and must still work
-        # numba is an optional extra. The install above deliberately did NOT
-        # request it, so this asserts two things that are easy to regress
-        # together: that nothing re-introduced numba as a hard dependency (which
-        # would make the package uninstallable on Intel macOS again), and that
-        # the library actually runs without it by auto-selecting the compiled
-        # kernels rather than silently interpreting them.
+      - name: numba must not be installed, and the solver must still work
+        # numba was removed outright. This asserts two things that are easy to
+        # regress together: that nothing re-introduced it as a dependency (which
+        # would re-add ~140 MB and break the macOS x86_64 wheel), and that the
+        # library solves through the compiled kernels without it.
         run: |
           set -euo pipefail
           if /tmp/wheel-check/bin/pip show numba >/dev/null 2>&1; then
-            echo "::error::numba was installed without being requested -- it must stay an optional extra"
+            echo "::error::numba is installed -- it was removed as a dependency and must not come back"
             exit 1
           fi
           cd /tmp
           /tmp/wheel-check/bin/python -W error::RuntimeWarning -c "
           import numpy as np
           from optimizers.combinatorial.strategy import (
-              HAS_NUMBA, HAS_CYTHON, TwoOptTSP, TwoOptTSPConfig,
+              HAS_CYTHON, TwoOptTSP, TwoOptTSPConfig,
               NearestNeighborTSP, NearestNeighborTSPConfig,
           )
-          assert not HAS_NUMBA, 'numba should be absent here'
           assert HAS_CYTHON, 'the wheel must still carry the compiled kernels'
           rng = np.random.default_rng(0)
           pts = rng.uniform(0, 100, (60, 2))
@@ -131,14 +128,14 @@ jobs:
           d = np.ascontiguousarray(d)
           nn = NearestNeighborTSP(config=NearestNeighborTSPConfig(name='nn'),
                                   network_routes=d.copy()).solve()
-          # -W error::RuntimeWarning: auto-promotion to cython is NOT a degraded
-          # state, so the 'no accelerator' warning must not fire here.
+          # -W error::RuntimeWarning: the wheel ships the kernels, so the
+          # 'falling back to interpreted Python' warning must not fire here.
           r = TwoOptTSP(config=TwoOptTSPConfig(name='x'),
                         initial_route=nn.solution_vector.copy(),
                         initial_value=nn.solution_score,
                         network_routes=d.copy()).solve()
           assert r.solution_score <= nn.solution_score
-          print(f'solved without numba via the cython kernels: {r.solution_score:.3f}')
+          print(f'solved via the cython kernels, no numba: {r.solution_score:.3f}')
           "
 
   test:
@@ -173,8 +170,8 @@ jobs:
         # pure-Python wheel and compiles nothing. Both extensions are declared
         # `optional=True`, and that flag is now actually effective, so a compile
         # failure is a warning and `build_ext` still exits 0. That is deliberate:
-        # a source tree without a usable toolchain should fall back to the numba
-        # / pure-NumPy kernels rather than hard-fail. CI must not accept the
+        # a source tree without a usable toolchain should fall back to the
+        # interpreted / pure-NumPy kernels rather than hard-fail. CI must not accept the
         # fallback silently, though, or a broken kernel reads as a green build
         # hiding a large performance regression.
         run: PYTHONPATH=./src python -c "import optimizers.combinatorial._tsp_cython, optimizers.benchmarks._bench_cython; print('compiled kernels present')"

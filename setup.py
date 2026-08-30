@@ -26,7 +26,7 @@ uses::
     python setup.py build_ext --inplace
 
 The extensions are **optional**: if one can't be compiled the build emits a
-warning and continues, and the library falls back to the numba kernels at import
+warning and continues, and the library falls back to the interpreted kernels at import
 time (see ``combinatorial/strategy.py`` and ``benchmarks/cython_kernels.py``).
 That covers an unsupported toolchain, an ordinary compile error, and a missing
 Cython — without Cython the ``.pyx`` reaches the compiler untranslated and
@@ -128,7 +128,7 @@ _extensions = [
     Extension(
         "optimizers.combinatorial._tsp_cython",
         ["src/optimizers/combinatorial/_tsp_cython.pyx"],
-        # A compile failure degrades to the numba fallback instead of failing
+        # A compile failure degrades to the interpreted fallback instead of failing
         # install. Re-stamped after cythonize() below, which drops it.
         optional=True,
     ),

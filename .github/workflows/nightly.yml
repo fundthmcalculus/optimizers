@@ -46,8 +46,8 @@ jobs:
 
       - name: Confirm the compiled kernels actually built
         # Same guard as PR Checks: `optional=True` means a compile failure is a
-        # warning and build_ext still exits 0, so a nightly measuring the numba
-        # fallback would report a large "regression" that is really a build
+        # warning and build_ext still exits 0, so a nightly measuring the
+        # interpreted fallback would report a large "regression" that is really a build
         # problem. Fail loudly here instead.
         run: PYTHONPATH=./src python -c "import optimizers.combinatorial._tsp_cython, optimizers.benchmarks._bench_cython; print('compiled kernels present')"
 

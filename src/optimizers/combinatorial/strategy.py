@@ -1,6 +1,6 @@
 import warnings
 from dataclasses import dataclass
-from typing import Any, Callable, Literal, Optional
+from typing import Literal, Optional
 
 import numpy as np
 
@@ -9,58 +9,22 @@ from ..core.base import OptimizerResult
 from .base import TSPBase, check_path_distance
 from ..core.types import AI, F, AF
 
-# --- Optional accelerators ---------------------------------------------------
-# Both local-search backends are optional, and the module works with neither.
-# They are *independent*: numba is a JIT applied to the kernels below, cython is
-# an ahead-of-time compiled extension shipped in the wheel.
-
-
-def _noop_njit(*args: Any, **kwargs: Any) -> Any:
-    """No-op stand-in for ``numba.njit``, used when numba is not installed.
-
-    Defined unconditionally rather than inside the ``except`` branch below so
-    that it is importable -- and therefore directly testable -- in the normal
-    environment where numba *is* present.
-
-    Supports both spellings so the decorators below need no branching: bare
-    ``@njit`` (a single positional callable) and ``@njit(cache=True)``
-    (keywords, returning the real decorator).
-    """
-    if len(args) == 1 and not kwargs and callable(args[0]):
-        return args[0]
-
-    def _decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        return func
-
-    return _decorator
-
-
-# numba is an optional extra (`pip install optimizers[numba]`), not a hard
-# dependency. It was made optional because it is the narrowest link in the
-# dependency chain: its own dependency `llvmlite` publishes no macOS x86_64
-# wheel, so requiring numba made this package uninstallable on Intel Macs
-# regardless of anything in it.
+# --- Compiled local-search backend -------------------------------------------
+# The 2-opt / 3-opt / Lin-Kernighan hot loops are tight scalar sweeps over a
+# distance matrix. They exist here as ordinary Python for correctness and as a
+# last-resort fallback, but they are only *fast* when the compiled extension is
+# available -- the gap is roughly 900x at N=200, not a few percent.
 #
-# Without numba the kernels below run as ordinary Python. They are correct that
-# way but *much* slower -- tight scalar loops over a distance matrix are the
-# worst case for the interpreter. That is why `_use_cython_backend` prefers the
-# compiled extension whenever numba is absent, and why the last resort warns.
-try:
-    from numba import njit
-
-    HAS_NUMBA = True
-except ImportError:  # pragma: no cover - exercised in the no-numba CI leg
-    njit = _noop_njit
-    HAS_NUMBA = False
-
-
-# Optional compiled backend (2-opt / 3-opt). Built into the wheel by
-# hatch_build.py, or via `setup.py build_ext` in a source checkout
-# (see docs/history/CYTHON_ANALYSIS.md).
+# numba used to provide a second accelerator for the same loops. It was removed:
+# the Cython kernels beat it on every kernel and size measured (2-opt 1.8-2.8x,
+# 3-opt 1.1-1.4x, LK 1.1-1.6x), while numba cost 140 MB of install (llvmlite is
+# 121 MB of it), ~300 ms of import on every process, and a JIT warm-up on first
+# call. Two accelerators for one set of loops was not worth that, once the
+# faster one shipped in every wheel (see hatch_build.py).
 try:
     # Compiled extension: no source/stub for mypy to read (built ahead-of-time),
     # so the submodule attribute is invisible to static analysis whether or not
-    # the .so is present — silence just this optional-backend import.
+    # the .so is present -- silence just this optional-backend import.
     from . import _tsp_cython  # type: ignore[attr-defined]
 
     HAS_CYTHON = True
@@ -68,36 +32,51 @@ except ImportError:  # pragma: no cover - exercised only in unbuilt checkouts
     _tsp_cython = None
     HAS_CYTHON = False
 
-LocalSearchBackend = Literal["numba", "cython"]
+#: Accepted values for ``local_search_backend``. ``"python"`` forces the
+#: interpreted kernels, which is useful for testing and debugging and almost
+#: never what you want otherwise.
+LocalSearchBackend = Literal["cython", "python"]
+
+#: Historical value. numba is gone, but configs and pickles predating its
+#: removal still carry it, so it is accepted and treated as "use the compiled
+#: kernel if you have one" -- which is what anyone who wrote it actually wanted.
+_LEGACY_NUMBA = "numba"
 
 _warned_no_accelerator = False
+_warned_legacy_numba = False
 
 
 def _use_cython_backend(config: object) -> bool:
     """Decide whether to run the compiled extension for this solve.
 
-    The config's ``local_search_backend`` states a *preference*; availability
-    decides the outcome. Behaviour when numba is installed is exactly as it was
-    before numba became optional -- the auto-promotion below can only trigger in
-    an environment that previously could not import this module at all.
+    ``local_search_backend`` states a *preference*; availability decides the
+    outcome.
 
-    * ``"cython"`` requested and built -> use it.
-    * Otherwise numba, when it is installed. (So requesting cython on a build
-      without the extension still lands on numba, exactly as before.)
-    * numba missing -> prefer the compiled extension over interpreting the
-      kernels, which is orders of magnitude slower rather than marginally so.
-    * Neither available -> pure Python, with a one-time warning, because a
-      silent 100x slowdown is worse than a noisy one.
-
-    Note the ordering: every un-accelerated path has to reach the warning at the
-    bottom. An earlier version returned ``HAS_CYTHON`` directly for a ``cython``
-    request, which skipped the warning precisely when the caller had *asked* for
-    a compiled backend and not got one.
+    * ``"cython"`` (the default) -> the compiled kernel when it is built,
+      otherwise the interpreted one, with a one-time warning. A silent ~900x
+      slowdown is much worse than a noisy one.
+    * ``"python"`` -> always the interpreted kernels, and no warning, because
+      that was asked for rather than fallen back to.
+    * ``"numba"`` -> deprecated alias, treated as ``"cython"``.
     """
-    requested = getattr(config, "local_search_backend", "numba")
-    if requested == "cython" and HAS_CYTHON:
-        return True
-    if HAS_NUMBA:
+    requested = getattr(config, "local_search_backend", "cython")
+
+    if requested == _LEGACY_NUMBA:
+        global _warned_legacy_numba
+        if not _warned_legacy_numba:
+            _warned_legacy_numba = True
+            warnings.warn(
+                'local_search_backend="numba" is deprecated: the numba backend '
+                "has been removed because the Cython kernels are faster on every "
+                'kernel measured. Treating it as "cython". Pass "cython" '
+                '(the default) to silence this, or "python" to force the '
+                "interpreted kernels.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+        requested = "cython"
+
+    if requested == "python":
         return False
     if HAS_CYTHON:
         return True
@@ -106,11 +85,11 @@ def _use_cython_backend(config: object) -> bool:
     if not _warned_no_accelerator:
         _warned_no_accelerator = True
         warnings.warn(
-            "Neither numba nor the compiled Cython kernels are available, so "
-            "TSP local search is running as interpreted Python. This is correct "
-            "but dramatically slower on non-trivial instances. Install the "
-            "extra with `pip install optimizers[numba]`, or use a wheel that "
-            "ships the compiled kernels.",
+            "The compiled Cython kernels are not available, so TSP local search "
+            "is running as interpreted Python. This is correct but dramatically "
+            "slower -- roughly 900x on a 200-city 2-opt. Install a wheel that "
+            "ships the kernels, or build them in a source checkout with "
+            "`python setup.py build_ext --inplace`.",
             RuntimeWarning,
             stacklevel=3,
         )
@@ -125,16 +104,20 @@ class TwoOptTSPConfig(IOptimizerConfig):
     """Number of iterations to run"""
     nearest_neighbors: int = -1
     """Only check the next nodes, which makes this O(nk), but lower chance of finding crossovers"""
-    local_search_backend: LocalSearchBackend = "numba"
-    """Which compiled 2-opt/3-opt kernel to prefer. ``"numba"`` (default) is the
-    JIT kernel; ``"cython"`` uses the ahead-of-time compiled ``nogil`` extension
-    when it has been built. Results are identical across backends.
+    local_search_backend: LocalSearchBackend = "cython"
+    """Which 2-opt/3-opt kernel to use.
 
-    This is a preference, not a guarantee -- both backends are optional. If the
-    requested one is unavailable the other is used, and if neither is, the
-    kernels run as interpreted Python (correct, but far slower, and warned
-    about once). numba ships as the ``numba`` extra:
-    ``pip install optimizers[numba]``."""
+    ``"cython"`` (default) runs the ahead-of-time compiled ``nogil`` extension,
+    which every wheel ships. ``"python"`` forces the interpreted reference
+    kernels -- useful for debugging, and roughly 900x slower at N=200, so it is
+    almost never what you want. Results are bit-identical either way.
+
+    This is a preference, not a guarantee: on a build without the extension
+    ``"cython"`` falls back to the interpreted kernels and warns once.
+
+    ``"numba"`` is accepted as a deprecated alias for ``"cython"``. The numba
+    backend was removed once the Cython kernels measured faster on every kernel
+    and size."""
 
 
 def _depot_first_tour(route: AI, n: int) -> AI:
@@ -167,15 +150,19 @@ def _swap_segment(ij: int, jk: int, new_route: AI) -> AI:
     return new_route
 
 
-# --- numba kernels for the local-search hot loops (report item #13) -----------
-# These are the classic numba sweet spot: tight scalar loops over a distance
-# matrix. cache=True persists the compiled code to disk so the ~1s compile is
-# paid once, not per run. The logic mirrors the pure-Python versions exactly so
-# results are unchanged; the speedup grows with N (2-opt is O(n^2) per pass,
-# 3-opt O(n^3)).
+# --- reference kernels for the local-search hot loops (report item #13) -------
+# These are the readable definition of each move, and the fallback when the
+# compiled extension is not available. They are deliberately written as flat
+# scalar loops that mirror `_tsp_cython.pyx` statement for statement, which is
+# what makes the two backends bit-identical and lets the tests assert that.
+#
+# They used to carry `@njit(cache=True)`. Do not interpret their shape as
+# leftover JIT accommodation and "modernise" it with vectorised NumPy: the
+# structure is what keeps them checkable against the Cython kernels, and the
+# compiled path is where the speed comes from. Run them on a large instance
+# only if you mean to -- roughly 900x slower than compiled at N=200.
 
 
-@njit(cache=True)
 def _two_opt_kernel(
     distances: AF,
     route: AI,
@@ -221,11 +208,10 @@ def _two_opt_kernel(
     return no_moves
 
 
-@njit(cache=True)
 def _three_opt_kernel(  # noqa: C901
     distances: AF, route: AI, num_iterations: int, nearest_neighbors: int
 ) -> bool:
-    """3-opt local search on ``route`` (mutated in place), numba-compiled.
+    """3-opt local search on ``route`` (mutated in place).
 
     For every triple of edges ``(a,b)``, ``(c,d)``, ``(e,f)`` (cut points
     ``ij < jk < kl``) tries all 8 ways to reconnect the 3 resulting segments --
@@ -235,10 +221,9 @@ def _three_opt_kernel(  # noqa: C901
     3-opt reconnection table: each ``best == k`` branch below moves exactly the
     cities that reconnection needs onto their new tour positions and leaves the
     rest untouched. This is written as a flat scalar switch rather than a
-    lookup table because it runs inside a numba ``@njit`` kernel, where a
-    table of index/reversal operations would cost more (dynamic dispatch,
-    allocation) than it saves -- see the 2-opt/3-opt section of
-    ``docs/history/CYTHON_ANALYSIS.md`` for the profiling that motivated the numba rewrite.
+    lookup table so it stays a statement-for-statement mirror of the Cython
+    kernel, which is what lets the tests assert the two are bit-identical -- see
+    the 2-opt/3-opt section of ``docs/history/CYTHON_ANALYSIS.md``.
     Returns ``True`` iff a full pass found no improving move (i.e. converged).
     """
     # N is the city count (see _two_opt_kernel), not the route length.
@@ -246,8 +231,9 @@ def _three_opt_kernel(  # noqa: C901
     # kl+1 must stay in-bounds. The old Python loop used ``l_nn = N`` and only
     # avoided an IndexError because back_to_start appends a depot node (route
     # length N+1); with no appended node it crashed. Capping by route length is
-    # a no-op for the well-defined back_to_start case and prevents njit (which
-    # skips bounds checks) from reading out of bounds otherwise.
+    # a no-op for the well-defined back_to_start case, and keeps this in step
+    # with the Cython kernel, which skips bounds checks and would read out of
+    # bounds otherwise.
     route_max = route.shape[0] - 1
     no_moves = True
     for _cur_iter in range(num_iterations):
@@ -359,7 +345,6 @@ def candidate_lists(distances: AF, k: int) -> AI:
     return np.argsort(dm, axis=1)[:, :k].astype(np.int64)
 
 
-@njit(cache=True)
 def _lk_relocate(
     tour: AI,
     pos: AI,
@@ -392,7 +377,6 @@ def _lk_relocate(
         pos[tour[x]] = x
 
 
-@njit(cache=True)
 def _lk_kernel(distances: AF, tour: AI, cand: AI, max_passes: int) -> int:  # noqa: C901
     """Lin-Kernighan-style local search on a cyclic tour (mutated in place).
 
