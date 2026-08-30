@@ -1,24 +1,45 @@
-from typing import Optional
-
 import numpy as np
 from numpy.random import Generator
+from numpy.typing import ArrayLike
 from scipy.special import ndtr, ndtri
 
-from ..core.types import AF, AI, F, I
+from ..core.types import af64, f64
 from ..core.variables import InputVariable as InputVariable  # re-exported
 from ..core.random import rng as global_rng
 
 
 class InputDiscreteVariable(InputVariable):
+    """A variable restricted to a fixed set of choices.
+
+    ``values`` is stored as float64 whatever dtype is passed in. Choices only
+    ever leave this class by way of a solution vector, and every buffer that
+    holds one is floating-point -- ``SolutionDeck.solution_archive``,
+    ``CVTArchive``'s batch, ``OptimizerResult.solution_vector``, all float64 by
+    default -- so an integer-valued variable was already widened one call later.
+    Normalising at construction keeps the class inside the ``InputVariable``
+    contract (``float`` for scalars, ``af64`` for populations) instead of
+    returning numpy dtype unions that the base class does not promise and the
+    pipeline does not preserve.
+    """
+
     def __init__(
         self,
         name: str,
-        values: AF | AI,
-        initial_value: Optional[F | I] = None,
+        values: ArrayLike,
+        initial_value: float | None = None,
     ):
         super().__init__(name)
-        self.values = values
-        self.initial_value = initial_value or self.random_value()
+        self.values: af64 = np.asarray(values, dtype=f64)
+        if self.values.size == 0:
+            raise ValueError(
+                f"variable {name!r} needs at least one value to choose from"
+            )
+        # Explicit None test: ``initial_value or ...`` re-drew at random whenever
+        # the caller pinned the variable to a falsy choice (0.0 being the obvious
+        # one), which silently ignored the argument.
+        self.initial_value = (
+            self.random_value() if initial_value is None else float(initial_value)
+        )
 
     def __repr__(self) -> str:
         return f"DV:{self.name} in {self.values}"
@@ -26,29 +47,29 @@ class InputDiscreteVariable(InputVariable):
     def __str__(self) -> str:
         return self.__repr__()
 
-    def perturb_value(self, current_value: F | I, perturbation: float = 0.1) -> F | I:
+    def perturb_value(self, current_value: float, perturbation: float = 0.1) -> float:
         # Just randomly tweak to another choice.
         return self.initial_random_value()
 
     def perturb_values(
         self,
-        current_values: AF,
+        current_values: af64,
         perturbation: float = 0.1,
         rng: Generator | None = None,
-    ) -> AF:
+    ) -> af64:
         # Perturbing a discrete variable just re-draws a random choice, so draw
         # the whole population at once.
         if rng is None:
             rng = global_rng()
         n = np.asarray(current_values).shape[0]
-        return rng.choice(self.values, size=n)
+        return self._choose(rng, n)
 
     def random_value(
         self,
-        current_value: F | I = np.nan,
-        other_values: Optional[AF] = None,
+        current_value: float = np.nan,
+        other_values: af64 | None = None,
         learning_rate: float = 0.7,
-    ) -> F | I:
+    ) -> float:
         rng = global_rng()
         if other_values is not None:
             # Convert into a weighted count, but ensure every option has a non-zero probability
@@ -56,16 +77,16 @@ class InputDiscreteVariable(InputVariable):
             unique, counts = np.unique(all_values, return_counts=True)
             # Unity normalize - TODO - Utilize the learning rate to adjust the non-base weights
             p_count = counts / np.sum(counts)
-            return rng.choice(self.values, p=p_count)
-        return rng.choice(self.values)
+            return float(rng.choice(self.values, p=p_count))
+        return float(rng.choice(self.values))
 
     def random_values(
         self,
-        current_values: AF,
-        other_values: Optional[AF] = None,
+        current_values: af64,
+        other_values: af64 | None = None,
         learning_rate: float = 0.7,
         rng: Generator | None = None,
-    ) -> AF:
+    ) -> af64:
         # The discrete weighting depends only on the archive column, not on the
         # per-entry current value, so build the probability vector ONCE and draw
         # all samples in a single rng.choice instead of running np.unique per
@@ -77,36 +98,44 @@ class InputDiscreteVariable(InputVariable):
             all_values = np.concatenate((self.values, other_values))
             unique, counts = np.unique(all_values, return_counts=True)
             p_count = counts / np.sum(counts)
-            return rng.choice(self.values, size=n, p=p_count)
-        return rng.choice(self.values, size=n)
+            return self._choose(rng, n, p=p_count)
+        return self._choose(rng, n)
 
-    def initial_random_value(self, perturbation: float = 0.1) -> F | I:
+    def _choose(self, rng: Generator, n: int, p: af64 | None = None) -> af64:
+        """One ``rng.choice`` draw, re-attached to the declared float64 type.
+
+        ``Generator.choice`` is stubbed as returning ``dtype[generic]``; the
+        ``asarray`` is a no-op at runtime because ``self.values`` is float64.
+        """
+        return np.asarray(rng.choice(self.values, size=n, p=p), dtype=f64)
+
+    def initial_random_value(self, perturbation: float = 0.1) -> float:
         rng = global_rng()
-        return rng.choice(self.values)
+        return float(rng.choice(self.values))
 
     def initial_random_values(
         self, n: int, perturbation: float = 0.1, rng: Generator | None = None
-    ) -> AF:
+    ) -> af64:
         if rng is None:
             rng = global_rng()
-        return rng.choice(self.values, size=n)
+        return self._choose(rng, n)
 
-    def range_value(self, p: float) -> F | I:
+    def range_value(self, p: float) -> float:
         # Map p in [0,1] to the discrete values
         idx = int(p * len(self.values))
         idx = min(max(idx, 0), len(self.values) - 1)
-        return self.values[idx]
+        return float(self.values[idx])
 
     @property
     def lower_bound(self) -> float:
-        return min(self.values)
+        return float(self.values.min())
 
     @property
     def upper_bound(self) -> float:
-        return max(self.values)
+        return float(self.values.max())
 
-    def get_nearest_value(self, x1: float) -> F:
-        return self.values[np.argmin(np.abs(self.values - x1))]
+    def get_nearest_value(self, x1: float) -> float:
+        return float(self.values[np.argmin(np.abs(self.values - x1))])
 
 
 class InputContinuousVariable(InputVariable):
@@ -151,10 +180,10 @@ class InputContinuousVariable(InputVariable):
 
     def perturb_values(
         self,
-        current_values: AF,
+        current_values: af64,
         perturbation: float = 0.1,
         rng: Generator | None = None,
-    ) -> AF:
+    ) -> af64:
         # Vectorized gaussian perturbation for a whole population at once.
         if rng is None:
             rng = global_rng()
@@ -197,7 +226,7 @@ class InputContinuousVariable(InputVariable):
     def random_value(
         self,
         current_value: float = np.nan,
-        other_values: Optional[AF] = None,
+        other_values: af64 | None = None,
         learning_rate: float = 0.7,
     ) -> float:
         rng = global_rng()
@@ -215,11 +244,11 @@ class InputContinuousVariable(InputVariable):
 
     def random_values(
         self,
-        current_values: AF,
-        other_values: Optional[AF] = None,
+        current_values: af64,
+        other_values: af64 | None = None,
         learning_rate: float = 0.7,
         rng: Generator | None = None,
-    ) -> AF:
+    ) -> af64:
         # Vectorized truncated-normal sampling: one draw per entry of
         # current_values, each centered on its own value with spread derived
         # from the (shared) archive column. Equivalent to calling random_value
@@ -275,7 +304,7 @@ class InputContinuousVariable(InputVariable):
 
     def initial_random_values(
         self, n: int, perturbation: float = 0.1, rng: Generator | None = None
-    ) -> AF:
+    ) -> af64:
         if rng is None:
             rng = global_rng()
         return rng.uniform(self.lower_bound, self.upper_bound, size=n)
@@ -293,7 +322,7 @@ class InputContinuousVariable(InputVariable):
         return self.__upper_bound
 
 
-def print_optimal_solution(x: AF, variables: list[InputContinuousVariable]) -> None:
+def print_optimal_solution(x: af64, variables: list[InputContinuousVariable]) -> None:
     print("Optimal solution:")
     for ij, var in enumerate(variables):
         print(f"{var.name}: {x[ij]}")
