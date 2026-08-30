@@ -76,8 +76,8 @@ class CVTArchive:
         self._cell_occupied = np.zeros(n_cells, dtype=bool)
 
         # --- scalar-surface views (rebuilt after each insertion) ---
-        self.solution_archive: af64 = np.empty((0, num_vars), dtype=dtype)
-        self.solution_value: af64 = np.empty((0,), dtype=f64)
+        self.solution_archive: AF = np.empty((0, num_vars), dtype=dtype)
+        self.solution_value: AF = np.empty((0,), dtype=f64)
         self.is_local_optima = np.empty((0,), dtype=b8)
         self.solution_outputs: AF | None = None
         # ``archive_size`` kept for API parity (consumers read it); for a MAP-Elites

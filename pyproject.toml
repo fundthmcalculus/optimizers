@@ -141,15 +141,13 @@ strict_optional = true
 # normally, including in these files.
 #
 # The original shape disabled nine codes across fourteen modules, so 136
-# (module, code) pairs were unreachable; this is 11.
+# (module, code) pairs were unreachable; this is 7.
 #
 # Measured in #143: with the whole baseline removed the tree had 110 errors.
-# #144 fixed a Liskov violation in continuous/variables.py (25), #146 swapped the
-# AF/AI dtype unions for numpy's abstract floating/signedinteger (13), #147 fixed
-# three non-numpy issues (4), #148 replaced the scalar `F` alias with `float`
-# throughout (22), #149 closed every `no-any-return` (9), #150 fixed two
-# None-safety bugs in the ant-colony solvers (13) and #151 gave the archive
-# protocol the methods solvers actually call on it (7). 17 remain.
+# #144 (25), #146 (13), #147 (4), #148 (22), #149 (9), #150 (13), #152 (7) and
+# #153 (7) have taken that to 10. What is left is one thing: the `Solution`
+# union on OptimizerResult, `AF | AI | list[AI]`, which every consumer has to
+# narrow by hand.
 #
 # `no-any-return`, `operator`, `union-attr`, `list-item` and `misc` are
 # deliberately absent below. Each turned out to mark a real defect rather than a
@@ -165,7 +163,6 @@ disable_error_code = ["arg-type"]
 [[tool.mypy.overrides]]
 module = [
     "optimizers.combinatorial.strategy",
-    "optimizers.continuous.base",
     "optimizers.continuous.gd",
     "optimizers.core.base",
 ]
@@ -174,7 +171,3 @@ disable_error_code = ["assignment"]
 [[tool.mypy.overrides]]
 module = ["optimizers.combinatorial.ga"]
 disable_error_code = ["arg-type", "assignment"]
-
-[[tool.mypy.overrides]]
-module = ["optimizers.continuous.ga"]
-disable_error_code = ["arg-type", "index", "return-value"]
