@@ -10,7 +10,7 @@ from optimizers.continuous.ga import (
 )
 from optimizers.continuous.variables import InputContinuousVariable
 from optimizers.core.base import ensure_literal_choice, literal_options, Phase
-from optimizers.core.types import AF, F
+from optimizers.core.types import AF
 
 
 @pytest.fixture()
@@ -42,7 +42,7 @@ def test_metadata_injection_into_goal_and_constraints(tiny_ga_cfg):
 
     user_args = {"note": "hello", "generation": -123}  # collision: metadata should win
 
-    def obj(x: AF, args: dict) -> F:
+    def obj(x: AF, args: dict) -> float:
         # Capture a compact snapshot for assertions
         snap = {
             "phase": args.get("phase"),
@@ -204,7 +204,7 @@ def test_eval_count_global_under_processes_backend(monkeypatch):
         local_grad_optim="none",
     )
 
-    def obj(x: AF, args: dict) -> F:
+    def obj(x: AF, args: dict) -> float:
         x = np.asarray(x, dtype=float)
         return float(np.sum(x**2))
 

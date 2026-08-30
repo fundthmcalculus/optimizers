@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from ..core.types import AF, F, b8
+from ..core.types import AF, b8
 
 
 @runtime_checkable
@@ -45,7 +45,7 @@ class Archive(Protocol):
 
     def truncate(self, size: int = -1) -> None: ...
 
-    def get_best(self) -> tuple[AF, F, b8]: ...
+    def get_best(self) -> tuple[AF, float, b8]: ...
 
     def __len__(self) -> int: ...
 

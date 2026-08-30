@@ -6,7 +6,7 @@ from .base import TSPBase, _check_stop_early
 from ..core.base import OptimizerResult, setup_for_generations
 from ..core.parallel import GenerationRunner
 from ..core.random import rng
-from ..core.types import AI, AF, F, ab8, i32, i16, ai64
+from ..core.types import AI, AF, ab8, i32, i16, ai64
 from .aco import AntColonyTSPConfig
 
 # NOTE - MST is the same as TSP parameters, except the "back to start" is ignored.
@@ -112,7 +112,7 @@ class AntColonyMST(TSPBase):
 
 def _run_ants_mst_batch(
     fixed: tuple[AF, AF, AntColonyTSPConfig, int, int], tau_alpha: AF
-) -> list[tuple[AI, F]]:
+) -> list[tuple[AI, float]]:
     """Run one worker's share of ants for a generation.
 
     ``fixed`` is ``(network_routes, eta_beta, config, start_idx,
@@ -150,7 +150,7 @@ def run_ant_mst(
     tau_alpha: AF,
     config: AntColonyTSPConfig,
     start_idx: int,
-) -> tuple[AI, F]:
+) -> tuple[AI, float]:
     cur_city = start_idx
     order_len = eta_beta.shape[0]
     # If fewer than 32,000 cities, we can use i16

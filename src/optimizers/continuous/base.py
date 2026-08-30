@@ -22,7 +22,7 @@ from ..core.base import (
     BatchGoalFcn,
     WrappedBatchGoalFcn,
 )
-from ..core.types import AF, F
+from ..core.types import AF
 from ..core.random import get_seed
 from ..solution_deck import SolutionDeck
 from ..archive.cvt import CVTArchive
@@ -197,7 +197,7 @@ class IOptimizer(BaseOptimizer):
                 x: AF,
                 _f: Callable[..., Any] = func,
                 _ap: "_ArgProvider" = self._arg_provider,
-            ) -> F:
+            ) -> float:
                 # Only pay the runtime-metadata bookkeeping (a time.time() call
                 # plus dict writes, per evaluation) when the goal function
                 # actually consumes args. For plain ``f(x)`` objectives nothing
@@ -209,9 +209,9 @@ class IOptimizer(BaseOptimizer):
                     result = _f(x)
                 # Multi-output goal fns return (fitness, outputs); solvers only
                 # ever need the scalar fitness. Unpacking (rather than indexing
-                # a value mypy sees as the scalar type F) keeps this checkable
-                # across numpy versions -- some numpy typeshed releases don't
-                # offer a generic.__getitem__(int) overload.
+                # the result) keeps this checkable across numpy versions -- some
+                # numpy typeshed releases don't offer a generic.__getitem__(int)
+                # overload.
                 if self._returns_outputs:
                     fitness, _outputs = result
                     return fitness
@@ -347,7 +347,7 @@ class IOptimizer(BaseOptimizer):
 
     def initialize(
         self, preserve_percent: float
-    ) -> tuple[list[F], tqdm.tqdm, int, int, int, joblib.Parallel, StopReason]:
+    ) -> tuple[list[float], tqdm.tqdm, int, int, int, joblib.Parallel, StopReason]:
         self.validate_config()
         init_type = getattr(self.config, "init_type", "random")
         sampler_type = getattr(self.config, "sampler_type", "uniform")
@@ -534,7 +534,7 @@ def sync_worker_meta(
 
 
 def check_stop_early(
-    config: IOptimizerConfig, best_soln_history: list[F], solution_values: AF
+    config: IOptimizerConfig, best_soln_history: list[float], solution_values: AF
 ) -> StopReason:
     if solution_values[0] <= config.target_score:
         print("Target score reached, terminating early.")
@@ -551,7 +551,7 @@ def check_stop_early(
     return "none"
 
 
-def cdf(q: F, N: int) -> AF:
+def cdf(q: float, N: int) -> AF:
     """
     Parameters
     ----------

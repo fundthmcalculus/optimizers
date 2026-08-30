@@ -7,7 +7,6 @@ from .base import IOptimizer
 from .local import local_perturb_optim
 from ..core import InputVariables, OptimizerResult
 from ..core.base import GoalFcn, InputArguments, IOptimizerConfig
-from ..core.types import F
 from ..solution_deck import SolutionDeck
 
 
@@ -40,7 +39,7 @@ class StepWiseOptimizer(IOptimizer):
         )
 
     def solve(self, *, preserve_percent: float = 0.0) -> OptimizerResult:
-        best_soln_value: list[F] = list()
+        best_soln_value: list[float] = list()
         # Start with the initial value from the input variables, and stepwise refine solve
         if not self.config.optimize_whole_solution_deck:
             x0 = np.array([v.initial_random_value(0.0) for v in self.variables])
@@ -73,7 +72,7 @@ class StepWiseOptimizer(IOptimizer):
             for soln_idx in tqdm(
                 range(self.soln_deck.archive_size), desc="Solution Deck Entry"
             ):
-                cur_best_soln_value: list[F] = list()
+                cur_best_soln_value: list[float] = list()
                 x0, x0_val, _ = self.soln_deck.get(soln_idx)
                 stop_reason = "max_iterations"
                 for gen in tqdm(
