@@ -218,3 +218,8 @@ __marimo__/
 
 # Cython-generated C sources (build artifacts)
 src/optimizers/**/*.c
+
+# Benchmark plots written by the test suite (tests/benchmark_scaling.png and
+# friends). These are run artifacts, not fixtures -- one was committed by
+# accident in #138 and removed in #139.
+tests/*.png
