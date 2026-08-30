@@ -108,6 +108,24 @@ def ensure_literal_choice(value: Any, literal_type: Any) -> None:
 _DataclassT = TypeVar("_DataclassT", bound="DataclassInstance")
 
 
+def single_vector(result: "OptimizerResult") -> AF | AI:
+    """Narrow ``solution_vector`` to the single-array form.
+
+    ``Solution`` admits ``list[AI]`` for the multi-TSP solver, which returns one
+    route per cluster. Every other solver produces one vector and every consumer
+    below expects one, so this is where that assumption is checked rather than
+    quietly relied on -- ``np.asarray`` on a list of routes would build a 2-D
+    array and carry on.
+    """
+    vector = result.solution_vector
+    if isinstance(vector, list):
+        raise TypeError(
+            f"expected a single solution vector, got a list of {len(vector)} "
+            "(a multi-TSP result cannot be used here)"
+        )
+    return vector
+
+
 def create_from_dict(data: dict[str, Any], cls: type[_DataclassT]) -> _DataclassT:
     """Create a dataclass instance from a dictionary.
 
@@ -237,6 +255,12 @@ class IOptimizerConfig:
 # ACO/GD), or a city permutation -- one tour (``AI``) or several (``list[AI]``,
 # e.g. one per vehicle/cluster in ``AntColonyMTSP``) -- for combinatorial ones.
 Solution = Union[AF, AI, "list[AI]"]
+"""What a solver returns as its answer.
+
+The ``list[AI]`` member is the multi-TSP solver alone, which produces one
+route per cluster. Every other solver returns a single vector, and so does
+every consumer expect -- use ``single_vector`` to say so and have it checked.
+"""
 SolutionHistory = Union[AF, "list[AF]"]
 
 
@@ -270,7 +294,7 @@ class OptimizerResult:
     def __add__(self, other: "OptimizerResult") -> "OptimizerResult":
         if not isinstance(other, OptimizerResult):
             raise ValueError("Cannot add non-OptimizerResult object")
-        combined_history = None
+        combined_history: Optional[SolutionHistory] = None
         if self.solution_history is not None and other.solution_history is not None:
             combined_history = np.concatenate(
                 (self.solution_history, other.solution_history)

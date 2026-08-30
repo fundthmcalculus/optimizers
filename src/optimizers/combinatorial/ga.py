@@ -188,7 +188,7 @@ def run_ga(
 
 def _2opt_refine(new_route: AI, network_routes: AF, nearest_neighbors: int = 10) -> AI:
     N = len(new_route)
-    ij = rng().integers(low=1, high=max(1, N - nearest_neighbors))
+    ij = int(rng().integers(low=1, high=max(1, N - nearest_neighbors)))
     k_nn = N
     if nearest_neighbors > 0:
         k_nn = min(k_nn, ij + nearest_neighbors)
@@ -235,10 +235,10 @@ def _mutate(child: AI, mutation_rate: float, network_routes: AF) -> AI:
 
 
 def _tournament_selection(
-    population_deck: AF | AI,
+    population_deck: AI,
     population_fitness: AF,
     tournament_size: int = 3,
-) -> AF | AI:
+) -> AI:
     # Randomly sample row
     row_idxs = rng().choice(
         population_deck.shape[0], size=tournament_size, replace=False
@@ -251,9 +251,7 @@ def _tournament_selection(
     return population_deck[row_idxs[row_idx_sort[0]], :].copy()
 
 
-def _crossover(
-    parent1: AF | AI, parent2: AF | AI, crossover_rate: float
-) -> tuple[AF | AI, AF | AI]:
+def _crossover(parent1: AI, parent2: AI, crossover_rate: float) -> tuple[AI, AI]:
     # Randomly pick a point in the array that the swap starts
     if rng().random() < crossover_rate:
         crossover_idx = rng().choice(len(parent1))
