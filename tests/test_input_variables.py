@@ -125,3 +125,21 @@ def test_get_nearest_value_snaps_to_the_closest_choice():
     assert var.get_nearest_value(23.0) == 20.0
     assert var.get_nearest_value(-5.0) == 10.0
     assert var.get_nearest_value(1e9) == 40.0
+
+
+def test_multidimensional_values_is_rejected_at_construction():
+    """``ArrayLike`` admits a list of lists; a choice set is one-dimensional.
+
+    Without this the array is accepted, ``rng.choice`` starts picking rows, and
+    the failure surfaces somewhere else entirely.
+    """
+    with pytest.raises(ValueError, match="1-D"):
+        InputDiscreteVariable("m", values=[[1, 2], [3, 4]])
+
+
+def test_values_does_not_alias_the_caller_s_array():
+    """Float64 input used to be stored by reference and int input by copy."""
+    supplied = np.array([1.0, 2.0, 3.0])
+    var = InputDiscreteVariable("a", values=supplied)
+    supplied[0] = 99.0
+    assert var.values[0] == 1.0

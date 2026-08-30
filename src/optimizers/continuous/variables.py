@@ -29,7 +29,16 @@ class InputDiscreteVariable(InputVariable):
         initial_value: float | None = None,
     ):
         super().__init__(name)
-        self.values: af64 = np.asarray(values, dtype=f64)
+        # ``np.array``, not ``asarray``: asarray returns the caller's own buffer
+        # untouched when it is already float64, so later mutation of it would
+        # reach in here for float input but not for int input. Copying keeps the
+        # choice set the variable's own, whatever was passed.
+        self.values: af64 = np.array(values, dtype=f64)
+        if self.values.ndim != 1:
+            raise ValueError(
+                f"variable {name!r} needs a 1-D set of values, "
+                f"got shape {self.values.shape}"
+            )
         if self.values.size == 0:
             raise ValueError(
                 f"variable {name!r} needs at least one value to choose from"
