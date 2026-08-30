@@ -290,13 +290,14 @@ class GroupedVariableOptimizer(IOptimizer):
                     raise NotImplementedError("Optimizer not implemented")
                 result = optim.solve()
                 # TODO - Update the solution deck here?
-                default_values = list(
-                    self.interleave_variables(
-                        group,
-                        single_vector(result),
-                        np.asarray(default_values, dtype=float),
-                    )
-                )
+                # .tolist(), not list(): the latter yields np.float64 elements
+                # into a list[float], which is the sort of drift this whole
+                # series was cleaning up.
+                default_values = self.interleave_variables(
+                    group,
+                    single_vector(result),
+                    np.asarray(default_values, dtype=float),
+                ).tolist()
 
             is_last_round = cur_round == self.config.num_rounds - 1
             if self.checkpoint_cfg is not None and self.checkpoint_cfg.enabled:
