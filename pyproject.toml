@@ -136,68 +136,79 @@ no_implicit_reexport = true
 strict_optional = true
 
 # --- Ratchet baseline -------------------------------------------------------
-# The modules below are not yet clean under the settings above. They are silenced
-# *per error-code* so every OTHER class of error — and any brand-new error type —
-# is still caught in these files. In particular `union-attr` stays ON here so
-# genuine None-safety bugs are not masked.
+# What is left of the baseline, grouped by the error codes each module actually
+# still produces. Everything else -- and any brand-new error type -- is caught
+# normally, including in these files.
 #
-# This list is not one problem, it is four, measured in #143 (110 errors with the
-# whole baseline removed):
-#   * a Liskov violation in continuous/variables.py (25 errors) — FIXED, that
-#     module is off this list and stays off;
-#   * the AF/AI aliases themselves, unions of float64/32/16 (and int64/32/16)
-#     that mypy cannot reconcile with the concrete dtypes the numpy stubs infer
-#     (~14 errors);
-#   * `no-any-return` from numpy's largely untyped ufunc/reduction stubs, which
-#     is genuinely upstream and may never go away (~14 errors);
-#   * three unrelated non-numpy issues (generic dataclass introspection,
-#     checkpoint deserialization, config values not narrowed to Literal).
-# Reworking the aliases alone does NOT empty this list — it accounts for 13% of
-# it. Tighten it down module by module.
+# It is deliberately narrow rather than one broad block. A module listed for
+# `arg-type` alone still fails CI on a new `assignment` or `union-attr` bug; the
+# old shape disabled nine codes across fourteen modules, so 136 (module, code)
+# pairs were unreachable. This is 34.
+#
+# Measured in #143: with the whole baseline removed the tree had 110 errors.
+# #144 fixed a Liskov violation in continuous/variables.py (25) and #146 swapped
+# the AF/AI dtype unions for numpy's abstract `floating`/`integer` (13), leaving
+# 72. Those 72 are:
+#   * ~10 `no-any-return` from numpy's largely untyped ufunc/reduction stubs.
+#     Genuinely upstream; this part may never go away.
+#   * three unrelated non-numpy issues -- generic dataclass introspection,
+#     checkpoint deserialization, config values not narrowed to Literal.
+#   * the remainder, which needs narrowing per call site rather than per module.
+
 [[tool.mypy.overrides]]
 module = [
     "optimizers.checkpoint",
-    "optimizers.core.base",
-    "optimizers.combinatorial.base",
-    "optimizers.combinatorial.aco",
-    "optimizers.combinatorial.ga",
-    "optimizers.combinatorial.mtsp",
-    "optimizers.combinatorial.strategy",
     "optimizers.continuous.aco",
-    "optimizers.continuous.base",
-    "optimizers.continuous.ga",
-    "optimizers.continuous.gd",
-    "optimizers.continuous.pso",
     "optimizers.continuous.step",
-    "optimizers.continuous.optimizer_strategy",
 ]
-disable_error_code = [
-    "arg-type",
-    "assignment",
-    "index",
-    "list-item",
-    "misc",
-    "no-any-return",
-    "operator",
-    "override",
-    "return-value",
-]
+disable_error_code = ["arg-type"]
 
-# aco_mst additionally has a dtype-union `union-attr` (an int|ndarray branch),
-# so it gets its own block rather than weakening union-attr everywhere else.
+[[tool.mypy.overrides]]
+module = ["optimizers.combinatorial.base"]
+disable_error_code = ["return-value"]
+
+[[tool.mypy.overrides]]
+module = [
+    "optimizers.combinatorial.ga",
+    "optimizers.combinatorial.strategy",
+    "optimizers.core.base",
+]
+disable_error_code = ["arg-type", "assignment"]
+
+[[tool.mypy.overrides]]
+module = ["optimizers.continuous.optimizer_strategy"]
+disable_error_code = ["arg-type", "no-any-return"]
+
+[[tool.mypy.overrides]]
+module = ["optimizers.continuous.base"]
+disable_error_code = ["arg-type", "assignment", "no-any-return"]
+
+[[tool.mypy.overrides]]
+module = ["optimizers.continuous.gd"]
+disable_error_code = ["arg-type", "assignment", "list-item"]
+
+[[tool.mypy.overrides]]
+module = ["optimizers.continuous.ga"]
+disable_error_code = ["arg-type", "index", "return-value"]
+
+[[tool.mypy.overrides]]
+module = ["optimizers.combinatorial.aco"]
+disable_error_code = ["arg-type", "assignment", "operator", "return-value"]
+
+# aco_mst additionally has a dtype `union-attr` (an int|ndarray branch), so it
+# gets its own block rather than weakening union-attr for aco as well.
 [[tool.mypy.overrides]]
 module = ["optimizers.combinatorial.aco_mst"]
 disable_error_code = [
     "arg-type",
     "assignment",
-    "no-any-return",
     "operator",
     "return-value",
     "union-attr",
 ]
 
-# Modules whose only baselined issue is `no-any-return` from numpy's untyped
-# stubs (ratchet 2). Kept separate so their other checks stay fully strict.
+# Modules whose only remaining issue is `no-any-return` from numpy's untyped
+# stubs. Kept separate so their other checks stay fully strict.
 [[tool.mypy.overrides]]
 module = [
     "optimizers.core.parallel",
