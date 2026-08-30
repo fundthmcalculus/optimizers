@@ -25,8 +25,13 @@ T = typing.TypeVar("T")
 # though float64 is obviously a float. numpy already publishes the abstract
 # hierarchy for exactly this, and `dtype` is covariant, so `af64` satisfies `AF`
 # the way it always should have.
+#
+# `signedinteger`, not `integer`: the union was signed-only, and the compiled TSP
+# kernels take `int64` buffers, so an unsigned array reaching them is a runtime
+# failure the checker should still catch. Costs nothing -- both spellings measure
+# the same error count.
 AF = NDArray[np.floating[typing.Any]]
-AI = NDArray[np.integer[typing.Any]]
+AI = NDArray[np.signedinteger[typing.Any]]
 F = np.floating[typing.Any]
-I = np.integer[typing.Any]  # noqa: E741
+I = np.signedinteger[typing.Any]  # noqa: E741
 B = b8
