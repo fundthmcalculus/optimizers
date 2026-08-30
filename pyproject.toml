@@ -1,5 +1,9 @@
 [build-system]
-requires = ["hatchling", "Cython>=3.0"]
+# Cython>=3.0 and setuptools are consumed by hatch_build.py, which shells out to
+# `setup.py build_ext` to compile the kernels into the wheel. Before that hook
+# existed, Cython here was dead weight -- installed into every isolated build
+# environment and never imported.
+requires = ["hatchling", "setuptools>=42", "Cython>=3.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -37,6 +41,46 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/optimizers"]
+
+# Compiles the Cython kernels and force-includes them in the wheel. Without it
+# hatchling ships py3-none-any and HAS_CYTHON is False in every installed copy
+# (#132). Best-effort by default so a source install without a compiler still
+# works; OPTIMIZERS_REQUIRE_CYTHON=1 makes a failure fatal, which is what the
+# release and CI jobs set.
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
+
+# The sdist must carry everything the hook needs to compile on the consumer's
+# machine: the .pyx sources come with the package, and setup.py holds the
+# compiler-detection logic the hook shells out to.
+[tool.hatch.build.targets.sdist]
+include = ["src", "setup.py", "hatch_build.py", "README.md", "LICENSE"]
+
+[tool.cibuildwheel]
+# requires-python is >=3.11,<3.15, and numpy>=2.4.6 supports >=3.11, so every
+# interpreter in that window is buildable.
+build = "cp311-* cp312-* cp313-* cp314-*"
+# 32-bit legs have no numpy/numba wheels to test against, and PyPy cannot load
+# these CPython-API extensions at all.
+skip = "*_i686 *-win32 pp*"
+
+# The whole point of #132. Without this the hook degrades to a pure-Python wheel
+# on a compile failure, which is correct for a source install but would silently
+# reintroduce the exact bug for a release -- and a `py3-none-any` wheel uploaded
+# beside real platform wheels would win for some installers.
+environment = { OPTIMIZERS_REQUIRE_CYTHON = "1" }
+
+# Import the built wheel from a directory where the source tree cannot shadow
+# it, then assert the kernels are actually loadable. `HAS_CYTHON` swallows an
+# ImportError by design, so checking the flag -- not merely that the file is in
+# the archive -- is what proves the extension imports on a clean machine.
+test-command = "python -c \"from optimizers.combinatorial.strategy import HAS_CYTHON as t; from optimizers.benchmarks.cython_kernels import HAS_CYTHON as b; assert t and b, f'wheel has no kernels: tsp={t} bench={b}'; print('kernels present')\""
+
+# Deliberately no [tool.cibuildwheel.linux] before-all installing libgomp: the
+# manylinux images already ship a GCC toolchain with it, and auditwheel vendors
+# libgomp.so into the wheel during repair, which is what makes the result work
+# on a user machine that has no libgomp at all. Installing it at build time
+# solves nothing and adds a step that can fail.
 
 [tool.flake8]
 max-line-length = 120

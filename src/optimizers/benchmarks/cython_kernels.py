@@ -1,16 +1,20 @@
 """Optional compiled backend for the batched benchmark functions.
 
 Mirrors the fallback pattern already used for the TSP local-search kernels
-(``optimizers.combinatorial.strategy``): if the ``.pyx`` extension was built --
-which today means ``python setup.py build_ext --inplace`` in a source checkout,
-and *only* that -- ``HAS_CYTHON`` is ``True`` and the compiled kernels are
-exposed; otherwise this module degrades to the pure-NumPy batch functions from
-``functions.py``, so nothing here is a hard dependency.
+(``optimizers.combinatorial.strategy``): if the ``.pyx`` extension was built,
+``HAS_CYTHON`` is ``True`` and the compiled kernels are exposed; otherwise this
+module degrades to the pure-NumPy batch functions from ``functions.py``, so
+nothing here is a hard dependency.
 
-Note that an install never takes the first branch, whatever compiler is present:
-the build backend is hatchling with no build hook, so every wheel is
-``py3-none-any`` and ships the ``.pyx`` as data rather than a compiled module.
-``HAS_CYTHON`` is therefore ``False`` in every installed copy. See issue #132.
+Installed copies do get the kernels. The ``hatch_build.py`` hook compiles them
+into the wheel, and the released wheels are built per-platform with
+``OPTIMIZERS_REQUIRE_CYTHON=1``, so a release that lost them fails to build
+rather than shipping quietly (issue #132 -- before that hook, hatchling ran no
+build step at all and *every* installed copy had ``HAS_CYTHON is False``).
+
+``HAS_CYTHON`` can still legitimately be ``False``: a source install on a
+machine with no C compiler degrades on purpose, and so does an sdist install
+that cannot compile.
 See
 docs/history/PERF_CONTINUOUS_REPORT.md for the measured Cython-vs-NumPy comparison -- the
 honest finding is that it is a modest, not dramatic, win on top of the

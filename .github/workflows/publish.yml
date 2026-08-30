@@ -1,27 +1,114 @@
 name: Publish to PyPI
+
+# Until #132 this job ran a bare `python -m build` on one Linux runner and
+# uploaded a single `py3-none-any` wheel. Since hatchling never executed
+# setup.py, that wheel contained no compiled kernels at all -- every
+# `pip install optimizers` silently took the numba / pure-NumPy fallback.
+#
+# With the hatch_build.py hook in place a wheel is now platform-specific, so one
+# runner can no longer produce a release: it has to be a matrix, one leg per
+# (OS, architecture), with cibuildwheel building every supported CPython inside
+# each leg. The sdist is built separately and is what a platform we do not ship
+# a wheel for falls back to -- it carries setup.py and the .pyx sources, so it
+# compiles on the consumer's machine, and degrades to the fallbacks if it can't.
 on:
   push:
     tags:
       - 'v*'
+  # Lets the matrix be exercised without cutting a release. The publish job is
+  # gated on the tag ref, so a manual run builds and uploads artifacts to the
+  # run and stops there.
+  workflow_dispatch: {}
 
 permissions:
   contents: read
 
 jobs:
-  build-and-publish:
+  build-wheels:
+    name: Wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One broken platform should not hide whether the others are fine.
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest      # manylinux x86_64
+          - ubuntu-24.04-arm   # manylinux aarch64
+          - windows-latest     # win_amd64
+          - macos-latest       # macOS arm64 (Apple silicon)
+          - macos-15-intel     # macOS x86_64
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build wheels
+        # cibuildwheel publishes no moving major tag, so this is an exact pin --
+        # `@v4` does not resolve and fails the job before any step runs.
+        uses: pypa/cibuildwheel@v4.2.0
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
+          if-no-files-found: error
+
+  build-sdist:
+    name: sdist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
           python-version: '3.14'
-      - name: Install dependencies
+
+      - name: Build sdist
+        # An sdist carries no interpreter tag, so pipx's own Python would be
+        # harmless here -- but the venv check below compiles the sdist for the
+        # interpreter set up above, so keep one interpreter for the whole job.
         run: |
-          python -m pip install --upgrade pip
-          pip install build
-      - name: Build package
-        run: python -m build
+          python -m pip install --upgrade build
+          python -m build --sdist
+
+      - name: Confirm the sdist can actually compile the kernels
+        # An sdist is the fallback for every platform the matrix above does not
+        # cover, so "it builds" is the whole contract. OPTIMIZERS_REQUIRE_CYTHON
+        # makes the hook fatal rather than silently degrading, which is the only
+        # way this step can fail on a broken sdist -- setup.py declares both
+        # extensions optional=True, so build_ext exits 0 even when a compile
+        # fails.
+        env:
+          OPTIMIZERS_REQUIRE_CYTHON: '1'
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/sdist-check
+          /tmp/sdist-check/bin/pip install --quiet dist/*.tar.gz
+          /tmp/sdist-check/bin/python -c "
+          from optimizers.combinatorial.strategy import HAS_CYTHON as tsp
+          from optimizers.benchmarks.cython_kernels import HAS_CYTHON as bench
+          assert tsp and bench, f'sdist install has no kernels: tsp={tsp} bench={bench}'
+          print('sdist compiled both kernels')
+          "
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: ./dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    # Only a tag publishes; workflow_dispatch stops after building.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-wheels, build-sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          # Every wheels-* artifact plus the sdist, flattened into dist/.
+          pattern: '*'
+          path: dist
+          merge-multiple: true
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.2
         with:
