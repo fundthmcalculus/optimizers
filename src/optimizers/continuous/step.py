@@ -7,6 +7,7 @@ from .base import IOptimizer
 from .local import local_perturb_optim
 from ..core import InputVariables, OptimizerResult
 from ..core.base import GoalFcn, InputArguments, IOptimizerConfig, StopReason
+from ..core.types import AF
 from ..solution_deck import SolutionDeck
 
 
@@ -68,28 +69,54 @@ class StepWiseOptimizer(IOptimizer):
                 stop_reason=stop_reason,
             )
         else:
-            best_soln_vector = None
             # ``get``/``set`` are index-addressable-storage operations that only
-            # the scalar deck has; a CVTArchive stores by cell. This path is also
-            # broken for a different reason -- see the issue linked in the
-            # docstring -- but an AttributeError three frames down is the worse
-            # of the two failures.
+            # the scalar deck has; a CVTArchive stores by cell.
             if not isinstance(self.soln_deck, SolutionDeck):
                 raise NotImplementedError(
                     "optimize_whole_solution_deck requires the scalar SolutionDeck; "
                     f"got {type(self.soln_deck).__name__}."
                 )
+            # Fill the deck. Without this the loop below read straight out of
+            # the np.empty the deck was constructed with -- uninitialised memory
+            # as both the starting vector and the incumbent score.
+            self.initialize_deck(preserve_percent)
+            if len(self.soln_deck) == 0:
+                raise ValueError(
+                    "optimize_whole_solution_deck needs a non-empty solution deck."
+                )
+            best_soln_vector: AF | None = None
+            # ``len``, not ``archive_size``: dedup/truncate can leave the deck
+            # shorter than its configured cap, and ``get`` indexes the array.
             for soln_idx in tqdm(
-                range(self.soln_deck.archive_size), desc="Solution Deck Entry"
+                range(len(self.soln_deck)), desc="Solution Deck Entry"
             ):
-                cur_best_soln_value: list[float] = list()
-                x0, x0_val, _ = self.soln_deck.get(soln_idx)
+                # .copy(): ``get`` hands back a view into the archive and
+                # ``local_perturb_optim`` writes through its argument.
+                deck_vector, _, _ = self.soln_deck.get(soln_idx)
+                x0 = deck_vector.copy()
+                # Tracking the running best as ``[-1]`` rather than
+                # ``min(whole_list)`` is equivalent (the list is monotone
+                # non-increasing) and O(1) per generation.
+                # Not seeded from the deck's stored score: the running best has
+                # to correspond to a vector this loop actually produced, or the
+                # returned score describes a different point than the returned
+                # vector.
+                cur_best_soln_value: list[float] = []
                 stop_reason = "max_iterations"
                 for gen in tqdm(
                     range(self.config.num_generations),
                     desc="Stepwise optimization generations",
                 ):
-                    cur_best_soln_value.append(min(min(cur_best_soln_value), x0_val))
+                    x0, x0_val = local_perturb_optim(
+                        self.wrapped_fcn,
+                        x0,
+                        self.variables,
+                        self.config.max_perturbation,
+                    )
+                    if len(cur_best_soln_value) == 0:
+                        cur_best_soln_value.append(x0_val)
+                    else:
+                        cur_best_soln_value.append(min(cur_best_soln_value[-1], x0_val))
                     if gen >= 2 and np.allclose(
                         cur_best_soln_value[-1],
                         cur_best_soln_value[-2],
@@ -101,22 +128,16 @@ class StepWiseOptimizer(IOptimizer):
                 self.soln_deck.set(
                     soln_idx, x0, x0_val, stop_reason == "no_improvement"
                 )
+                # Emptiness first: written the other way round, the ``[-1]`` ran
+                # on an empty list before the guard could stop it.
                 if (
-                    cur_best_soln_value[-1] < best_soln_value[-1]
-                    or len(best_soln_value) == 0
+                    len(best_soln_value) == 0
+                    or cur_best_soln_value[-1] < best_soln_value[-1]
                 ):
                     best_soln_vector = x0
                     best_soln_value.append(cur_best_soln_value[-1])
 
-            if best_soln_vector is None:
-                # Nothing ever beat the incumbent, so no vector was recorded.
-                # Handing None back as the answer is bug (3) of #151; the other
-                # three in this branch are left alone, but returning None from a
-                # field typed `Solution` is wrong under any reading.
-                raise ValueError(
-                    "no solution was recorded: every deck entry failed to "
-                    "improve. See #151 -- this code path is known-broken."
-                )
+            assert best_soln_vector is not None  # the deck is non-empty
             return OptimizerResult(
                 solution_score=best_soln_value[-1],
                 solution_history=np.array(best_soln_value),

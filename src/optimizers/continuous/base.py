@@ -354,9 +354,14 @@ class IOptimizer(BaseOptimizer):
     def _set_generation(self, generation: int) -> None:
         self._arg_provider.meta["generation"] = generation
 
-    def initialize(
-        self, preserve_percent: float
-    ) -> tuple[list[float], tqdm.tqdm, int, int, int, joblib.Parallel, StopReason]:
+    def initialize_deck(self, preserve_percent: float) -> None:
+        """Validate the config and fill the solution deck.
+
+        Split out of ``initialize`` because the stepwise whole-deck path needs a
+        populated archive but none of the generation machinery -- and without
+        this it read straight out of the ``np.empty`` the deck was constructed
+        with. See #151.
+        """
         self.validate_config()
         # getattr erases the Literal the config declares, so re-check it here
         # rather than assert it: a typo used to reach the deck and pick the
@@ -391,6 +396,11 @@ class IOptimizer(BaseOptimizer):
         # generation's ``eval_count`` continues from them (and process workers are
         # shipped the correct starting base). See ``_ArgProvider``.
         self._arg_provider.commit(self._arg_provider.eval_delta)
+
+    def initialize(
+        self, preserve_percent: float
+    ) -> tuple[list[float], tqdm.tqdm, int, int, int, joblib.Parallel, StopReason]:
+        self.initialize_deck(preserve_percent)
 
         # Add the progress bar
         generation_pbar, individuals_per_job, n_jobs, parallel = setup_for_generations(

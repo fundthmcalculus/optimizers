@@ -264,7 +264,7 @@ class SolutionDeck:
         )
 
     def set(
-        self, idx: int, x0: af64, x_val: f64, is_local_optima: bool = False
+        self, idx: int, x0: AF, x_val: float, is_local_optima: bool = False
     ) -> None:
         self.solution_archive[idx] = x0
         self.solution_value[idx] = x_val
