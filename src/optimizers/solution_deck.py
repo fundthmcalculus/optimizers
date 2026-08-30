@@ -254,7 +254,7 @@ class SolutionDeck:
             self.solution_outputs = self.solution_outputs[:size]
 
     def __len__(self) -> int:
-        return self.solution_archive.shape[0]
+        return int(self.solution_archive.shape[0])
 
     def get(self, idx: int) -> tuple[af64, f64, b8]:
         return (
@@ -344,7 +344,8 @@ def lloyds_algorithm_points(n: int, k: int, n_steps: int = 10) -> af64:
 
     for step in range(n_steps):
         kmeans.fit_predict(points)
-        centers = kmeans.cluster_centers_
+        # sklearn ships no stubs, so cluster_centers_ arrives as Any.
+        centers = np.asarray(kmeans.cluster_centers_, dtype=np.float64)
         centers = np.sort(centers, axis=0)
         # Early stopping if converged
         if np.allclose(points, centers, rtol=1e-4, atol=1e-4):

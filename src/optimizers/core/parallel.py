@@ -20,7 +20,7 @@ processes).
 """
 
 import uuid
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Sequence, cast
 
 import joblib
 from joblib import cpu_count
@@ -40,7 +40,7 @@ _FIXED: dict[str, Any] = {}
 def resolve_n_jobs(n_jobs: int | None) -> int:
     """Normalize a config ``n_jobs`` (``< 1`` means "all but one core")."""
     if n_jobs is None or n_jobs < 1:
-        return max(1, cpu_count() - 1)
+        return max(1, int(cpu_count()) - 1)
     return n_jobs
 
 
@@ -152,12 +152,14 @@ class GenerationRunner:
             ]
             return [f.result() for f in futures]
         assert self._parallel is not None
-        return self._parallel(
+        # joblib ships no stubs, so Parallel.__call__ is Any. It returns a list.
+        results = self._parallel(
             joblib.delayed(_call_with_stream)(
                 worker_fn, self._fixed, varying_args, streams[i]
             )
             for i in range(n)
         )
+        return cast("list[Any]", results)
 
     def close(self) -> None:
         # Tear down our dedicated process pool so its workers (and the once-
