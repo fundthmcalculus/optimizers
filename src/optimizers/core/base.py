@@ -15,7 +15,7 @@ import numpy as np
 from joblib import cpu_count, Parallel
 from tqdm import trange, tqdm
 
-from .types import AF, AI, F
+from .types import AF, AI
 from .samplers import SamplerType
 
 if TYPE_CHECKING:
@@ -49,13 +49,16 @@ StopReason = Literal["none", "target_score", "no_improvement", "max_iterations"]
 LocalOptimType = Literal["none", "grad", "single-var-grad", "perturb"]
 Phase = Literal["init", "evolve", "finalize"]
 InputArguments = dict[str, Any]
+# One member per arity. This was four members: the same two signatures written
+# once with `F` and once with `float`, back when those were different types. A
+# goal function returning `np.float64` still satisfies it -- numpy declares
+# float64 as a subclass of float -- but a narrower numpy width needs a `float()`
+# at the return, which is where the pipeline coerces anyway.
 GoalFcn = Union[
-    Callable[[AF], F],
-    Callable[[AF, InputArguments], F],
     Callable[[AF], float],
     Callable[[AF, InputArguments], float],
 ]
-WrappedGoalFcn = Callable[[AF], F]
+WrappedGoalFcn = Callable[[AF], float]
 ConstraintFcn = GoalFcn
 WrappedConstraintFcn = WrappedGoalFcn
 
@@ -163,7 +166,7 @@ class IOptimizerConfig:
     """Size of solution archive used as memory of good solutions"""
     stop_after_iterations: int = 15
     """Stop after a certain number of iterations. This is used for early stopping if nothing improves"""
-    target_score: F = 0.0
+    target_score: float = 0.0
     """The target score for the optimizer to achieve. This is used for early stopping."""
     n_jobs: int = 4
     """The number of jobs to use for parallel execution. -1 means use all available cores."""
@@ -244,7 +247,7 @@ class OptimizerResult:
     Extended to include optional constraint violation information and an unconstrained-best result.
     """
 
-    solution_score: F
+    solution_score: float
     """The score of the best solution found by the optimizer (respecting deck ordering)."""
     solution_vector: Solution
     """The best solution found by the optimizer (respecting deck ordering)."""

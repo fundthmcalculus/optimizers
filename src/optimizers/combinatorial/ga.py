@@ -9,7 +9,7 @@ from ..core import IOptimizerConfig
 from ..core.base import OptimizerResult, setup_for_generations
 from ..core.parallel import GenerationRunner
 from ..core.random import rng
-from ..core.types import AF, AI, F
+from ..core.types import AF, AI
 
 
 @dataclass
@@ -152,7 +152,7 @@ class GeneticAlgorithmTSP(TSPBase):
 
 def _run_ga_batch(
     fixed: tuple[AF, GeneticAlgorithmTSPConfig, int], genome: AI, genome_value: AF
-) -> list[tuple[AI, F]]:
+) -> list[tuple[AI, float]]:
     """Run one worker's share of offspring for a generation.
 
     ``fixed`` is ``(network_routes, config, individuals_per_job)``; ``genome``
@@ -167,7 +167,7 @@ def _run_ga_batch(
 
 def run_ga(
     genome: AI, genome_value: AF, network_routes: AF, config: GeneticAlgorithmTSPConfig
-) -> tuple[AI, F]:
+) -> tuple[AI, float]:
     # Take two parents
     parent_1 = _tournament_selection(genome, genome_value)
     parent_2 = _tournament_selection(genome, genome_value)
@@ -210,7 +210,7 @@ def _2opt_refine(new_route: AI, network_routes: AF, nearest_neighbors: int = 10)
     return new_route
 
 
-def _mutate(child: AI, mutation_rate: F, network_routes: AF) -> AI:
+def _mutate(child: AI, mutation_rate: float, network_routes: AF) -> AI:
     if rng().random() < mutation_rate:
         # Swap a percentage of the variables
         n_swaps = max(1, int(np.round(mutation_rate * len(child) / 2.0)))

@@ -8,7 +8,7 @@ from .strategy import TwoOptTSPConfig, TwoOptTSP
 from ..core.base import IOptimizerConfig, OptimizerResult, setup_for_generations
 from ..core.parallel import GenerationRunner
 from ..core.random import rng
-from ..core.types import AI, AF, F, ab8, i32, i16, ai64
+from ..core.types import AI, AF, ab8, i32, i16, ai64
 
 
 @dataclass
@@ -157,7 +157,7 @@ class AntColonyTSP(TSPBase):
 
 def _run_ants_batch(
     fixed: tuple[AF, AF, AntColonyTSPConfig, int], tau_alpha: AF
-) -> list[tuple[AI, F]]:
+) -> list[tuple[AI, float]]:
     """Run one worker's share of ants for a generation.
 
     ``fixed`` (shipped once, see ``GenerationRunner``) is
@@ -193,7 +193,7 @@ def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF | int:
 
 def run_ant(
     network_routes: AF, eta_beta: AF, tau_alpha: AF, config: AntColonyTSPConfig
-) -> tuple[AI, F]:
+) -> tuple[AI, float]:
     # Start at city 1, and visit each city exactly once
     cur_city = 0  # Offset by 1, so we start at city 1
     eta_shape_ = eta_beta.shape[0]

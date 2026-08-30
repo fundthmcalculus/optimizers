@@ -97,7 +97,7 @@ class AntColonyMTSP(TSPBase):
 
         return OptimizerResult(
             solution_history=[result.solution_history for result in results],
-            solution_score=np.sum([result.solution_score for result in results]),
+            solution_score=float(np.sum([result.solution_score for result in results])),
             stop_reason="max_iterations",
             solution_vector=optimal_paths,
         )

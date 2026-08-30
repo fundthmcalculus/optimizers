@@ -7,7 +7,7 @@ import numpy as np
 from ..core import IOptimizerConfig
 from ..core.base import OptimizerResult, ensure_literal_choice
 from .base import TSPBase, check_path_distance
-from ..core.types import AI, F, AF
+from ..core.types import AI, AF
 
 # --- Compiled local-search backend -------------------------------------------
 # The 2-opt / 3-opt / Lin-Kernighan hot loops are tight scalar sweeps over a
@@ -488,7 +488,7 @@ class TwoOptTSP(TSPBase):
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
         initial_route: Optional[AI] = None,
-        initial_value: Optional[F] = None,
+        initial_value: Optional[float] = None,
     ):
         super().__init__(
             config=config, network_routes=network_routes, city_locations=city_locations
@@ -565,7 +565,7 @@ class ThreeOptTSP(TwoOptTSP):
         *,
         config: TwoOptTSPConfig,
         initial_route: Optional[AI] = None,
-        initial_value: Optional[F] = None,
+        initial_value: Optional[float] = None,
         network_routes: Optional[AF] = None,
         city_locations: Optional[AF] = None,
     ):
@@ -708,7 +708,7 @@ class NearestNeighborTSP(TSPBase):
         n = self.network_routes.shape[0]
         route = [0]
         visited = np.zeros(n, dtype=bool)
-        total_distance = 0
+        total_distance = 0.0
 
         current_node = 0  # Start at first node (index 0)
         visited[current_node] = True
@@ -766,7 +766,7 @@ class ConvexHullTSP(TSPBase):
         # Use the windmill method starting at point-0.
         # NOTE - This will give us the convex hull PLUS the sequence required to get there.
         current_node = 0
-        total_distance = 0
+        total_distance = 0.0
         tour = [current_node]
         visited = set()
         visited.add(current_node)

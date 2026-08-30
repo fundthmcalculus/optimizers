@@ -1,13 +1,13 @@
 import numpy as np
 from sklearn.metrics import pairwise_distances
 
-from ..core.types import AF, AI, F
+from ..core.types import AF, AI
 from ..core.base import BaseOptimizer, StopReason, IOptimizerConfig
 
 
 def check_path_distance(
     distances: AF, order_path: AI, return_to_start: bool = False
-) -> F:
+) -> float:
     # Sum every consecutive edge in one fancy-indexed gather instead of a scalar
     # Python loop (report item #10). Equivalent to the old loop: the closing edge
     # returns to city 0 (order_path[0] is always the depot in these solvers).
@@ -21,7 +21,9 @@ def check_path_distance(
     return total_dist
 
 
-def _check_stop_early(config: IOptimizerConfig, soln_history: list[F]) -> StopReason:
+def _check_stop_early(
+    config: IOptimizerConfig, soln_history: list[float]
+) -> StopReason:
     if len(soln_history) < config.stop_after_iterations:
         return "none"
     if np.allclose(

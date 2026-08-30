@@ -30,7 +30,7 @@ from optimizers.continuous.variables import (
     InputVariable,
 )
 from optimizers.core.base import IOptimizerConfig
-from optimizers.core.types import AF, F
+from optimizers.core.types import AF
 from optimizers.solution_deck import (
     fibonacci_sphere_points,
     spiral_points,
@@ -38,7 +38,7 @@ from optimizers.solution_deck import (
 )
 
 
-def optim_ackley(x: AF) -> F:
+def optim_ackley(x: AF) -> float:
     a = 20.0
     b = 0.2
     c = 2 * np.pi
@@ -51,12 +51,12 @@ def optim_ackley(x: AF) -> F:
     )
 
 
-def optim_rosenbrock(x: AF) -> F:
+def optim_rosenbrock(x: AF) -> float:
     # https://en.wikipedia.org/wiki/Rosenbrock_function
     return np.sum(100 * (x[0::2] ** 2 - x[1::2]) ** 2 + (x[0::2] - 1) ** 2)
 
 
-def optim_para(x: AF) -> F:
+def optim_para(x: AF) -> float:
     # N-dimensional parabola
     return np.sqrt(np.sum(np.power(x - 1.414, 2)))
 
