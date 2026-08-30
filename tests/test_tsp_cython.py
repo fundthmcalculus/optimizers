@@ -163,18 +163,32 @@ def test_solver_backend_parity(solver_cls, extra):
 # ------------------------------ performance ------------------------------
 
 
-def test_two_opt_far_faster_than_pure_python(capsys):
-    """Robust speed floor: compiled 2-opt must crush a pure-Python 2-opt."""
-    D = _distances(200)
-    route = _route(200, back_to_start=True)
-    t_py = _best_time(lambda: _py_two_opt(D, route), reps=2)
-    t_cy = _best_time(lambda: cy.two_opt(D, route.copy(), -1, -1, True), reps=5)
-    with capsys.disabled():
-        print(
-            f"\n[2-opt N=200] pure-python={t_py*1e3:.1f}ms  cython={t_cy*1e3:.2f}ms"
-            f"  speedup={t_py/t_cy:.0f}x"
-        )
-    assert t_cy < t_py / 10.0  # expect ~100x+; 10x is a safe floor
+@pytest.mark.parametrize("n", [40, 90])
+@pytest.mark.parametrize("back_to_start", [True, False])
+def test_reference_kernel_matches_an_independent_2opt(n, back_to_start):
+    """Cross-check the reference kernel against a differently-written 2-opt.
+
+    ``_py_two_opt`` is an independent implementation: it reverses a segment with
+    a NumPy slice, where ``_two_opt_kernel`` walks a scalar swap loop. Both
+    should converge to the same tour.
+
+    This used to be a *speed* test -- the compiled kernel against a pure-Python
+    baseline -- which made sense while ``_two_opt_kernel`` was JIT-compiled and
+    so could not serve as the slow reference. Now that the numba decorator is
+    gone the kernel is itself plain Python, and that timing duplicated
+    ``test_two_opt_cython_vs_reference_benchmark`` almost exactly (765x vs 759x
+    at N=200). The speed floor moved there, where both timings already exist;
+    what is kept here is the thing a second implementation is actually good
+    for, which timing never tested.
+    """
+    D = _distances(n)
+    route = _route(n, back_to_start)
+
+    r_ref = route.copy()
+    _two_opt_kernel(D, r_ref, -1, -1, back_to_start)
+    r_ind = _py_two_opt(D, route.copy(), back_to_start)
+
+    assert np.array_equal(r_ref, r_ind)
 
 
 def test_two_opt_cython_vs_reference_benchmark(capsys):
@@ -197,6 +211,13 @@ def test_two_opt_cython_vs_reference_benchmark(capsys):
             _two_opt_kernel(D, r_py, -1, -1, True)
             r_cy = cy.two_opt(D, base.copy(), -1, -1, True)[0]
             assert np.array_equal(r_py, r_cy)  # parity is the hard guarantee
+            # Speed floor, moved here from the old
+            # test_two_opt_far_faster_than_pure_python: both timings are already
+            # in hand, so measuring them twice bought nothing. Expect several
+            # hundred x; 10x is a floor loose enough not to flake on a shared
+            # runner, but tight enough to catch the compiled kernel silently
+            # not being used at all.
+            assert t_cy < t_py / 10.0
             print(
                 f"  N={n:4d}  python={t_py*1e3:9.2f}ms  cython={t_cy*1e3:7.2f}ms"
                 f"  speedup={t_py/t_cy:.0f}x"
