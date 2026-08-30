@@ -35,7 +35,7 @@ The compile is **best-effort by default and mandatory on request**, which are
 genuinely different needs:
 
 * A source install on a machine with no C compiler must keep working. It
-  degrades to the numba / pure-NumPy fallbacks exactly as before, and the wheel
+  degrades to the interpreted / pure-NumPy fallbacks exactly as before, and the wheel
   stays honestly tagged ``py3-none-any``.
 * A *release* wheel must never silently ship without the kernels — that is the
   bug this hook exists to fix, and it would be invisible again. Setting

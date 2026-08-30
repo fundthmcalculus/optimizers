@@ -28,14 +28,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# numba is an accelerator, not a requirement. It is an extra because its own
-# dependency `llvmlite` publishes no macOS x86_64 wheel, so listing numba as a
-# hard dependency made this package uninstallable on Intel Macs. The TSP
-# local-search kernels fall back to the compiled Cython extension (shipped in
-# every wheel) and then to interpreted Python. See combinatorial/strategy.py.
-numba = ["numba"]
+# No numba extra: the backend was removed outright once the Cython kernels
+# measured faster on every kernel and size. See combinatorial/strategy.py.
 dev = [
-    "numba",
     "pytest>=6.0",
     "black>=24.0",
     "mypy>=1.8",
@@ -66,7 +61,7 @@ include = ["src", "setup.py", "hatch_build.py", "README.md", "LICENSE"]
 # requires-python is >=3.11,<3.15, and numpy>=2.4.6 supports >=3.11, so every
 # interpreter in that window is buildable.
 build = "cp311-* cp312-* cp313-* cp314-*"
-# 32-bit legs have no numpy/numba wheels to test against, and PyPy cannot load
+# 32-bit legs have no numpy/scipy wheels to test against, and PyPy cannot load
 # these CPython-API extensions at all.
 #
 # musllinux is skipped because `scikit-learn` -- a hard runtime dependency --
@@ -75,9 +70,9 @@ build = "cp311-* cp312-* cp313-* cp314-*"
 # all. So a musl wheel would build fine here and then be uninstallable.
 #
 # This was previously attributed to numba/llvmlite, which was also true at the
-# time. numba is now an optional extra, which removed it as a constraint and
-# restored the macOS x86_64 leg -- but scikit-learn independently blocks musl,
-# so the skip stays. Re-checking this means re-checking sklearn, not numba.
+# time. numba has since been removed entirely, which restored the macOS x86_64
+# leg -- but scikit-learn independently blocks musl, so the skip stays.
+# Re-checking this means re-checking sklearn.
 skip = "*_i686 *-win32 pp* *musllinux*"
 
 # The whole point of #132. Without this the hook degrades to a pure-Python wheel
@@ -105,7 +100,8 @@ include = "./src,./tests"
 extend-ignore = ["E203"]
 # Complexity ceiling: kept above the current worst offender, _three_opt_kernel
 # (bypassed via its own `# noqa: C901` -- an 8-way reconnection switch that
-# isn't realistically reducible under numba -- see combinatorial/strategy.py).
+# isn't realistically reducible while mirroring the Cython kernel --
+# see combinatorial/strategy.py).
 # Guards against regressions elsewhere; ratchet down as complex functions are
 # simplified.
 max-complexity = 18

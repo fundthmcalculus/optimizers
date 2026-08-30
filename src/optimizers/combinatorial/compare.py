@@ -49,8 +49,10 @@ def _resolve_distances(network_routes: AF | None, city_locations: AF | None) -> 
 
 
 def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
-    # Compile the (numba/cython) kernels on a tiny instance so the reported
-    # runtimes are steady-state compute, not one-time JIT warm-up.
+    # Touch the kernels on a tiny instance first so the reported runtimes are
+    # steady-state compute. With numba gone there is no JIT warm-up left, but
+    # this still pays the first-call import/page-in of the compiled extension
+    # outside the measured region.
     n = min(6, distances.shape[0])
     d = np.ascontiguousarray(distances[:n, :n])
     seed = NearestNeighborTSP(
@@ -87,7 +89,7 @@ def compare_tsp_heuristics(
     three_opt_iterations: int = 5,
     three_opt_neighbors: int = 10,
     candidate_k: int = 8,
-    backend: LocalSearchBackend = "numba",
+    backend: LocalSearchBackend = "cython",
     warmup: bool = True,
 ) -> list[HeuristicResult]:
     """Run NN / 2-opt / 3-opt / LK on one instance and return ranked results.
