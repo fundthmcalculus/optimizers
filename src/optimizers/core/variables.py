@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from numpy.random import Generator
-from .types import af64
+from .types import AF, af64
 from .random import rng as global_rng
 
 
@@ -15,15 +15,15 @@ class InputVariable(ABC):
     def random_value(
         self,
         current_value: float = np.nan,
-        other_values: af64 | None = None,
+        other_values: AF | None = None,
         learning_rate: float = 0.7,
     ) -> float:
         pass
 
     def random_values(
         self,
-        current_values: af64,
-        other_values: af64 | None = None,
+        current_values: AF,
+        other_values: AF | None = None,
         learning_rate: float = 0.7,
         rng: Generator | None = None,
     ) -> af64:
@@ -45,7 +45,7 @@ class InputVariable(ABC):
 
     def perturb_values(
         self,
-        current_values: af64,
+        current_values: AF,
         perturbation: float = 0.1,
         rng: Generator | None = None,
     ) -> af64:

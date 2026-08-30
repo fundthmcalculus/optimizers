@@ -3,7 +3,7 @@ from numpy.random import Generator
 from numpy.typing import ArrayLike
 from scipy.special import ndtr, ndtri
 
-from ..core.types import af64, f64
+from ..core.types import AF, af64, f64
 from ..core.variables import InputVariable as InputVariable  # re-exported
 from ..core.random import rng as global_rng
 
@@ -62,7 +62,7 @@ class InputDiscreteVariable(InputVariable):
 
     def perturb_values(
         self,
-        current_values: af64,
+        current_values: AF,
         perturbation: float = 0.1,
         rng: Generator | None = None,
     ) -> af64:
@@ -76,7 +76,7 @@ class InputDiscreteVariable(InputVariable):
     def random_value(
         self,
         current_value: float = np.nan,
-        other_values: af64 | None = None,
+        other_values: AF | None = None,
         learning_rate: float = 0.7,
     ) -> float:
         rng = global_rng()
@@ -91,8 +91,8 @@ class InputDiscreteVariable(InputVariable):
 
     def random_values(
         self,
-        current_values: af64,
-        other_values: af64 | None = None,
+        current_values: AF,
+        other_values: AF | None = None,
         learning_rate: float = 0.7,
         rng: Generator | None = None,
     ) -> af64:
@@ -189,7 +189,7 @@ class InputContinuousVariable(InputVariable):
 
     def perturb_values(
         self,
-        current_values: af64,
+        current_values: AF,
         perturbation: float = 0.1,
         rng: Generator | None = None,
     ) -> af64:
@@ -235,7 +235,7 @@ class InputContinuousVariable(InputVariable):
     def random_value(
         self,
         current_value: float = np.nan,
-        other_values: af64 | None = None,
+        other_values: AF | None = None,
         learning_rate: float = 0.7,
     ) -> float:
         rng = global_rng()
@@ -253,8 +253,8 @@ class InputContinuousVariable(InputVariable):
 
     def random_values(
         self,
-        current_values: af64,
-        other_values: af64 | None = None,
+        current_values: AF,
+        other_values: AF | None = None,
         learning_rate: float = 0.7,
         rng: Generator | None = None,
     ) -> af64:

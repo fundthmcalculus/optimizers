@@ -5,7 +5,7 @@ import numpy as np
 from numpy.random import Generator
 
 from .local import apply_local_optimization
-from ..core.types import AF, AI
+from ..core.types import AF
 from ..core.base import (
     OptimizerResult,
     IOptimizerConfig,
@@ -36,12 +36,12 @@ class GeneticAlgorithmOptimizerConfig(IOptimizerConfig):
 
 
 def _tournament_selection_batch(
-    population_deck: AF | AI,
+    population_deck: AF,
     population_fitness: AF,
     n: int,
     tournament_size: int = 3,
     rng: Generator | None = None,
-) -> AF | AI:
+) -> AF:
     # Select ``n`` winners at once. Each winner is the best of ``tournament_size``
     # random rows, drawn directly via ``rng.integers`` -- O(n*k) instead of the
     # previous O(n*deck_len) (first an O(n*deck_len log deck_len) argsort, then
@@ -71,16 +71,17 @@ def _tournament_selection_batch(
 
 
 def _crossover_batch(
-    parents1: AF | AI,
-    parents2: AF | AI,
+    parents1: AF,
+    parents2: AF,
     crossover_rate: float,
     rng: Generator | None = None,
-) -> tuple[AF | AI, AF | AI]:
+) -> tuple[AF, AF]:
     # Single-point crossover for every pair at once. Rows where crossover does
     # not fire pass the parents through unchanged (matching the scalar version).
     if rng is None:
         rng = global_rng()
-    n, n_vars = parents1.shape
+    n: int = parents1.shape[0]
+    n_vars: int = parents1.shape[1]
     do_cross = rng.random(n) < crossover_rate
     point = rng.integers(0, n_vars, size=n)  # crossover index in [0, n_vars)
     cols = np.arange(n_vars)[None, :]
@@ -91,17 +92,17 @@ def _crossover_batch(
 
 
 def _mutate_batch(
-    children: AF | AI,
+    children: AF,
     mutation_rate: float,
     variables: InputVariables,
     rng: Generator | None = None,
-) -> AF | AI:
+) -> AF:
     # Mutate a whole batch of children. For each variable (few), decide which
     # rows mutate and perturb those entries with one vectorized call.
     if rng is None:
         rng = global_rng()
     out = np.copy(children)
-    n = out.shape[0]
+    n: int = out.shape[0]
     mask = rng.random((n, len(variables))) < mutation_rate
     for ij, variable in enumerate(variables):
         col_mask = mask[:, ij]
@@ -114,7 +115,7 @@ def _mutate_batch(
 def run_ga(
     fixed: tuple[Any, ...],
     meta: InputArguments,
-    solution_values: AF | AI,
+    solution_values: AF,
     solution_archive: AF,
 ) -> OptimizerRun:
     # ``fixed`` is shipped to each worker once; ``meta`` is the small per-
