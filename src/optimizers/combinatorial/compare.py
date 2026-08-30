@@ -48,40 +48,6 @@ def _resolve_distances(network_routes: AF | None, city_locations: AF | None) -> 
     raise ValueError("provide either network_routes or city_locations")
 
 
-def _warmup(distances: AF, backend: LocalSearchBackend) -> None:
-    # Touch the kernels on a tiny instance first so the reported runtimes are
-    # steady-state compute. With numba gone there is no JIT warm-up left, but
-    # this still pays the first-call import/page-in of the compiled extension
-    # outside the measured region.
-    n = min(6, distances.shape[0])
-    d = np.ascontiguousarray(distances[:n, :n])
-    seed = NearestNeighborTSP(
-        config=NearestNeighborTSPConfig(name="w"), network_routes=cast(AF, d.copy())
-    ).solve()
-    seed_route = cast(AI, np.ascontiguousarray(seed.solution_vector))
-    seed_value = seed.solution_score
-    TwoOptTSP(
-        config=TwoOptTSPConfig(name="w", local_search_backend=backend),
-        network_routes=cast(AF, d.copy()),
-        initial_route=seed_route.copy(),
-        initial_value=seed_value,
-    ).solve()
-    ThreeOptTSP(
-        config=TwoOptTSPConfig(
-            name="w", num_iterations=1, local_search_backend=backend
-        ),
-        network_routes=cast(AF, d.copy()),
-        initial_route=seed_route.copy(),
-        initial_value=seed_value,
-    ).solve()
-    LinKernighanTSP(
-        config=LinKernighanTSPConfig(name="w", local_search_backend=backend),
-        network_routes=cast(AF, d.copy()),
-        initial_route=seed_route.copy(),
-        initial_value=seed_value,
-    ).solve()
-
-
 def compare_tsp_heuristics(
     network_routes: AF | None = None,
     city_locations: AF | None = None,
@@ -90,17 +56,14 @@ def compare_tsp_heuristics(
     three_opt_neighbors: int = 10,
     candidate_k: int = 8,
     backend: LocalSearchBackend = "cython",
-    warmup: bool = True,
 ) -> list[HeuristicResult]:
     """Run NN / 2-opt / 3-opt / LK on one instance and return ranked results.
 
     The three improvers start from the *same* nearest-neighbour tour, so the
-    comparison isolates the local search. Times exclude JIT warm-up (see
-    ``warmup``). ``gap_pct`` is relative to the shortest tour found.
+    comparison isolates the local search. ``gap_pct`` is relative to the
+    shortest tour found.
     """
     distances = _resolve_distances(network_routes, city_locations)
-    if warmup:
-        _warmup(distances, backend)
 
     records: list[tuple[str, OptimizerResult, float]] = []
 

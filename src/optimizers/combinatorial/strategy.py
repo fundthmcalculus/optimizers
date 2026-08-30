@@ -37,9 +37,6 @@ except ImportError:  # pragma: no cover - exercised only in unbuilt checkouts
 #: never what you want otherwise.
 LocalSearchBackend = Literal["cython", "python"]
 
-#: Historical value. Rejected rather than aliased -- see `_use_cython_backend`.
-_LEGACY_NUMBA = "numba"
-
 _warned_no_accelerator = False
 
 
@@ -66,7 +63,7 @@ def _use_cython_backend(config: object) -> bool:
     """
     requested = getattr(config, "local_search_backend", "cython")
 
-    if requested == _LEGACY_NUMBA:
+    if requested == "numba":
         raise ValueError(
             'local_search_backend="numba" is no longer supported: the numba '
             "backend was removed because the Cython kernels are faster on every "
