@@ -37,6 +37,63 @@ jobs:
       - name: Verify uv.lock is in sync with pyproject.toml
         run: uv lock --check
 
+  wheel:
+    # Guards the fix for #132. The `test` job below builds with
+    # `setup.py build_ext --inplace`, which is the *developer* path -- it proves
+    # the kernels compile, but it says nothing about whether an installed copy
+    # gets them. For a long time it did not: hatchling had no build hook, so
+    # every wheel was py3-none-any and HAS_CYTHON was False for every user while
+    # CI stayed green.
+    #
+    # So this job deliberately never touches the source tree: it builds a wheel,
+    # installs it into a clean venv, and asserts from a directory where `src/`
+    # cannot shadow the package. That is the only arrangement that can tell
+    # "the kernels compile" apart from "the kernels ship".
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+
+      - name: Build a wheel with the kernels required
+        # Without this the hook degrades to a pure-Python wheel on a compile
+        # failure, which is correct for a source install but would let exactly
+        # the #132 regression through this gate unnoticed.
+        env:
+          OPTIMIZERS_REQUIRE_CYTHON: '1'
+        run: pipx run build --wheel
+
+      - name: The wheel must be platform-tagged, not py3-none-any
+        run: |
+          set -euo pipefail
+          wheel=$(ls dist/*.whl)
+          echo "built: $wheel"
+          case "$wheel" in
+            *py3-none-any.whl)
+              echo "::error::$wheel is a pure-Python wheel -- the build hook did not run (#132)"
+              exit 1
+              ;;
+          esac
+
+      - name: Install the wheel and confirm HAS_CYTHON is True
+        # Run from /tmp: at the repo root `src/` is not on sys.path, but keeping
+        # the assertion away from the checkout entirely removes any doubt about
+        # what got imported.
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/wheel-check
+          /tmp/wheel-check/bin/pip install --quiet dist/*.whl
+          cd /tmp
+          /tmp/wheel-check/bin/python -c "
+          from optimizers.combinatorial.strategy import HAS_CYTHON as tsp
+          from optimizers.benchmarks.cython_kernels import HAS_CYTHON as bench
+          assert tsp and bench, f'installed wheel has no kernels: tsp={tsp} bench={bench}'
+          print('installed wheel exposes both compiled kernels')
+          "
+
   test:
     runs-on: ubuntu-latest
     steps:

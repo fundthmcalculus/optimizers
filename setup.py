@@ -3,27 +3,27 @@
 Package metadata lives in ``pyproject.toml``; this file only declares the Cython
 extension modules (2-opt / 3-opt kernels — see CYTHON_ANALYSIS.md).
 
-**Read this before assuming an install compiles anything.** The build backend is
-``hatchling`` (``pyproject.toml``), and there is no hatchling build hook, so no
-packaging path executes this file. ``pip install .``, ``uv sync`` and
-``python -m build`` all produce a pure-Python ``py3-none-any`` wheel that ships
-``_tsp_cython.pyx`` as package data and no compiled module, which is why both
-``strategy.HAS_CYTHON`` and ``benchmarks.cython_kernels.HAS_CYTHON`` are
-``False`` in every installed copy.
+**This file is now on the packaging path, indirectly.** The build backend is
+``hatchling``, which never executes ``setup.py`` on its own. It is reached
+because ``hatch_build.py`` -- the wheel build hook added for #132 -- shells out
+to::
 
-Nor can a local build leak into one: hatchling's file selection honours
+    python setup.py build_ext --build-lib <tmpdir>
+
+and force-includes whatever lands there. So the flag and compiler logic below
+is what every wheel is compiled with, not just a developer's ``--inplace`` run.
+
+That force-include is load-bearing: hatchling's file selection honours
 ``.gitignore``, which excludes ``*.so`` and ``*.py[codz]`` (that last pattern
-matches ``.pyd``), so ``python -m build`` emits ``py3-none-any`` even when run
-immediately after a successful ``build_ext --inplace`` with the artifacts
-sitting in ``src/``.
+matches ``.pyd``), so compiled artifacts are stripped from a wheel even when
+they exist in ``src/``. Before the hook, ``python -m build`` emitted
+``py3-none-any`` even immediately after a successful ``build_ext --inplace``,
+and ``HAS_CYTHON`` was ``False`` in every installed copy.
 
-So this file is a developer and CI convenience, reached only by an explicit::
+The direct developer invocation still works and is what the `test` CI job
+uses::
 
     python setup.py build_ext --inplace
-
-That is what CI runs, and it is the only way the compiled kernels come into
-existence. Wiring them into the wheel would need a hatchling custom build hook
-and is a separate question from anything below.
 
 The extensions are **optional**: if one can't be compiled the build emits a
 warning and continues, and the library falls back to the numba kernels at import
