@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
@@ -36,17 +36,20 @@ class AntColonyMST(TSPBase):
         # Constant desirability raised to beta once (report item #6).
         eta_beta = np.power(eta, self.config.beta)
         # Pheromone matrix
-        tau = np.ones(self.network_routes.shape)
+        tau: AF = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
         optimal_city_order: Optional[ai64] = None
         tour_lengths = []
         optimal_tour_length = np.inf
-        if self.config.hot_start is not None:
-            optimal_tour_length = self.config.hot_start_length
-            optimal_city_order = self.config.hot_start
-            for ij in range(self.config.hot_start.shape[0]):
-                tau[self.config.hot_start[ij, 0], self.config.hot_start[ij, 0]] += (
-                    10 * self.config.q / self.config.hot_start_length
+        # See AntColonyTSPConfig.__post_init__: the pair is validated together.
+        hot_start = self.config.hot_start
+        hot_start_length = self.config.hot_start_length
+        if hot_start is not None and hot_start_length is not None:
+            optimal_tour_length = hot_start_length
+            optimal_city_order = hot_start
+            for ij in range(hot_start.shape[0]):
+                tau[hot_start[ij, 0], hot_start[ij, 0]] += (
+                    10 * self.config.q / hot_start_length
                 )
 
         generation_pbar, individuals_per_job, n_jobs, _ = setup_for_generations(
@@ -101,6 +104,15 @@ class AntColonyMST(TSPBase):
         finally:
             runner.close()
 
+        if optimal_city_order is None:
+            # Only reachable when every ant in every generation hit a dead end
+            # (a disconnected or degenerate distance matrix). Returning None as
+            # the solution vector would surface far from the cause.
+            raise ValueError(
+                "no valid tour was found: every ant reached a dead end. Check "
+                "that the distance matrix is connected and has no zero rows."
+            )
+
         return OptimizerResult(
             solution_vector=optimal_city_order,
             solution_score=optimal_tour_length,
@@ -130,7 +142,7 @@ def pheromone_update(tau_xy: AF, delta_tau_xy: AF, rho: float) -> AF:
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8) -> AF | int:
+def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8) -> AF:
     # ``eta_beta``/``tau_alpha`` are pre-raised to beta/alpha upstream (#6).
     p = tau_alpha_xy[~allowed_y, :] * eta_beta_xy[~allowed_y, :]
     # Remove negative probabilities, those are not allowed
@@ -139,7 +151,10 @@ def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8) -> AF | int:
     # Normalize the probabilities
     total = p.sum()
     if total == 0.0:
-        return 0
+        # Every entry is already zero (negatives were clamped above, so a zero
+        # sum means a zero array). Returning it rather than the bare int 0 keeps
+        # one return type: callers test ``np.sum(p) == 0``, which is unchanged.
+        return p
     p /= total
     return p
 
@@ -154,7 +169,7 @@ def run_ant_mst(
     cur_city = start_idx
     order_len = eta_beta.shape[0]
     # If fewer than 32,000 cities, we can use i16
-    dtype = i32
+    dtype: type[np.signedinteger[Any]] = i32
     if order_len < 32000:
         dtype = i16
 
@@ -162,7 +177,7 @@ def run_ant_mst(
     city_order = np.zeros((order_len, 2), dtype=dtype)
 
     idx = 0
-    total_length = 0
+    total_length = 0.0
     allowed_cities = np.ones(order_len, dtype=bool)
     choice_indexes = np.arange(order_len)
 

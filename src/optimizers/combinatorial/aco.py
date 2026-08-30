@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
@@ -30,6 +30,20 @@ class AntColonyTSPConfig(IOptimizerConfig):
     hot_start_length: Optional[float] = None
     """Hot start length"""
 
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        # The two are meaningless apart: `solve` seeds the pheromone matrix with
+        # ``q / hot_start_length`` as soon as a route is present. Supplying only
+        # the route used to reach that division with None and raise
+        # ``TypeError: unsupported operand type(s) for /`` from inside the
+        # generation loop.
+        if (self.hot_start is None) != (self.hot_start_length is None):
+            raise ValueError(
+                "hot_start and hot_start_length must be given together "
+                f"(got hot_start={'set' if self.hot_start is not None else 'None'}, "
+                f"hot_start_length={self.hot_start_length!r})."
+            )
+
 
 class AntColonyTSP(TSPBase):
     config: AntColonyTSPConfig
@@ -56,17 +70,21 @@ class AntColonyTSP(TSPBase):
         # to once-per-generation below.
         eta_beta = np.power(eta, self.config.beta)
         # Pheromone matrix
-        tau = np.ones(self.network_routes.shape)
+        tau: AF = np.ones(self.network_routes.shape)
         # If we have a hot start, preload it 4x
         optimal_city_order: Optional[ai64] = None
         tour_lengths = []
         optimal_tour_length = np.inf
-        if self.config.hot_start is not None:
-            optimal_tour_length = self.config.hot_start_length
-            optimal_city_order = self.config.hot_start
-            for i in range(len(self.config.hot_start) - 1):
-                tau[self.config.hot_start[i], self.config.hot_start[i + 1]] += (
-                    10 * self.config.q / self.config.hot_start_length
+        # Read both into locals: the config validates that they move together,
+        # so testing both is narrowing rather than a second policy.
+        hot_start = self.config.hot_start
+        hot_start_length = self.config.hot_start_length
+        if hot_start is not None and hot_start_length is not None:
+            optimal_tour_length = hot_start_length
+            optimal_city_order = hot_start
+            for i in range(len(hot_start) - 1):
+                tau[hot_start[i], hot_start[i + 1]] += (
+                    10 * self.config.q / hot_start_length
                 )
 
         generation_pbar, individuals_per_job, n_jobs, _ = setup_for_generations(
@@ -146,6 +164,15 @@ class AntColonyTSP(TSPBase):
                 generations_completed=generations_completed + 1,
             )
         else:
+            if optimal_city_order is None:
+                # Only reachable when every ant in every generation hit a dead end
+                # (a disconnected or degenerate distance matrix). Returning None as
+                # the solution vector would surface far from the cause.
+                raise ValueError(
+                    "no valid tour was found: every ant reached a dead end. Check "
+                    "that the distance matrix is connected and has no zero rows."
+                )
+
             return OptimizerResult(
                 solution_vector=optimal_city_order,
                 solution_score=optimal_tour_length,
@@ -176,7 +203,7 @@ def pheromone_update(tau_xy: AF, delta_tau_xy: AF, rho: float) -> AF:
     return new_tau_xy / new_tau_xy.max()
 
 
-def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF | int:
+def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF:
     # ``eta_beta``/``tau_alpha`` are already raised to beta/alpha upstream
     # (report item #6), so this is a single elementwise product per step.
     p = tau_alpha_xy[x, :] * eta_beta_xy[x, :]
@@ -186,7 +213,10 @@ def p_xy(eta_beta_xy: AF, tau_alpha_xy: AF, allowed_y: ab8, x: int) -> AF | int:
     # Normalize the probabilities
     total = p.sum()
     if total == 0.0:
-        return 0
+        # Every entry is already zero (negatives were clamped above, so a zero
+        # sum means a zero array). Returning it rather than the bare int 0 keeps
+        # one return type: callers test ``np.sum(p) == 0``, which is unchanged.
+        return p
     p /= total
     return p
 
@@ -199,12 +229,12 @@ def run_ant(
     eta_shape_ = eta_beta.shape[0]
     order_len = eta_shape_
     # If fewer than 32,000 cities, we can use i16
-    dtype = i32
+    dtype: type[np.signedinteger[Any]] = i32
     if order_len < 32000:
         dtype = i16
     city_order = np.zeros(order_len, dtype=dtype)
     idx = 0
-    total_length = 0
+    total_length = 0.0
     allowed_cities = np.ones(eta_shape_, dtype=bool)
     while np.any(allowed_cities):
         # Mark off the current city

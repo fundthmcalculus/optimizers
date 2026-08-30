@@ -143,18 +143,18 @@ strict_optional = true
 # It is deliberately narrow rather than one broad block. A module listed for
 # `arg-type` alone still fails CI on a new `assignment` or `union-attr` bug. The
 # original shape disabled nine codes across fourteen modules, so 136 (module,
-# code) pairs were unreachable; this is 20.
+# code) pairs were unreachable; this is 13.
 #
 # Measured in #143: with the whole baseline removed the tree had 110 errors.
 # #144 fixed a Liskov violation in continuous/variables.py (25), #146 swapped the
 # AF/AI dtype unions for numpy's abstract floating/signedinteger (13), #147 fixed
 # three non-numpy issues (4), #148 replaced the scalar `F` alias with `float`
-# throughout (22) and #149 closed every `no-any-return` (9). 37 remain.
+# throughout (22), #149 closed every `no-any-return` (9) and #150 fixed two
+# None-safety bugs in the ant-colony solvers (13). 24 remain.
 #
-# `no-any-return` is deliberately absent below. #143 called that category
-# "genuinely upstream" and predicted it would never go away; it took nine
-# annotations and coercions. If it reappears, fix it rather than re-adding it
-# here.
+# `no-any-return`, `operator` and `union-attr` are deliberately absent below.
+# Each turned out to mark a real defect rather than a numpy-stub artefact. If one
+# reappears, fix it rather than re-adding it here.
 
 [[tool.mypy.overrides]]
 module = [
@@ -179,16 +179,5 @@ module = [
 disable_error_code = ["arg-type", "assignment"]
 
 [[tool.mypy.overrides]]
-module = ["optimizers.combinatorial.aco"]
-disable_error_code = ["arg-type", "assignment", "operator"]
-
-[[tool.mypy.overrides]]
 module = ["optimizers.continuous.ga"]
 disable_error_code = ["arg-type", "index", "return-value"]
-
-# aco_mst additionally has a dtype `union-attr` (an int|ndarray branch), so it
-# gets its own block rather than weakening union-attr for aco as well.
-
-[[tool.mypy.overrides]]
-module = ["optimizers.combinatorial.aco_mst"]
-disable_error_code = ["arg-type", "assignment", "operator", "union-attr"]
