@@ -79,9 +79,14 @@ def ensure_literal_choice(value: Any, literal_type: Any) -> None:
     allowed = literal_options(literal_type)
     if allowed and value not in allowed:
         allowed_str = ", ".join(repr(x) for x in allowed)
-        raise ValueError(
-            f"Invalid {type(literal_type)}={value!r}. Allowed options: {allowed_str}"
-        )
+        # This used to interpolate `type(literal_type)`, rendering as
+        # "Invalid <class 'typing._LiteralGenericAlias'>='cyton'" -- naming the
+        # typing machinery rather than anything the caller can act on. There is
+        # no better name available: a Literal alias reports `__name__` as
+        # "Literal", not the variable it was assigned to. So the message names
+        # the offending value and the options, and leaves it at that; callers
+        # that want to name the setting can catch and re-raise.
+        raise ValueError(f"Invalid value {value!r}. Allowed options: {allowed_str}")
 
 
 T = TypeVar("T")
