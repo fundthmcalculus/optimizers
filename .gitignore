@@ -95,10 +95,12 @@ ipython_config.py
 #Pipfile.lock
 
 # UV
-#   Similar to Pipfile.lock, it is generally recommended to include uv.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#uv.lock
+#   uv.lock IS tracked here -- deliberately, not by omission. Leaving it neither
+#   tracked nor ignored meant any read-only `uv run --project .` wrote the file
+#   and dirtied the working tree, which breaks consumers that vendor this repo as
+#   a pinned git submodule and expect `git -C <submodule> status` to stay clean.
+#   Tracking it also makes `uv lock --check` a meaningful CI gate (see pr.yml).
+#   Do not add uv.lock below.
 
 # poetry
 #   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
