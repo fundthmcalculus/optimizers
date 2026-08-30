@@ -191,17 +191,19 @@ def run_multiple(
         deck, res = runner()
         runtime_s = time.perf_counter() - start
 
+        score = float(res.solution_score)
+        runtime_seconds = float(runtime_s)
         entry = {
             "run_index": i,
             "optimizer": opt_name,
             "seed": used_seed,
-            "solution_score": float(res.solution_score),
+            "solution_score": score,
             "generations_completed": int(res.generations_completed),
             "stop_reason": res.stop_reason,
-            "runtime_seconds": float(runtime_s),
+            "runtime_seconds": runtime_seconds,
         }
-        scores.append(entry["solution_score"])
-        runtimes.append(entry["runtime_seconds"])
+        scores.append(score)
+        runtimes.append(runtime_seconds)
 
         if checkpoint_cfg and checkpoint_cfg.enabled:
             cp_path = save_checkpoint(

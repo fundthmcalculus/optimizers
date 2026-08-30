@@ -1,6 +1,15 @@
 import abc
 import os
-from typing import Literal, Optional, TypeVar, get_args, Callable, Union, Any
+from typing import (
+    Any,
+    Callable,
+    Literal,
+    Optional,
+    TYPE_CHECKING,
+    TypeVar,
+    Union,
+    get_args,
+)
 from dataclasses import dataclass, fields
 import numpy as np
 from joblib import cpu_count, Parallel
@@ -8,6 +17,10 @@ from tqdm import trange, tqdm
 
 from .types import AF, AI, F
 from .samplers import SamplerType
+
+if TYPE_CHECKING:
+    # typeshed-only protocol for "a dataclass"; there is no runtime equivalent.
+    from _typeshed import DataclassInstance
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
@@ -89,11 +102,15 @@ def ensure_literal_choice(value: Any, literal_type: Any) -> None:
         raise ValueError(f"Invalid value {value!r}. Allowed options: {allowed_str}")
 
 
-T = TypeVar("T")
+_DataclassT = TypeVar("_DataclassT", bound="DataclassInstance")
 
 
-def create_from_dict(data: dict[str, Any], cls: type[T]) -> T:
+def create_from_dict(data: dict[str, Any], cls: type[_DataclassT]) -> _DataclassT:
     """Create a dataclass instance from a dictionary.
+
+    ``cls`` is bound to a dataclass rather than left as a bare ``TypeVar``:
+    ``fields()`` only accepts one, so an unbounded parameter meant the checker
+    could not tell a config class from any other type handed in here.
 
     Args:
         data: Dictionary containing field values
