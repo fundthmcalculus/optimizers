@@ -19,6 +19,7 @@ from optimizers.continuous.variables import (
     InputDiscreteVariable,
     InputVariable,
 )
+from optimizers.core.random import set_seed
 from optimizers.core.types import f64
 
 
@@ -143,3 +144,78 @@ def test_values_does_not_alias_the_caller_s_array():
     var = InputDiscreteVariable("a", values=supplied)
     supplied[0] = 99.0
     assert var.values[0] == 1.0
+
+
+# ------------------- archive weighting follows the choice set ----------------
+#
+# The weights used to be built from ``np.unique(concatenate(values, archive))``,
+# which is sorted and deduplicated, then handed to ``rng.choice`` alongside
+# ``self.values`` in construction order. They lined up only by luck.
+
+
+def _archive_fractions(var, archive, n=6000, seed=1):
+    set_seed(seed)
+    draws = [var.random_value(archive[0], archive) for _ in range(n)]
+    return {x: draws.count(x) / n for x in set(draws)}
+
+
+def test_weights_follow_the_choice_set_not_its_sort_order():
+    """The archive favours 10; an unsorted set used to hand that mass to 30."""
+    archive = np.array([10.0, 10.0, 10.0, 20.0])
+    frac = _archive_fractions(
+        InputDiscreteVariable("u", values=np.array([30.0, 10.0, 20.0])), archive
+    )
+    # weights are (1 + occurrences): 10 -> 4/7, 20 -> 2/7, 30 -> 1/7
+    assert frac[10.0] == pytest.approx(4 / 7, abs=0.03)
+    assert frac[20.0] == pytest.approx(2 / 7, abs=0.03)
+    assert frac[30.0] == pytest.approx(1 / 7, abs=0.03)
+
+
+def test_a_sorted_set_is_weighted_the_same_way():
+    """Same multiset of choices, same distribution -- order must not matter."""
+    archive = np.array([10.0, 10.0, 10.0, 20.0])
+    sorted_frac = _archive_fractions(
+        InputDiscreteVariable("s", values=np.array([10.0, 20.0, 30.0])), archive
+    )
+    unsorted_frac = _archive_fractions(
+        InputDiscreteVariable("u", values=np.array([30.0, 10.0, 20.0])), archive
+    )
+    for choice in (10.0, 20.0, 30.0):
+        assert sorted_frac[choice] == pytest.approx(unsorted_frac[choice], abs=0.03)
+
+
+def test_duplicated_choices_no_longer_raise():
+    """``rng.choice`` used to reject the mismatched p vector outright."""
+    var = InputDiscreteVariable("d", values=np.array([10.0, 10.0, 20.0]))
+    assert var.random_value(10.0, np.array([10.0, 20.0])) in (10.0, 20.0)
+
+
+def test_archive_values_outside_the_choice_set_are_ignored():
+    """They used to make the p vector longer than the choice set."""
+    var = InputDiscreteVariable("o", values=np.array([10.0, 20.0]))
+    assert var.random_value(10.0, np.array([10.0, 99.0])) in (10.0, 20.0)
+
+
+def test_every_choice_keeps_a_non_zero_probability():
+    """The +1 floor: an option absent from the archive must still be reachable."""
+    var = InputDiscreteVariable("f", values=np.array([1.0, 2.0, 3.0]))
+    archive = np.full(500, 1.0)
+    weights = var._archive_weights(archive)
+    assert np.all(weights > 0)
+    assert weights.sum() == pytest.approx(1.0)
+
+
+def test_weights_match_the_old_implementation_when_it_was_correct():
+    """Sorted + unique + archive drawn from the set: the only working case.
+
+    Pinning this is what makes the fix safe to land -- seeded runs reproduce
+    across it rather than merely producing a valid distribution.
+    """
+    values = np.array([10.0, 20.0, 30.0, 40.0])
+    archive = np.array([10.0, 10.0, 10.0, 20.0, 30.0])
+    var = InputDiscreteVariable("s", values=values)
+
+    legacy_counts = np.unique(np.concatenate((values, archive)), return_counts=True)[1]
+    legacy_p = legacy_counts / legacy_counts.sum()
+
+    assert np.allclose(var._archive_weights(archive), legacy_p)
