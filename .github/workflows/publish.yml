@@ -31,12 +31,16 @@ jobs:
       # One broken platform should not hide whether the others are fine.
       fail-fast: false
       matrix:
+        # These four legs are exactly the platforms `llvmlite` publishes wheels
+        # for, which bounds us because `numba` is a hard runtime dependency.
+        # There is deliberately no macOS x86_64 leg: llvmlite ships
+        # macosx_12_0_arm64 only, so an Intel-mac wheel builds and then cannot
+        # be installed. See the `skip` note in pyproject.toml.
         os:
           - ubuntu-latest      # manylinux x86_64
           - ubuntu-24.04-arm   # manylinux aarch64
           - windows-latest     # win_amd64
           - macos-latest       # macOS arm64 (Apple silicon)
-          - macos-15-intel     # macOS x86_64
     steps:
       - uses: actions/checkout@v7
 
