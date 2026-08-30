@@ -81,17 +81,22 @@ def _use_cython_backend(config: object) -> bool:
     before numba became optional -- the auto-promotion below can only trigger in
     an environment that previously could not import this module at all.
 
-    * ``"cython"`` requested -> use it if built, else fall through to the
-      (possibly un-JITed) Python kernels, as before.
-    * ``"numba"`` requested (the default) -> use numba when it is installed.
-      When it is not, prefer the compiled extension over interpreting the
+    * ``"cython"`` requested and built -> use it.
+    * Otherwise numba, when it is installed. (So requesting cython on a build
+      without the extension still lands on numba, exactly as before.)
+    * numba missing -> prefer the compiled extension over interpreting the
       kernels, which is orders of magnitude slower rather than marginally so.
     * Neither available -> pure Python, with a one-time warning, because a
       silent 100x slowdown is worse than a noisy one.
+
+    Note the ordering: every un-accelerated path has to reach the warning at the
+    bottom. An earlier version returned ``HAS_CYTHON`` directly for a ``cython``
+    request, which skipped the warning precisely when the caller had *asked* for
+    a compiled backend and not got one.
     """
     requested = getattr(config, "local_search_backend", "numba")
-    if requested == "cython":
-        return HAS_CYTHON
+    if requested == "cython" and HAS_CYTHON:
+        return True
     if HAS_NUMBA:
         return False
     if HAS_CYTHON:

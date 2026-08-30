@@ -94,8 +94,16 @@ def test_missing_backend_attribute_defaults_to_numba(monkeypatch):
 # ------------------------------- the warning -------------------------------
 
 
-def test_warns_once_when_no_accelerator_is_available(monkeypatch):
-    """A silent 100x slowdown is worse than a noisy one -- but warn only once."""
+@pytest.mark.parametrize("backend", ["numba", "cython"])
+def test_warns_once_when_no_accelerator_is_available(monkeypatch, backend):
+    """A silent 100x slowdown is worse than a noisy one -- but warn only once.
+
+    Parametrised over the requested backend deliberately. An earlier version
+    returned early for a ``cython`` request and never reached the warning, so a
+    caller who explicitly asked for a compiled backend and did not get one was
+    the *only* one not told about the slowdown. Testing just ``"numba"`` here
+    reproduced the same blind spot as the code.
+    """
     monkeypatch.setattr(st, "HAS_NUMBA", False)
     monkeypatch.setattr(st, "HAS_CYTHON", False)
     monkeypatch.setattr(st, "_warned_no_accelerator", False)
@@ -103,11 +111,42 @@ def test_warns_once_when_no_accelerator_is_available(monkeypatch):
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         for _ in range(5):
-            st._use_cython_backend(_Cfg("numba"))
+            st._use_cython_backend(_Cfg(backend))
 
     runtime = [w for w in caught if issubclass(w.category, RuntimeWarning)]
     assert len(runtime) == 1, "the warning must not repeat once per solve"
     assert "numba" in str(runtime[0].message)
+
+
+@pytest.mark.parametrize(
+    "backend,has_numba,has_cython",
+    [
+        ("numba", True, True),
+        ("numba", True, False),
+        ("cython", True, True),
+        ("cython", True, False),
+        ("numba", False, True),
+        ("cython", False, True),
+    ],
+)
+def test_never_warns_while_an_accelerator_exists(
+    monkeypatch, backend, has_numba, has_cython
+):
+    """The warning means "you are on interpreted kernels", nothing else.
+
+    Every row here has at least one accelerator, so none of them may warn --
+    including the ``cython``-requested-but-only-numba-available rows, which are
+    a fallback but not a degraded one.
+    """
+    monkeypatch.setattr(st, "HAS_NUMBA", has_numba)
+    monkeypatch.setattr(st, "HAS_CYTHON", has_cython)
+    monkeypatch.setattr(st, "_warned_no_accelerator", False)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        st._use_cython_backend(_Cfg(backend))
+
+    assert [w for w in caught if issubclass(w.category, RuntimeWarning)] == []
 
 
 def test_does_not_warn_when_cython_is_available(monkeypatch):
@@ -134,24 +173,28 @@ def _distances(n, seed):
     return np.ascontiguousarray(d, dtype=np.float64)
 
 
-def test_kernels_are_plain_functions_under_the_shim():
-    """The shim must leave a callable that behaves identically.
+@pytest.mark.skipif(
+    not st.HAS_NUMBA,
+    reason=(
+        "compares the JIT against the interpreted kernel; without numba both "
+        "sides are the same object and the assertion is vacuous. The no-numba "
+        "path is covered by the wheel job in CI."
+    ),
+)
+def test_jit_and_interpreted_kernels_agree():
+    """``njit`` compiles the same source, so both must produce the same tour.
 
-    ``njit`` compiles the same Python source, so an un-JITed kernel has to
-    produce the same tour -- this asserts that the *undecorated* kernel body is
-    reachable and correct, which is what the no-numba install actually runs.
+    This is what makes the no-op shim safe: dropping the decorator changes how
+    the kernel runs, never what it computes. ``py_func`` is numba's handle on
+    the original Python function.
     """
     n = 40
     d = _distances(n, seed=11)
     route = np.ascontiguousarray(np.arange(n, dtype=np.int64))
 
-    # py_func is numba's handle on the original Python function; without numba
-    # the kernel already *is* that function.
-    kernel = getattr(st._two_opt_kernel, "py_func", st._two_opt_kernel)
-
     jit_route = route.copy()
     py_route = route.copy()
     st._two_opt_kernel(d, jit_route, -1, -1, True)
-    kernel(d, py_route, -1, -1, True)
+    st._two_opt_kernel.py_func(d, py_route, -1, -1, True)
 
     assert np.array_equal(jit_route, py_route)
