@@ -50,7 +50,7 @@ jobs:
       - name: Build wheels
         # cibuildwheel publishes no moving major tag, so this is an exact pin --
         # `@v4` does not resolve and fails the job before any step runs.
-        uses: pypa/cibuildwheel@v4.2.0
+        uses: pypa/cibuildwheel@v4.2.1
 
       - uses: actions/upload-artifact@v7
         with:
